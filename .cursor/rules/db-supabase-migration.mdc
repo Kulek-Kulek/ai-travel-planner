@@ -1,0 +1,278 @@
+---
+description: Supabase database migration guidelines
+globs: '**/supabase/migrations/**/*.sql'
+alwaysApply: false
+---
+
+# Database Migrations - Supabase
+
+You are a Postgres expert who creates secure, well-documented database schemas.
+
+This project uses Supabase CLI for database migrations.
+
+## Creating a Migration File
+
+### Location
+All migrations go in: `supabase/migrations/`
+
+### Naming Convention
+Files MUST follow this format: `YYYYMMDDHHmmss_short_description.sql`
+
+- `YYYY` - Four-digit year (e.g., `2024`)
+- `MM` - Two-digit month (01-12)
+- `DD` - Two-digit day (01-31)
+- `HH` - Two-digit hour in 24h format (00-23)
+- `mm` - Two-digit minute (00-59)
+- `ss` - Two-digit second (00-59)
+- `short_description` - Snake_case description
+
+**Examples:**
+```
+20241012143022_create_itineraries_table.sql
+20241012143500_add_destinations_table.sql
+20241012144000_add_user_preferences.sql
+```
+
+## SQL Guidelines
+
+### File Structure
+```sql
+-- Migration: Create itineraries table
+-- Description: Stores user travel itineraries with dates and destinations
+-- Author: [Your name]
+-- Date: 2024-10-12
+
+-- create table
+create table if not exists public.itineraries (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade not null,
+  title text not null,
+  destination text not null,
+  start_date timestamptz not null,
+  end_date timestamptz not null,
+  created_at timestamptz default now() not null,
+  updated_at timestamptz default now() not null
+);
+
+-- enable row level security
+alter table public.itineraries enable row level security;
+
+-- create indexes
+create index idx_itineraries_user_id on public.itineraries(user_id);
+create index idx_itineraries_start_date on public.itineraries(start_date);
+
+-- create rls policies
+create policy "users can view own itineraries"
+  on public.itineraries
+  for select
+  to authenticated
+  using (auth.uid() = user_id);
+
+create policy "users can create own itineraries"
+  on public.itineraries
+  for insert
+  to authenticated
+  with check (auth.uid() = user_id);
+
+create policy "users can update own itineraries"
+  on public.itineraries
+  for update
+  to authenticated
+  using (auth.uid() = user_id);
+
+create policy "users can delete own itineraries"
+  on public.itineraries
+  for delete
+  to authenticated
+  using (auth.uid() = user_id);
+```
+
+### Writing Standards
+
+**General:**
+- Write all SQL keywords in lowercase
+- Use `public.` schema prefix explicitly
+- Include header comment with migration metadata
+- Add comments explaining each major step
+- Use `if not exists` for idempotent operations
+
+**Tables:**
+- Always include `id uuid primary key default gen_random_uuid()`
+- Add `created_at` and `updated_at` timestamps
+- Use foreign keys with `on delete cascade` where appropriate
+- Use appropriate column types (`text`, `timestamptz`, `jsonb`, etc.)
+- Add `not null` constraints where data is required
+
+**Row Level Security (RLS):**
+- **ALWAYS enable RLS** on every table (even public ones)
+- Create separate policies for each operation: `select`, `insert`, `update`, `delete`
+- Create separate policies for each role: `authenticated`, `anon` (if needed)
+- Never combine policies - keep them granular
+- For public tables, policy can return `true`
+- Include comments explaining each policy's purpose
+
+**Indexes:**
+- Add indexes on foreign keys
+- Add indexes on commonly queried columns
+- Add indexes on columns used in WHERE clauses
+- Use descriptive names: `idx_table_column`
+
+**Destructive Operations:**
+- Add **multiple warning comments** before any destructive command
+- Include backup/rollback instructions in comments
+- Examples: `drop table`, `drop column`, `truncate`, `alter column type`
+
+### Common Patterns
+
+#### User-Owned Data Table
+```sql
+-- table for user-owned data with full CRUD
+create table if not exists public.table_name (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade not null,
+  -- other columns
+  created_at timestamptz default now() not null,
+  updated_at timestamptz default now() not null
+);
+
+alter table public.table_name enable row level security;
+
+create policy "users view own data"
+  on public.table_name for select
+  to authenticated
+  using (auth.uid() = user_id);
+
+create policy "users create own data"
+  on public.table_name for insert
+  to authenticated
+  with check (auth.uid() = user_id);
+
+create policy "users update own data"
+  on public.table_name for update
+  to authenticated
+  using (auth.uid() = user_id);
+
+create policy "users delete own data"
+  on public.table_name for delete
+  to authenticated
+  using (auth.uid() = user_id);
+```
+
+#### Public Read, Auth Write Table
+```sql
+-- table readable by all, writable by authenticated users
+create table if not exists public.destinations (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  country text not null,
+  description text,
+  created_at timestamptz default now() not null
+);
+
+alter table public.destinations enable row level security;
+
+-- anyone can read
+create policy "public can view destinations"
+  on public.destinations for select
+  to anon, authenticated
+  using (true);
+
+-- only authenticated can write
+create policy "authenticated can create destinations"
+  on public.destinations for insert
+  to authenticated
+  with check (true);
+```
+
+#### Adding Columns
+```sql
+-- add new column to existing table
+alter table public.itineraries
+  add column if not exists budget numeric(10, 2);
+
+-- add comment explaining the column
+comment on column public.itineraries.budget is 'Estimated budget in USD';
+
+-- create index if needed
+create index if not exists idx_itineraries_budget 
+  on public.itineraries(budget);
+```
+
+#### Updating Timestamps
+```sql
+-- function to auto-update updated_at
+create or replace function public.handle_updated_at()
+returns trigger as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$ language plpgsql;
+
+-- trigger to call function
+create trigger set_updated_at
+  before update on public.itineraries
+  for each row
+  execute function public.handle_updated_at();
+```
+
+### Security Checklist
+
+- ✅ RLS enabled on every table
+- ✅ Separate policy for each CRUD operation
+- ✅ Separate policy for each role (anon, authenticated)
+- ✅ Foreign keys reference `auth.users(id)` for user data
+- ✅ Foreign keys use `on delete cascade` where appropriate
+- ✅ Indexes on foreign keys and frequently queried columns
+- ✅ Comments explain policies and complex logic
+- ✅ Use `if not exists` for idempotent migrations
+- ❌ Never disable RLS
+- ❌ Never combine multiple operations in one policy
+- ❌ Never expose sensitive data without proper policies
+
+### Testing Migrations
+
+```bash
+# Apply migration locally
+npx supabase db reset
+
+# Check migration status
+npx supabase migration list
+
+# Generate TypeScript types after migration
+npx supabase gen types typescript --local > src/types/supabase.ts
+```
+
+### Rollback Pattern
+
+If you need to rollback, create a new migration:
+```sql
+-- Migration: Rollback - remove itineraries table
+-- Description: Reverses 20241012143022_create_itineraries_table.sql
+-- DESTRUCTIVE: This will delete all itinerary data
+-- Backup recommended before applying
+
+-- drop policies first
+drop policy if exists "users can delete own itineraries" on public.itineraries;
+drop policy if exists "users can update own itineraries" on public.itineraries;
+drop policy if exists "users can create own itineraries" on public.itineraries;
+drop policy if exists "users can view own itineraries" on public.itineraries;
+
+-- drop indexes
+drop index if exists public.idx_itineraries_user_id;
+drop index if exists public.idx_itineraries_start_date;
+
+-- drop table
+drop table if exists public.itineraries;
+```
+
+## Best Practices
+
+1. **One migration = One logical change**
+2. **Test locally before deploying**
+3. **Generate types after each migration**
+4. **Document all policies with comments**
+5. **Keep migrations idempotent** (use `if not exists`)
+6. **Never edit existing migrations** (create new ones instead)
+7. **Always enable RLS** (no exceptions)
+8. **Granular policies** (one per operation, one per role)

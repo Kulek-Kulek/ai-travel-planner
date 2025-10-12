@@ -1,0 +1,512 @@
+---
+description: API routes, Supabase, and OpenRouter AI
+globs: '**/api/**/*.ts, **/lib/supabase/**/*.ts, **/lib/openrouter/**/*.ts, **/lib/actions/**/*.ts'
+---
+
+## Backend & Data Layer Guidelines
+
+### Core Architecture (Next.js Server Actions)
+
+1. **Primary Mutation Channel:** All data write operations (INSERT, UPDATE, DELETE) and authentication actions **must** be implemented within Next.js **Server Actions** (`'use server'`).
+2. **API Routes Usage:** The `./src/app/api` folder (Route Handlers) should only be used for external, non-user-specific APIs (e.g., **webhooks** or third-party service integration).
+3. **Authentication:** Server Actions and Server Components must perform authentication checks using the **Server Supabase Client**.
+
+### Supabase Setup
+
+#### Server-Side Client (Server Actions, Server Components)
+
+```typescript
+// lib/supabase/server.ts
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
+import type { Database } from '@/types/supabase';
+
+export async function createClient() {
+  const cookieStore = await cookies();
+  
+  return createServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, options)
+          );
+        },
+      },
+    }
+  );
+}
+
+// Helper: Get authenticated user
+export async function getAuthenticatedUser() {
+  const supabase = await createClient();
+  const { data: { user }, error } = await supabase.auth.getUser();
+  
+  if (error || !user) return null;
+  return user;
+}
+```
+
+#### Client-Side Client (Client Components)
+
+```typescript
+// lib/supabase/client.ts
+import { createBrowserClient } from '@supabase/ssr';
+import type { Database } from '@/types/supabase';
+
+export function createClient() {
+  return createBrowserClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+}
+```
+
+#### Generate TypeScript Types
+
+```bash
+# Install Supabase CLI
+npm install supabase --save-dev
+
+# Generate types from your database
+npx supabase gen types typescript --project-id YOUR_PROJECT_ID > src/types/supabase.ts
+```
+
+**Important:** 
+- ✅ Use `import type { Database } from '@/types/supabase'`
+- ❌ Don't import `SupabaseClient` from `@supabase/supabase-js` directly
+
+### Server Actions Pattern
+
+#### Basic Server Action
+
+```typescript
+// lib/actions/itinerary-actions.ts
+'use server';
+
+import { createClient } from '@/lib/supabase/server';
+import { revalidatePath } from 'next/cache';
+import { z } from 'zod';
+
+// 1. Define Zod schema
+const createItinerarySchema = z.object({
+  destination: z.string().min(1).max(100),
+  startDate: z.string().datetime(),
+  endDate: z.string().datetime(),
+  interests: z.array(z.string()).min(1).max(10),
+});
+
+type CreateItineraryInput = z.infer<typeof createItinerarySchema>;
+
+// 2. Define return type
+type ActionResult<T> = 
+  | { success: true; data: T }
+  | { success: false; error: string };
+
+// 3. Server Action
+export async function createItinerary(
+  input: CreateItineraryInput
+): Promise<ActionResult<{ id: string }>> {
+  try {
+    // Validate input
+    const validated = createItinerarySchema.parse(input);
+    
+    // Get authenticated user
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    
+    // Insert data (RLS enforces user_id)
+    const { data, error } = await supabase
+      .from('itineraries')
+      .insert({
+        user_id: user.id,
+        destination: validated.destination,
+        start_date: validated.startDate,
+        end_date: validated.endDate,
+      })
+      .select('id')
+      .single();
+      
+    if (error) {
+      console.error('Database error:', error);
+      return { success: false, error: 'Failed to create itinerary' };
+    }
+    
+    // Revalidate relevant paths
+    revalidatePath('/dashboard');
+    
+    return { success: true, data: { id: data.id } };
+    
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { success: false, error: 'Invalid input data' };
+    }
+    console.error('Server action error:', error);
+    return { success: false, error: 'An unexpected error occurred' };
+  }
+}
+```
+
+#### Using Server Action in a Component
+
+```typescript
+// components/create-itinerary-form.tsx
+'use client';
+
+import { useTransition } from 'react';
+import { createItinerary } from '@/lib/actions/itinerary-actions';
+import { toast } from 'sonner';
+
+export function CreateItineraryForm() {
+  const [isPending, startTransition] = useTransition();
+
+  async function handleSubmit(formData: FormData) {
+    startTransition(async () => {
+      const result = await createItinerary({
+        destination: formData.get('destination') as string,
+        startDate: formData.get('startDate') as string,
+        endDate: formData.get('endDate') as string,
+        interests: [formData.get('interests') as string],
+      });
+
+      if (result.success) {
+        toast.success('Itinerary created!');
+      } else {
+        toast.error(result.error);
+      }
+    });
+  }
+
+  return (
+    <form action={handleSubmit}>
+      {/* form fields */}
+      <button disabled={isPending}>
+        {isPending ? 'Creating...' : 'Create Itinerary'}
+      </button>
+    </form>
+  );
+}
+```
+
+### AI Integration with Credit System
+
+#### OpenRouter Client Setup
+
+```typescript
+// lib/openrouter/client.ts
+import OpenAI from 'openai';
+
+export const openrouter = new OpenAI({
+  baseURL: 'https://openrouter.ai/api/v1',
+  apiKey: process.env.OPENROUTER_API_KEY!,
+  defaultHeaders: {
+    'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+    'X-Title': 'AI Travel Planner',
+  },
+});
+```
+
+#### AI Generation with Credit Check (FR-010)
+
+```typescript
+// lib/actions/ai-actions.ts
+'use server';
+
+import { createClient } from '@/lib/supabase/server';
+import { openrouter } from '@/lib/openrouter/client';
+import { z } from 'zod';
+
+// Input schema
+const generatePlanSchema = z.object({
+  destination: z.string().min(1),
+  duration: z.number().int().positive().max(30),
+  interests: z.array(z.string()).min(1),
+  budget: z.number().positive().optional(),
+});
+
+// AI response schema (FR-006)
+const aiResponseSchema = z.object({
+  title: z.string(),
+  daily_plans: z.array(z.object({
+    day: z.number(),
+    activities: z.array(z.object({
+      time: z.string(),
+      title: z.string(),
+      description: z.string(),
+      estimated_cost: z.number().optional(),
+    })),
+  })),
+  total_cost: z.number().optional(),
+});
+
+type ActionResult<T> = 
+  | { success: true; data: T }
+  | { success: false; error: string };
+
+export async function generateTravelPlan(
+  input: z.infer<typeof generatePlanSchema>
+): Promise<ActionResult<z.infer<typeof aiResponseSchema>>> {
+  try {
+    // 1. Validate input
+    const validated = generatePlanSchema.parse(input);
+    
+    // 2. Authenticate
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return { success: false, error: 'Unauthorized' };
+    }
+    
+    // 3. Check credits (FR-010)
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('generation_credits')
+      .eq('id', user.id)
+      .single();
+      
+    if (profileError || !profile) {
+      console.error('Profile fetch error:', profileError);
+      return { success: false, error: 'Unable to verify credits' };
+    }
+    
+    if (profile.generation_credits < 1) {
+      return { success: false, error: 'Insufficient generation credits' };
+    }
+    
+    // 4. Build prompt
+    const prompt = buildPrompt(validated);
+    
+    // 5. Call AI (server-side only)
+    const completion = await openrouter.chat.completions.create({
+      model: 'anthropic/claude-3.5-sonnet',
+      messages: [{ role: 'user', content: prompt }],
+      response_format: { type: 'json_object' },
+      temperature: 0.7,
+      max_tokens: 2000,
+    });
+    
+    const content = completion.choices[0]?.message?.content;
+    if (!content) {
+      console.error('No AI response received');
+      return { success: false, error: 'Failed to generate plan' };
+    }
+    
+    // 6. Parse and validate AI response (FR-006)
+    let parsedResponse;
+    try {
+      parsedResponse = JSON.parse(content);
+    } catch (parseError) {
+      console.error('AI response parse error:', content);
+      return { success: false, error: 'Invalid AI response format' };
+    }
+    
+    const validatedResponse = aiResponseSchema.parse(parsedResponse);
+    
+    // 7. Decrement credits (FR-010)
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({ 
+        generation_credits: profile.generation_credits - 1 
+      })
+      .eq('id', user.id);
+      
+    if (updateError) {
+      console.error('Credit update error:', updateError);
+      // Note: AI call succeeded but credit deduction failed
+      // Consider implementing retry logic or compensation
+    }
+    
+    return { success: true, data: validatedResponse };
+    
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      console.error('Validation error:', error.errors);
+      return { success: false, error: 'Invalid data provided' };
+    }
+    
+    if (error instanceof Error) {
+      // Handle specific AI errors
+      if (error.message.includes('rate_limit')) {
+        return { success: false, error: 'Rate limit exceeded. Try again later.' };
+      }
+      if (error.message.includes('insufficient_quota')) {
+        console.error('OpenRouter quota exceeded');
+        return { success: false, error: 'Service temporarily unavailable' };
+      }
+    }
+    
+    console.error('AI generation error:', error);
+    return { success: false, error: 'Failed to generate travel plan' };
+  }
+}
+
+function buildPrompt(params: z.infer<typeof generatePlanSchema>): string {
+  return `Generate a ${params.duration}-day travel itinerary for ${params.destination}.
+
+Interests: ${params.interests.join(', ')}
+${params.budget ? `Budget: $${params.budget}` : ''}
+
+Return a JSON object with this exact structure:
+{
+  "title": "Trip to [destination]",
+  "daily_plans": [
+    {
+      "day": 1,
+      "activities": [
+        {
+          "time": "09:00",
+          "title": "Activity name",
+          "description": "Detailed description",
+          "estimated_cost": 50
+        }
+      ]
+    }
+  ],
+  "total_cost": 500
+}`;
+}
+```
+
+### Row Level Security (RLS)
+
+**Must enable RLS on all tables:**
+
+```sql
+-- Enable RLS
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE itineraries ENABLE ROW LEVEL SECURITY;
+
+-- Profiles: Users can only access their own profile
+CREATE POLICY "users_read_own_profile"
+  ON profiles FOR SELECT
+  TO authenticated
+  USING (auth.uid() = id);
+
+CREATE POLICY "users_update_own_profile"
+  ON profiles FOR UPDATE
+  TO authenticated
+  USING (auth.uid() = id);
+
+-- Itineraries: Full CRUD for own data
+CREATE POLICY "users_read_own_itineraries"
+  ON itineraries FOR SELECT
+  TO authenticated
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "users_create_own_itineraries"
+  ON itineraries FOR INSERT
+  TO authenticated
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "users_update_own_itineraries"
+  ON itineraries FOR UPDATE
+  TO authenticated
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "users_delete_own_itineraries"
+  ON itineraries FOR DELETE
+  TO authenticated
+  USING (auth.uid() = user_id);
+```
+
+### API Routes (Webhooks Only)
+
+Use API routes **only** for external services:
+
+```typescript
+// app/api/webhooks/stripe/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import { headers } from 'next/headers';
+import Stripe from 'stripe';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+
+export async function POST(request: NextRequest) {
+  const body = await request.text();
+  const headersList = await headers();
+  const signature = headersList.get('stripe-signature');
+  
+  if (!signature) {
+    return NextResponse.json({ error: 'No signature' }, { status: 400 });
+  }
+  
+  try {
+    const event = stripe.webhooks.constructEvent(
+      body,
+      signature,
+      process.env.STRIPE_WEBHOOK_SECRET!
+    );
+    
+    // Handle webhook event
+    if (event.type === 'payment_intent.succeeded') {
+      // Update user credits
+      // Use service role key for admin operations
+    }
+    
+    return NextResponse.json({ received: true });
+    
+  } catch (error) {
+    console.error('Webhook error:', error);
+    return NextResponse.json({ error: 'Webhook failed' }, { status: 400 });
+  }
+}
+```
+
+### Security Checklist
+
+- ✅ **Always** use Server Actions for mutations
+- ✅ **Always** validate inputs with Zod schemas
+- ✅ **Always** check authentication before processing
+- ✅ **Always** enable RLS on all user data tables
+- ✅ **Always** validate AI responses with Zod (FR-006)
+- ✅ **Always** check credits before AI calls (FR-010)
+- ✅ **Always** decrement credits after successful generation
+- ✅ Use typed Supabase client from `@/types/supabase`
+- ✅ Keep OpenRouter API key server-side only
+- ✅ Return structured errors from Server Actions
+- ✅ Log errors for debugging (exclude sensitive data)
+- ❌ **Never** expose API keys to client
+- ❌ **Never** trust client data without validation
+- ❌ **Never** skip RLS checks
+- ❌ **Never** use API routes for user-specific mutations
+
+### Error Handling Pattern
+
+```typescript
+// Consistent error returns
+type ActionResult<T> = 
+  | { success: true; data: T }
+  | { success: false; error: string };
+
+// Usage in Server Actions
+export async function myAction(): Promise<ActionResult<MyData>> {
+  try {
+    // ... logic
+    return { success: true, data: result };
+  } catch (error) {
+    console.error('Action error:', error);
+    return { success: false, error: 'User-friendly message' };
+  }
+}
+```
+
+### Best Practices Summary
+
+1. **Server Actions First:** Use for all mutations and auth operations
+2. **Type Safety:** Use generated Supabase types, not raw imports
+3. **Validation:** Zod schemas for all inputs and AI outputs
+4. **Credit System:** Check before AI calls, decrement after success
+5. **RLS:** Enabled on all tables, policies for all CRUD operations
+6. **Security:** Server-side only for AI calls and sensitive operations
+7. **Errors:** Structured returns, safe messages, proper logging
+8. **API Routes:** Only for webhooks and external integrations
