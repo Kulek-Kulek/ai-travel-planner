@@ -1,0 +1,157 @@
+---
+Rule Type: Auto Attached
+globs: '**/*.tsx, **/hooks/*.ts, !**/lib/actions/**'
+---
+
+## Frontend Development Guidelines
+
+### Next.js App Router Best Practices
+
+#### Server vs Client Components
+
+- Default to **Server Components** - use 'use client' only when needed
+- Use Client Components when:
+  - Using React hooks (useState, useEffect, etc.)
+  - Using browser-only APIs
+  - Using event handlers (onClick, onChange, etc.)
+  - Using TanStack Query hooks
+- Keep 'use client' directive as low in the tree as possible
+- Server Components can import and render Client Components
+- Client Components cannot import Server Components (but can receive them as children)
+
+#### Route Organization
+
+- Use route groups (folders with parentheses) for organization without affecting URLs
+- Implement loading.tsx for loading states
+- Implement error.tsx for error boundaries
+- Use layout.tsx for shared layouts
+- Implement not-found.tsx for 404 pages
+- Use parallel routes (@folder) for advanced layouts
+
+#### Data Fetching
+
+- Fetch data in Server Components when possible
+- Use TanStack Query in Client Components for interactive data
+- Implement proper loading and error states
+- Use Suspense boundaries for streaming
+- Cache API responses appropriately
+
+### Component/Function Declaration
+
+- Prefer functional declarations for top-level pages and components using arrow functions.
+- Components and handlers should use arrow functions: `const MyComponent = ({ prop }) => {...}` or `const handleClick = () => {...}`.
+- Pages/Server Components should be declared as async default functions: `export default async function Page() {...}`. (This is the required standard for Server Components in Next.js)
+
+### Guidelines for Styling
+
+#### Tailwind CSS
+
+- Use Tailwind classes exclusively - avoid inline styles and CSS modules
+- Use the @layer directive to organize custom styles
+- Use arbitrary values with square brackets for one-off designs (e.g., `w-[123px]`)
+- Implement dark mode with the `dark:` variant
+- Use responsive variants (sm:, md:, lg:, xl:, 2xl:) for adaptive designs
+- Leverage state variants (hover:, focus:, active:, disabled:, etc.)
+- Use Tailwind's configuration for theme customization
+- Follow consistent spacing scale (4, 8, 12, 18, 24, 32, etc.)
+
+#### shadcn/ui Components
+
+- Always use shadcn/ui components for common UI patterns
+- Components are located in `./src/components/ui/`
+- Customize via className prop and Tailwind
+- Use composition patterns for complex components
+- Follow shadcn/ui documentation for proper usage
+- Install new components via: `npx shadcn@latest add <component>`
+
+### Guidelines for Accessibility
+
+#### Semantic HTML
+
+- Use semantic HTML elements (header, nav, main, article, section, footer)
+- Use button for actions, a for navigation
+- Use proper heading hierarchy (h1 → h2 → h3)
+- Use labels for all form inputs
+- Use alt text for all images
+- Use fieldset and legend for form groups
+
+#### ARIA Best Practices
+
+- Use ARIA landmarks to identify regions (main, navigation, search, etc.)
+- Apply appropriate ARIA roles only when semantic HTML is insufficient
+- Set aria-expanded and aria-controls for expandable content
+- Use aria-live regions for dynamic content updates
+- Apply aria-label or aria-labelledby for elements without visible labels
+- Use aria-describedby for additional descriptions
+- Implement aria-current for indicating current item
+- Avoid redundant ARIA that duplicates HTML semantics
+
+#### Keyboard Navigation
+
+- Ensure all interactive elements are keyboard accessible
+- Implement proper focus management
+- Use visible focus indicators
+- Support common keyboard shortcuts (Esc, Enter, Space, Arrow keys)
+- Implement proper tab order
+- Use focus traps for modals and dialogs
+
+### Form Handling
+
+- **Always use React Hook Form for form state management.**
+- **Use Zod for schema validation (passed to RHF resolver).**
+- Implement proper form validation (client and server side)
+- Implement proper error messages
+- Use controlled components for complex forms
+- Show loading states during submission
+- Provide clear success/error feedback
+- Implement proper accessibility for form errors
+
+### Image Optimization
+
+- Always use Next.js Image component
+- Provide width and height or use fill
+- Use appropriate sizes prop for responsive images
+- Implement proper alt text
+- Consider lazy loading for below-the-fold images
+- Use appropriate formats (WebP with fallbacks)
+
+### Performance Optimization
+
+- Use dynamic imports for large components
+- Implement code splitting at route level
+- Use React.memo() for expensive pure components
+- Avoid unnecessary re-renders
+- Use useCallback for event handlers passed to children
+- Use useMemo for expensive calculations
+- Monitor bundle size
+- Implement proper loading strategies
+
+### Component Organization
+
+Standard component file structure:
+
+```typescript
+// 1. Imports
+import { useState } from 'react';
+import { ExternalLib } from 'external-lib';
+import { InternalUtil } from '@/lib/utils';
+import type { ComponentProps } from '@/types';
+
+// 2. Types
+interface Props {
+  title: string;
+  // ...
+}
+
+// 3. Constants
+const MAX_ITEMS = 10;
+
+// 4. Main Component (Preferred arrow function style)
+export const MyComponent = ({ title }: Props) => {
+  // Component logic
+};
+
+// 5. Sub-components (if small and tightly coupled)
+const SubComponent = () => {
+  // ...
+};
