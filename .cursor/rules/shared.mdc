@@ -1,0 +1,53 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# AI Rules for AI Travel Planner
+
+An intelligent travel planning application that uses AI to create personalized travel itineraries, recommendations, and travel assistance.
+
+## Tech Stack
+
+- Framework: Next.js 15 (App Router)
+- Language: TypeScript 5
+- UI: Tailwind CSS 4, shadcn/ui
+- Data fetching: TanStack Query (React Query)
+- Backend/DB/Auth: Supabase (PostgreSQL, Auth)
+- AI provider: OpenRouter
+- Testing: Playwright (E2E), Vitest (Unit/Integration)
+- Hosting: Vercel / Cloudflare Pages
+
+## Project Structure
+
+When introducing changes to the project, always follow the directory structure below:
+
+- `./src` - source code
+- `./src/app` - Next.js App Router pages and layouts
+- `./src/app/api` - API route handlers
+- `./src/components` - React components
+- `./src/components/ui` - shadcn/ui components (generated)
+- `./src/lib` - utility functions, shared logic, configurations
+- `./src/lib/supabase` - Supabase client and utilities
+- `./src/lib/openrouter` - OpenRouter AI client and utilities
+- `./src/hooks` - custom React hooks
+- `./src/types` - TypeScript type definitions
+- `./src/stores` - state management (if needed)
+- `./public` - static public assets
+- `./tests` - test files (e2e, unit, integration)
+
+When modifying the directory structure, always update this section.
+
+## Coding Practices
+
+### Guidelines for Clean Code
+
+- Prioritize error handling and edge cases
+- Handle errors and edge cases at the beginning of functions
+- Use early returns for error conditions to avoid deeply nested if statements
+- Place the happy path last in the function for improved readability
+- Avoid unnecessary else statements; use if-return pattern instead
+- Use guard clauses to handle preconditions and invalid states early
+- Implement proper error logging and user-friendly error messages
+- Consider using custom error types or error factories for consistent error handling

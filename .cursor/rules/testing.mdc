@@ -1,0 +1,224 @@
+---
+description: Testing with Vitest and Playwright
+globs: '**/*.test.ts, **/*.test.tsx, **/*.spec.ts, **/*.spec.tsx, **/tests/**/*'
+---
+
+## Testing Guidelines
+
+### General Principles
+- Test behavior, not implementation
+- Write tests like users interact with app
+- Keep tests simple and readable
+- Use descriptive names
+- Follow AAA: Arrange, Act, Assert
+- Make tests independent
+
+### Vitest (Unit/Integration)
+
+#### Configuration
+```typescript
+// vitest.config.ts
+import { defineConfig } from 'vitest/config';
+import react from '@vitejs/plugin-react';
+import path from 'path';
+
+export default defineConfig({
+  plugins: [react()],
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./tests/setup.ts'],
+    globals: true,
+  },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
+});
+```
+
+#### Component Test
+```typescript
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { TravelCard } from '@/components/TravelCard';
+
+describe('TravelCard', () => {
+  it('displays destination info', () => {
+    render(<TravelCard destination="Paris" duration={5} price={1500} />);
+    
+    expect(screen.getByText('Paris')).toBeInTheDocument();
+    expect(screen.getByText(/5 days/i)).toBeInTheDocument();
+  });
+
+  it('handles click', async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    
+    render(<TravelCard onClick={onClick} />);
+    await user.click(screen.getByRole('button'));
+    
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+});
+```
+
+#### TanStack Query Test
+```typescript
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+function createWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+    },
+  });
+  
+  return ({ children }) => (
+    <QueryClientProvider client={queryClient}>
+      {children}
+    </QueryClientProvider>
+  );
+}
+
+it('loads destinations', async () => {
+  render(<DestinationList />, { wrapper: createWrapper() });
+  
+  await waitFor(() => {
+    expect(screen.getByText('Paris')).toBeInTheDocument();
+  });
+});
+```
+
+#### Hook Test
+```typescript
+import { renderHook, waitFor } from '@testing-library/react';
+
+describe('useTravelData', () => {
+  it('fetches data', async () => {
+    const { result } = renderHook(() => useTravelData('paris'));
+    
+    expect(result.current.isLoading).toBe(true);
+    
+    await waitFor(() => {
+      expect(result.current.data).toBeDefined();
+    });
+  });
+});
+```
+
+#### Mocking
+```typescript
+// Mock module
+vi.mock('@/lib/supabase/client', () => ({
+  createClient: vi.fn(() => ({
+    from: vi.fn(() => ({
+      select: vi.fn(() => Promise.resolve({ data: [], error: null })),
+    })),
+  })),
+}));
+
+// Mock fetch
+global.fetch = vi.fn(() =>
+  Promise.resolve({
+    ok: true,
+    json: () => Promise.resolve({ data: 'mock' }),
+  })
+) as any;
+```
+
+### Playwright (E2E)
+
+#### Configuration
+```typescript
+// playwright.config.ts
+import { defineConfig, devices } from '@playwright/test';
+
+export default defineConfig({
+  testDir: './tests/e2e',
+  use: {
+    baseURL: 'http://localhost:3000',
+    trace: 'on-first-retry',
+  },
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+  ],
+  webServer: {
+    command: 'npm run dev',
+    url: 'http://localhost:3000',
+    reuseExistingServer: !process.env.CI,
+  },
+});
+```
+
+#### E2E Test
+```typescript
+import { test, expect } from '@playwright/test';
+
+test.describe('Travel Search', () => {
+  test('user searches destinations', async ({ page }) => {
+    await page.goto('/');
+    
+    // Fill form
+    await page.getByLabel(/destination/i).fill('Paris');
+    await page.getByLabel(/start date/i).fill('2025-06-01');
+    await page.getByRole('button', { name: /search/i }).click();
+    
+    // Assert
+    await expect(page.getByText(/paris/i)).toBeVisible();
+  });
+
+  test('creates itinerary', async ({ page }) => {
+    // Login
+    await page.goto('/login');
+    await page.getByLabel(/email/i).fill('test@example.com');
+    await page.getByLabel(/password/i).fill('password123');
+    await page.getByRole('button', { name: /log in/i }).click();
+    
+    await expect(page).toHaveURL('/dashboard');
+    
+    // Create
+    await page.getByRole('button', { name: /new/i }).click();
+    await page.getByLabel(/destination/i).fill('Tokyo');
+    await page.getByRole('button', { name: /generate/i }).click();
+    
+    // Wait for AI (30s timeout)
+    await expect(page.getByText(/day 1/i)).toBeVisible({ timeout: 30000 });
+  });
+});
+```
+
+### Best Practices
+
+#### Do ✅
+- Use semantic queries (`getByRole`, `getByLabelText`)
+- Test accessibility
+- Mock external dependencies
+- Test error and loading states
+- Clean up after tests
+
+#### Don't ❌
+- Test implementation details
+- Use brittle selectors (CSS classes)
+- Make tests dependent on each other
+- Skip error cases
+- Over-mock
+
+### Coverage Goals
+- **Utilities:** 90%+
+- **Business Logic:** 80%+
+- **Components:** 70%+
+- **E2E:** Critical user flows
+
+### Commands
+```bash
+# Unit tests
+npm run test              # Run
+npm run test:watch        # Watch
+npm run test:coverage     # Coverage
+
+# E2E
+npm run test:e2e          # Run
+npm run test:e2e:ui       # UI mode
+npm run test:e2e:debug    # Debug
+```
