@@ -99,10 +99,11 @@ globs: '**/*.tsx, **/hooks/*.ts, !**/lib/actions/**'
 
 - **Always use React Hook Form for form state management.**
 - **Use Zod for schema validation (passed to RHF resolver).**
+- **Call Server Actions (from `./src/lib/actions/`) for all data mutations** - these act as your controllers
 - Implement proper form validation (client and server side)
 - Implement proper error messages
 - Use controlled components for complex forms
-- Show loading states during submission
+- Show loading states during submission (use `useTransition` for Server Actions)
 - Provide clear success/error feedback
 - Implement proper accessibility for form errors
 
