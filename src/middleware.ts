@@ -32,8 +32,14 @@ export async function middleware(request: NextRequest) {
   // Refresh session if expired
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Protect routes
-  if (!user && request.nextUrl.pathname.startsWith('/dashboard')) {
+  // Protected routes that require authentication
+  const protectedRoutes = ['/itineraries', '/profile'];
+  const isProtectedRoute = protectedRoutes.some(route => 
+    request.nextUrl.pathname.startsWith(route)
+  );
+
+  // Redirect to sign-in if accessing protected route without authentication
+  if (!user && isProtectedRoute) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = '/sign-in';
     return NextResponse.redirect(redirectUrl);
