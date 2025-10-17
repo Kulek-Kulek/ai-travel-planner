@@ -21,16 +21,13 @@ jobs:
           node-version: '20'
           
       - name: Install dependencies
-        working-directory: ./travel-planner
         run: npm ci
         
       - name: Run ESLint
-        working-directory: ./travel-planner
         run: npm run lint
         continue-on-error: true
         
       - name: Build Next.js app
-        working-directory: ./travel-planner
         run: npm run build
         continue-on-error: true
         env:
@@ -40,7 +37,6 @@ jobs:
           NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL || 'http://localhost:3000' }}
           
       - name: Check build artifacts
-        working-directory: ./travel-planner
         continue-on-error: true
         run: |
           if [ -d ".next" ]; then
@@ -63,10 +59,8 @@ jobs:
           node-version: '20'
           
       - name: Install dependencies
-        working-directory: ./travel-planner
         run: npm ci
         
       - name: Run TypeScript compiler
-        working-directory: ./travel-planner
         run: npx tsc --noEmit
 
