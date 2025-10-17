@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { QueryProvider } from "@/providers/query-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { NavHeader } from "@/components/nav-header";
 
 export const metadata: Metadata = {
   title: "AI Travel Planner",
@@ -17,6 +18,7 @@ export default function RootLayout({
     <html lang="en">
       <body suppressHydrationWarning>
         <QueryProvider>
+          <NavHeader />
           {children}
         </QueryProvider>
         <Toaster />
