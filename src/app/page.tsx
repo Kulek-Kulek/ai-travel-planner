@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 import { ItineraryForm } from '@/components/itinerary-form';
-import { ToastDemo } from '@/components/toast-demo';
+import { ItineraryGallery } from '@/components/itinerary-gallery';
 import { generateItinerary } from '@/lib/actions/ai-actions';
 import { toast } from 'sonner';
+import Link from 'next/link';
 
 export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
@@ -33,9 +34,13 @@ export default function Home() {
       toast.dismiss('generating');
 
       if (response.success) {
-        // Show success toast
-        toast.success('Itinerary generated successfully!', {
+        // Show success toast with save confirmation
+        toast.success('Itinerary generated and saved!', {
           description: `${data.days}-day trip to ${response.data.city}`,
+          action: {
+            label: 'View',
+            onClick: () => window.location.href = `/itinerary/${response.data.id}`,
+          },
         });
 
         setResult({
@@ -61,13 +66,29 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      {/* Hero Section */}
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h1 className="text-4xl md:text-5xl font-bold mb-4">
+            ✈️ AI Travel Planner
+          </h1>
+          <p className="text-xl md:text-2xl text-blue-100 mb-6">
+            Generate personalized travel itineraries in seconds
+          </p>
+          <p className="text-lg text-blue-50">
+            Create, save, and discover amazing travel plans powered by AI
+          </p>
+        </div>
+      </div>
+
       {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        {/* Form and Preview Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-16">
           {/* Form Section */}
           <div className="bg-white rounded-lg shadow-lg p-6">
             <h2 className="text-2xl font-semibold mb-6 text-gray-900">
-              Plan Your Trip
+              Create Your Itinerary
             </h2>
             <ItineraryForm onSubmit={handleSubmit} isLoading={isGenerating} />
           </div>
@@ -110,11 +131,12 @@ export default function Home() {
                   </p>
                 </div>
 
-                {result.aiPlan?.days?.map((day: any, dayIndex: number) => (
+                {/* Show first 2 days as preview */}
+                {result.aiPlan?.days?.slice(0, 2).map((day: any, dayIndex: number) => (
                   <div key={dayIndex} className="border-l-4 border-blue-500 pl-4 space-y-3">
                     <h4 className="font-semibold text-gray-900">{day.title}</h4>
                     
-                    {day.places?.map((place: any, placeIndex: number) => (
+                    {day.places?.slice(0, 3).map((place: any, placeIndex: number) => (
                       <div key={placeIndex} className="bg-gray-50 rounded-lg p-3">
                         <p className="font-medium text-gray-900">{place.name}</p>
                         <p className="text-sm text-gray-600 mt-1">{place.desc}</p>
@@ -126,57 +148,47 @@ export default function Home() {
                   </div>
                 ))}
 
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <p className="text-blue-800 text-sm">
-                    💡 <strong>Next steps:</strong> Add authentication to save this itinerary, 
-                    or generate a new one with different preferences!
+                {result.aiPlan?.days?.length > 2 && (
+                  <p className="text-sm text-gray-500 text-center">
+                    + {result.aiPlan.days.length - 2} more days...
                   </p>
+                )}
+
+                {result.aiPlan?.tags && result.aiPlan.tags.length > 0 && (
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <p className="text-sm font-medium text-gray-700 mb-2">🏷️ Tags:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {result.aiPlan.tags.map((tag: string, idx: number) => (
+                        <span
+                          key={idx}
+                          className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <p className="text-green-800 text-sm">
+                    ✅ <strong>Itinerary saved!</strong> View your full itinerary or browse more plans below.
+                  </p>
+                  <Link
+                    href={`/itinerary/${result.aiPlan.id}`}
+                    className="inline-block mt-2 text-green-700 font-medium hover:underline"
+                  >
+                    View Full Itinerary →
+                  </Link>
                 </div>
               </div>
             )}
           </div>
         </div>
 
-        {/* Info Section */}
-        <div className="mt-12 bg-white rounded-lg shadow-lg p-6">
-          <h3 className="text-xl font-semibold mb-4 text-gray-900">
-            🎯 What We've Built So Far
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="border border-gray-200 rounded p-4">
-              <div className="text-2xl mb-2">✅</div>
-              <h4 className="font-semibold mb-1">React Hook Form</h4>
-              <p className="text-sm text-gray-600">
-                Form state management with validation
-              </p>
-            </div>
-            <div className="border border-gray-200 rounded p-4">
-              <div className="text-2xl mb-2">✅</div>
-              <h4 className="font-semibold mb-1">Zod Validation</h4>
-              <p className="text-sm text-gray-600">
-                Type-safe schema validation
-              </p>
-            </div>
-            <div className="border border-gray-200 rounded p-4">
-              <div className="text-2xl mb-2">✅</div>
-              <h4 className="font-semibold mb-1">shadcn/ui</h4>
-              <p className="text-sm text-gray-600">
-                Beautiful, accessible components
-              </p>
-            </div>
-            <div className="border border-gray-200 rounded p-4">
-              <div className="text-2xl mb-2">✅</div>
-              <h4 className="font-semibold mb-1">Toast Notifications</h4>
-              <p className="text-sm text-gray-600">
-                User feedback with Sonner
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Toast Demo Section */}
-        <div className="mt-8">
-          <ToastDemo />
+        {/* Public Itineraries Gallery */}
+        <div className="mt-16">
+          <ItineraryGallery />
         </div>
       </main>
     </div>

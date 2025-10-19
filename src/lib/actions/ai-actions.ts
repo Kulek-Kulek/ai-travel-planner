@@ -1,6 +1,7 @@
 'use server';
 
 import { openrouter } from '@/lib/openrouter/client';
+import { createClient } from '@/lib/supabase/server';
 import { z } from 'zod';
 
 // Input schema
@@ -28,9 +29,15 @@ type ActionResult<T> =
   | { success: true; data: T }
   | { success: false; error: string };
 
+// Saved itinerary response (includes database ID)
+type SavedItinerary = z.infer<typeof aiResponseSchema> & {
+  id: string;
+  tags: string[];
+};
+
 export async function generateItinerary(
   input: z.infer<typeof generateItinerarySchema>
-): Promise<ActionResult<z.infer<typeof aiResponseSchema>>> {
+): Promise<ActionResult<SavedItinerary>> {
   try {
     // 1. Validate input
     const validated = generateItinerarySchema.parse(input);
@@ -47,7 +54,7 @@ export async function generateItinerary(
     // 3. Build prompt
     const prompt = buildPrompt(validated);
     
-    // 4. Call AI (server-side only)
+    // 4. Call AI to generate itinerary
     const completion = await openrouter.chat.completions.create({
       model: 'anthropic/claude-3.5-sonnet',
       messages: [{ role: 'user', content: prompt }],
@@ -73,7 +80,50 @@ export async function generateItinerary(
     
     const validatedResponse = aiResponseSchema.parse(parsedResponse);
     
-    return { success: true, data: validatedResponse };
+    // 6. Generate AI tags for the itinerary
+    const tags = await generateTags({
+      destination: validated.destination,
+      days: validated.days,
+      travelers: validated.travelers,
+      notes: validated.notes,
+      aiPlan: validatedResponse,
+    });
+    
+    // 7. Save to database
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    const { data: savedItinerary, error: dbError } = await supabase
+      .from('itineraries')
+      .insert({
+        user_id: user?.id || null, // NULL for anonymous users
+        destination: validated.destination,
+        days: validated.days,
+        travelers: validated.travelers,
+        notes: validated.notes || null,
+        ai_plan: validatedResponse,
+        tags,
+        is_private: false, // Default to public (users can change later)
+      })
+      .select('id')
+      .single();
+    
+    if (dbError || !savedItinerary) {
+      console.error('Database save error:', dbError);
+      return { 
+        success: false, 
+        error: 'Generated itinerary but failed to save. Please try again.' 
+      };
+    }
+    
+    return { 
+      success: true, 
+      data: {
+        ...validatedResponse,
+        id: savedItinerary.id,
+        tags,
+      }
+    };
     
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -139,4 +189,114 @@ Important:
 - ALL descriptions, times, and text must be in the SAME language as the user's notes
 ${params.notes ? `- Take into account: ${params.notes}` : ''}`;
 }
+
+/**
+ * Generate relevant tags for filtering and categorization
+ * Uses AI to intelligently tag itineraries based on content
+ */
+async function generateTags(params: {
+  destination: string;
+  days: number;
+  travelers: number;
+  notes?: string;
+  aiPlan: z.infer<typeof aiResponseSchema>;
+}): Promise<string[]> {
+  try {
+    const prompt = `You are a travel categorization expert. Analyze this travel itinerary and generate relevant tags for filtering and search.
+
+Destination: ${params.destination}
+Duration: ${params.days} days
+Travelers: ${params.travelers}
+${params.notes ? `Notes: ${params.notes}` : ''}
+
+Itinerary summary: ${params.aiPlan.days.map(d => d.places.map(p => p.name).join(', ')).join('; ')}
+
+Generate 5-10 relevant tags that would help users find this itinerary. Include tags for:
+1. Location (city, country, region, continent)
+2. Duration category (e.g., "weekend", "3-5 days", "week-long", "1-2 days")
+3. Trip type (e.g., "city break", "beach holiday", "adventure", "cultural", "romantic", "family-friendly")
+4. Group size (e.g., "solo", "couple", "family", "group")
+5. Main interests based on activities (e.g., "food", "history", "art", "nature", "shopping", "nightlife", "museums")
+6. Season/weather if relevant (e.g., "summer", "winter activities")
+7. Budget level if detectable (e.g., "budget", "mid-range", "luxury")
+
+Return ONLY a JSON array of strings (tags should be lowercase, concise, in English):
+["tag1", "tag2", "tag3", ...]
+
+Example: ["rome", "italy", "europe", "3-5 days", "city break", "couple", "history", "art", "food", "cultural"]`;
+
+    const completion = await openrouter.chat.completions.create({
+      model: 'anthropic/claude-3.5-sonnet',
+      messages: [{ role: 'user', content: prompt }],
+      response_format: { type: 'json_object' },
+      temperature: 0.3, // Lower temperature for more consistent tagging
+      max_tokens: 200,
+    });
+
+    const content = completion.choices[0]?.message?.content;
+    if (!content) {
+      console.warn('No tags generated, using fallback');
+      return generateFallbackTags(params);
+    }
+
+    const parsed = JSON.parse(content);
+    // Handle both array response and object with tags array
+    const tags = Array.isArray(parsed) ? parsed : (parsed.tags || []);
+    
+    if (!Array.isArray(tags) || tags.length === 0) {
+      return generateFallbackTags(params);
+    }
+
+    // Clean and validate tags
+    return tags
+      .filter((tag): tag is string => typeof tag === 'string')
+      .map(tag => tag.toLowerCase().trim())
+      .filter(tag => tag.length > 0 && tag.length < 50)
+      .slice(0, 15); // Max 15 tags
+
+  } catch (error) {
+    console.error('Tag generation error:', error);
+    return generateFallbackTags(params);
+  }
+}
+
+/**
+ * Fallback tag generation when AI fails
+ */
+function generateFallbackTags(params: {
+  destination: string;
+  days: number;
+  travelers: number;
+  notes?: string;
+}): string[] {
+  const tags: string[] = [];
+  
+  // Add destination
+  tags.push(params.destination.toLowerCase());
+  
+  // Add duration category
+  if (params.days <= 2) tags.push('weekend', '1-2 days');
+  else if (params.days <= 5) tags.push('3-5 days');
+  else if (params.days <= 7) tags.push('week-long');
+  else tags.push('extended trip');
+  
+  // Add traveler type
+  if (params.travelers === 1) tags.push('solo');
+  else if (params.travelers === 2) tags.push('couple');
+  else if (params.travelers <= 4) tags.push('small group');
+  else tags.push('group');
+  
+  // Extract keywords from notes
+  if (params.notes) {
+    const keywords = ['family', 'kids', 'children', 'adventure', 'romantic', 'food', 'culture', 'beach', 'history', 'art', 'nature', 'luxury', 'budget'];
+    keywords.forEach(keyword => {
+      if (params.notes!.toLowerCase().includes(keyword)) {
+        tags.push(keyword);
+      }
+    });
+  }
+  
+  return tags;
+}
+
 
