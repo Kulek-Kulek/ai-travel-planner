@@ -194,3 +194,4 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 - Authentication is optional - generation works without account
 - Ready for public/private itinerary feature implementation
 
+
