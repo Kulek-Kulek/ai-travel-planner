@@ -63,7 +63,16 @@ export const ItineraryForm = ({ onSubmit, isLoading = false }: ItineraryFormProp
       duration: 1000,
     });
     
-    onSubmit(data);
+    // Capitalize destination (convert to title case)
+    const capitalizedData = {
+      ...data,
+      destination: data.destination
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ')
+    };
+    
+    onSubmit(capitalizedData);
   };
 
   const handleFormError = () => {

@@ -1,31 +1,49 @@
 import { getItinerary } from '@/lib/actions/itinerary-actions';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import { ItineraryActions } from '@/components/itinerary-actions';
+import { createClient } from '@/lib/supabase/server';
 
 export default async function ItineraryPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  const result = await getItinerary(params.id);
+  const { id } = await params;
+  const result = await getItinerary(id);
 
   if (!result.success || !result.data) {
     notFound();
   }
 
   const itinerary = result.data;
-  const { ai_plan, destination, days, travelers, notes, tags, created_at } = itinerary;
+  const { ai_plan, destination, days, travelers, notes, tags, created_at, user_id } = itinerary;
+
+  // Check if current user is the owner
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const isOwner = user?.id === user_id;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12">
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Back button */}
-        <Link
-          href="/"
-          className="inline-flex items-center text-blue-600 hover:text-blue-800 mb-6"
-        >
-          ← Back to Home
-        </Link>
+        <div className="flex gap-4 mb-6">
+          <Link
+            href="/"
+            className="inline-flex items-center text-blue-600 hover:text-blue-800"
+          >
+            ← Back to Home
+          </Link>
+          {isOwner && (
+            <Link
+              href="/my-plans"
+              className="inline-flex items-center text-blue-600 hover:text-blue-800"
+            >
+              📋 My Plans
+            </Link>
+          )}
+        </div>
 
         {/* Header Card */}
         <div className="bg-white rounded-lg shadow-lg p-6 md:p-8 mb-6">
@@ -109,17 +127,11 @@ export default async function ItineraryPage({
         </div>
 
         {/* Footer Actions */}
-        <div className="mt-8 bg-white rounded-lg shadow-lg p-6 text-center">
-          <p className="text-gray-700 mb-4">
-            ✨ Want to create your own personalized itinerary?
-          </p>
-          <Link
-            href="/"
-            className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
-          >
-            Create New Itinerary
-          </Link>
-        </div>
+        <ItineraryActions
+          itineraryId={id}
+          destination={ai_plan.city || destination}
+          isOwner={isOwner}
+        />
       </main>
     </div>
   );

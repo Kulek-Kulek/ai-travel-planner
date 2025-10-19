@@ -1,53 +1,45 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { ItineraryCard } from './itinerary-card';
 import { Button } from './ui/button';
-import type { Itinerary } from '@/lib/actions/itinerary-actions';
 import { getPublicItineraries, getAllTags } from '@/lib/actions/itinerary-actions';
 import { toast } from 'sonner';
 
 export function ItineraryGallery() {
-  const [itineraries, setItineraries] = useState<Itinerary[]>([]);
-  const [allTags, setAllTags] = useState<string[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [total, setTotal] = useState(0);
 
-  // Fetch itineraries
-  useEffect(() => {
-    async function fetchData() {
-      setIsLoading(true);
-      
+  // Fetch itineraries with TanStack Query
+  const { data: itinerariesData, isLoading } = useQuery({
+    queryKey: ['public-itineraries', selectedTags],
+    queryFn: async () => {
       const result = await getPublicItineraries({
         tags: selectedTags,
         limit: 20,
       });
       
-      if (result.success) {
-        setItineraries(result.data.itineraries);
-        setTotal(result.data.total);
-      } else {
+      if (!result.success) {
         toast.error('Failed to load itineraries');
+        return { itineraries: [], total: 0 };
       }
       
-      setIsLoading(false);
-    }
-    
-    fetchData();
-  }, [selectedTags]);
+      return result.data;
+    },
+  });
 
-  // Fetch all available tags on mount
-  useEffect(() => {
-    async function fetchTags() {
+  // Fetch all available tags
+  const { data: allTags = [] } = useQuery({
+    queryKey: ['all-tags'],
+    queryFn: async () => {
       const result = await getAllTags();
-      if (result.success) {
-        setAllTags(result.data);
-      }
-    }
-    
-    fetchTags();
-  }, []);
+      if (!result.success) return [];
+      return result.data;
+    },
+  });
+
+  const itineraries = itinerariesData?.itineraries || [];
+  const total = itinerariesData?.total || 0;
 
   const toggleTag = (tag: string) => {
     setSelectedTags(prev => 
