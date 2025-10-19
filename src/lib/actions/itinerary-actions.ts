@@ -25,6 +25,9 @@ export type Itinerary = {
   tags: string[];
   is_private: boolean;
   status?: string; // 'active', 'completed', 'archived'
+  image_url?: string | null;
+  image_photographer?: string | null;
+  image_photographer_url?: string | null;
   created_at: string;
 };
 

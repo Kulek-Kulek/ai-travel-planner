@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import type { Itinerary } from '@/lib/actions/itinerary-actions';
 import { Button } from './ui/button';
 import {
@@ -24,7 +25,7 @@ export function ItineraryCard({
   onToggleStatus,
   onDelete 
 }: ItineraryCardProps) {
-  const { id, destination, days, travelers, tags, ai_plan, created_at, is_private, status } = itinerary;
+  const { id, destination, days, travelers, tags, ai_plan, created_at, is_private, status, user_id, image_url, image_photographer, image_photographer_url } = itinerary;
   
   // Get first few places as preview
   const previewPlaces = ai_plan.days
@@ -33,12 +34,35 @@ export function ItineraryCard({
     .slice(0, 4);
   
   const cardContent = (
-    <div className="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 p-5 h-full border border-gray-200 hover:border-blue-400">
+    <div className="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 overflow-hidden h-full border border-gray-200 hover:border-blue-400">
+      {/* Image Header */}
+      {image_url && (
+        <div className="relative w-full h-48 bg-gray-200">
+          <Image
+            src={image_url}
+            alt={`${ai_plan.city || destination} - Travel destination`}
+            fill
+            className="object-cover"
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+          />
+        </div>
+      )}
+      
+      {/* Content */}
+      <div className="p-5">
       {/* Header */}
       <div className="mb-3">
-        <h3 className="text-xl font-bold text-gray-900 mb-1">
-          {ai_plan.city || destination}
-        </h3>
+        <div className="flex items-start justify-between gap-2 mb-1">
+          <h3 className="text-xl font-bold text-gray-900">
+            {ai_plan.city || destination}
+          </h3>
+          {/* Admin viewing indicator */}
+          {showActions && !user_id && (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium shrink-0">
+              Anonymous
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-3 text-sm text-gray-600 mb-2">
           <span className="flex items-center gap-1">
             📅 {days} {days === 1 ? 'day' : 'days'}
@@ -48,7 +72,7 @@ export function ItineraryCard({
           </span>
         </div>
         
-        {/* Privacy and Status badges (only in My Plans) */}
+        {/* Privacy and Status badges (only when showActions is true) */}
         {showActions && (
           <div className="flex items-center gap-2">
             <span
@@ -201,6 +225,7 @@ export function ItineraryCard({
           </div>
         </>
       )}
+      </div>
     </div>
   );
 

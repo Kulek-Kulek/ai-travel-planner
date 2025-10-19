@@ -1,14 +1,20 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ItineraryCard } from './itinerary-card';
 import { Button } from './ui/button';
 import { getPublicItineraries, getAllTags } from '@/lib/actions/itinerary-actions';
+import { deleteItineraryAdmin, updateItineraryPrivacyAdmin } from '@/lib/actions/admin-actions';
 import { toast } from 'sonner';
 
-export function ItineraryGallery() {
+interface ItineraryGalleryProps {
+  isAdmin?: boolean;
+}
+
+export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const queryClient = useQueryClient();
 
   // Fetch itineraries with TanStack Query
   const { data: itinerariesData, isLoading } = useQuery({
@@ -53,11 +59,58 @@ export function ItineraryGallery() {
     setSelectedTags([]);
   };
 
+  // Admin: Delete itinerary
+  const handleDelete = async (id: string) => {
+    const result = await deleteItineraryAdmin(id);
+    
+    if (result.success) {
+      toast.success('Itinerary deleted');
+      queryClient.invalidateQueries({ queryKey: ['public-itineraries'] });
+      queryClient.invalidateQueries({ queryKey: ['all-tags'] });
+    } else {
+      toast.error(result.error);
+    }
+  };
+
+  // Admin: Toggle privacy
+  const handleTogglePrivacy = async (id: string, currentPrivacy: boolean) => {
+    const result = await updateItineraryPrivacyAdmin(id, !currentPrivacy);
+    
+    if (result.success) {
+      toast.success(`Set to ${!currentPrivacy ? 'private' : 'public'}`);
+      queryClient.invalidateQueries({ queryKey: ['public-itineraries'] });
+    } else {
+      toast.error(result.error);
+    }
+  };
+
+  // Admin: Toggle status
+  const handleToggleStatus = async (id: string, currentStatus: string) => {
+    // For admin view, we don't need status toggle on gallery
+    // Redirect to edit page instead
+    window.location.href = `/itinerary/${id}/edit`;
+  };
+
   // Group tags by category for better UX
   const popularTags = allTags.slice(0, 15);
 
   return (
     <div className="space-y-6">
+      {/* Admin Mode Indicator */}
+      {isAdmin && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">🛡️</span>
+            <div>
+              <p className="font-semibold text-red-900">Admin Mode Active</p>
+              <p className="text-sm text-red-700">
+                You can edit, delete, and manage all itineraries directly from this gallery
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Filter Section */}
       {allTags.length > 0 && (
         <div className="bg-white rounded-lg shadow-sm p-5 border border-gray-200">
@@ -143,7 +196,14 @@ export function ItineraryGallery() {
       {!isLoading && itineraries.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {itineraries.map(itinerary => (
-            <ItineraryCard key={itinerary.id} itinerary={itinerary} />
+            <ItineraryCard 
+              key={itinerary.id} 
+              itinerary={itinerary}
+              showActions={isAdmin}
+              onTogglePrivacy={isAdmin ? handleTogglePrivacy : undefined}
+              onToggleStatus={isAdmin ? handleToggleStatus : undefined}
+              onDelete={isAdmin ? (id, destination) => handleDelete(id) : undefined}
+            />
           ))}
         </div>
       )}

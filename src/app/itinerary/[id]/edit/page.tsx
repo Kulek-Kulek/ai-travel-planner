@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import Link from 'next/link';
 import { toast } from 'sonner';
 
@@ -20,8 +21,10 @@ export default function EditItineraryPage() {
   const [itinerary, setItinerary] = useState<Itinerary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
   const [days, setDays] = useState(3);
   const [travelers, setTravelers] = useState(1);
+  const [hasAccessibilityNeeds, setHasAccessibilityNeeds] = useState(false);
   const [notes, setNotes] = useState('');
 
   useEffect(() => {
@@ -51,6 +54,32 @@ export default function EditItineraryPage() {
     loadItinerary();
   }, [id, router]);
 
+  // Cycle through loading messages while regenerating
+  useEffect(() => {
+    if (!isRegenerating) {
+      setLoadingMessage('');
+      return;
+    }
+
+    const messages = [
+      '🔍 Analyzing updated preferences...',
+      '🌍 Re-exploring destination...',
+      '🎨 Crafting new itinerary...',
+      '🗺️ Replanning activities...',
+      '✨ Finalizing changes...',
+    ];
+
+    let currentIndex = 0;
+    setLoadingMessage(messages[0]);
+
+    const interval = setInterval(() => {
+      currentIndex = (currentIndex + 1) % messages.length;
+      setLoadingMessage(messages[currentIndex]);
+    }, 3000); // Change message every 3 seconds
+
+    return () => clearInterval(interval);
+  }, [isRegenerating]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -69,22 +98,21 @@ export default function EditItineraryPage() {
 
     setIsRegenerating(true);
 
-    // Show loading toast
-    toast.loading('🤖 AI is regenerating your itinerary...', {
-      id: 'regenerating',
-      description: `${days}-day trip for ${travelers} travelers`,
-    });
-
     try {
       // Call AI to regenerate the itinerary with new parameters
       const result = await generateItinerary({
         destination: itinerary.destination, // Keep same destination
         days,
         travelers,
+        hasAccessibilityNeeds,
         notes,
+        keepExistingPhoto: true, // Don't fetch new photo
+        existingPhotoData: {
+          image_url: itinerary.image_url,
+          image_photographer: itinerary.image_photographer,
+          image_photographer_url: itinerary.image_photographer_url,
+        },
       });
-
-      toast.dismiss('regenerating');
 
       if (result.success) {
         toast.success('✅ Itinerary regenerated successfully!', {
@@ -98,7 +126,6 @@ export default function EditItineraryPage() {
         setIsRegenerating(false);
       }
     } catch (error) {
-      toast.dismiss('regenerating');
       toast.error('Unexpected error occurred');
       console.error('Regeneration error:', error);
       setIsRegenerating(false);
@@ -205,6 +232,24 @@ export default function EditItineraryPage() {
               </div>
             </div>
 
+            {/* Accessibility Needs */}
+            <div className="flex flex-row items-center justify-between rounded-lg border border-gray-200 p-4">
+              <div className="space-y-0.5">
+                <Label htmlFor="accessibility" className="text-base">
+                  Accessibility Requirements
+                </Label>
+                <p className="text-sm text-gray-500">
+                  Enable wheelchair access, elevator availability, and other mobility considerations
+                </p>
+              </div>
+              <Switch
+                id="accessibility"
+                checked={hasAccessibilityNeeds}
+                onCheckedChange={setHasAccessibilityNeeds}
+                disabled={isRegenerating}
+              />
+            </div>
+
             {/* Notes / Preferences */}
             <div>
               <Label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-2">
@@ -242,10 +287,9 @@ export default function EditItineraryPage() {
                 size="lg"
               >
                 {isRegenerating ? (
-                  <>
-                    <span className="animate-spin mr-2">🤖</span>
-                    Regenerating...
-                  </>
+                  <span className="animate-pulse">
+                    {loadingMessage || '✨ Regenerating...'}
+                  </span>
                 ) : (
                   <>
                     <span className="mr-2">✨</span>
