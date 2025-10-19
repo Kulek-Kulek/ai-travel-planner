@@ -203,7 +203,7 @@ export async function updateItineraryPrivacy(
       return { success: false, error: 'Failed to update itinerary' };
     }
     
-    return { success: true };
+    return { success: true, data: undefined };
   } catch (error) {
     console.error('Error in updateItineraryPrivacy:', error);
     return { success: false, error: 'An unexpected error occurred' };
@@ -236,7 +236,7 @@ export async function updateItineraryStatus(
       return { success: false, error: 'Failed to update status' };
     }
     
-    return { success: true };
+    return { success: true, data: undefined };
   } catch (error) {
     console.error('Error in updateItineraryStatus:', error);
     return { success: false, error: 'An unexpected error occurred' };
@@ -272,7 +272,7 @@ export async function updateItinerary(
       return { success: false, error: 'Failed to update itinerary' };
     }
     
-    return { success: true };
+    return { success: true, data: undefined };
   } catch (error) {
     console.error('Error in updateItinerary:', error);
     return { success: false, error: 'An unexpected error occurred' };
@@ -302,7 +302,7 @@ export async function deleteItinerary(id: string): Promise<ActionResult<void>> {
       return { success: false, error: 'Failed to delete itinerary' };
     }
     
-    return { success: true };
+    return { success: true, data: undefined };
   } catch (error) {
     console.error('Error in deleteItinerary:', error);
     return { success: false, error: 'An unexpected error occurred' };
