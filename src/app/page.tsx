@@ -1,31 +1,32 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ItineraryForm } from '@/components/itinerary-form';
 import { ItineraryGallery } from '@/components/itinerary-gallery';
 import { generateItinerary } from '@/lib/actions/ai-actions';
+import { getUserRole } from '@/lib/auth/admin';
 import { toast } from 'sonner';
 import Link from 'next/link';
 
 export default function Home() {
   const [result, setResult] = useState<any>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
   const queryClient = useQueryClient();
+  const galleryRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Check if user is admin
+    getUserRole().then(role => {
+      setIsAdmin(role === 'admin');
+    });
+  }, []);
 
   // Use TanStack Query mutation for generating itinerary
   const mutation = useMutation({
     mutationFn: generateItinerary,
-    onMutate: () => {
-      // Show loading toast
-      toast.loading('AI is generating your itinerary...', {
-        id: 'generating',
-        description: 'This may take 10-20 seconds',
-      });
-    },
     onSuccess: (response, variables) => {
-      // Dismiss loading toast
-      toast.dismiss('generating');
-
       if (response.success) {
         // Show success toast
         toast.success('Itinerary generated and saved!', {
@@ -44,6 +45,16 @@ export default function Home() {
         // Invalidate queries to refresh gallery and tags
         queryClient.invalidateQueries({ queryKey: ['public-itineraries'] });
         queryClient.invalidateQueries({ queryKey: ['all-tags'] });
+
+        // Auto-scroll to gallery to show the new plan
+        setTimeout(() => {
+          if (galleryRef.current) {
+            galleryRef.current.scrollIntoView({ 
+              behavior: 'smooth', 
+              block: 'start' 
+            });
+          }
+        }, 500); // Small delay to allow gallery to update
       } else {
         toast.error('Failed to generate itinerary', {
           description: response.error,
@@ -51,7 +62,6 @@ export default function Home() {
       }
     },
     onError: (error) => {
-      toast.dismiss('generating');
       toast.error('Unexpected error occurred', {
         description: 'Please try again or contact support',
       });
@@ -59,12 +69,44 @@ export default function Home() {
     },
   });
 
+  // Cycle through loading messages while generating
+  useEffect(() => {
+    if (!mutation.isPending) {
+      setLoadingMessage('');
+      return;
+    }
+
+    const messages = [
+      '🔍 Analyzing your travel preferences...',
+      '🌍 Exploring destination highlights...',
+      '🎨 Curating the perfect itinerary...',
+      '🗺️ Planning daily activities...',
+      '📸 Selecting beautiful destination photos...',
+      '✨ Adding final touches...',
+    ];
+
+    let currentIndex = 0;
+    setLoadingMessage(messages[0]);
+
+    const interval = setInterval(() => {
+      currentIndex = (currentIndex + 1) % messages.length;
+      setLoadingMessage(messages[currentIndex]);
+    }, 3000); // Change message every 3 seconds
+
+    return () => clearInterval(interval);
+  }, [mutation.isPending]);
+
   const handleSubmit = (data: any) => {
     setResult(null);
     mutation.mutate({
       destination: data.destination,
       days: data.days,
       travelers: data.travelers,
+      startDate: data.startDate,
+      endDate: data.endDate,
+      children: data.children,
+      childAges: data.childAges,
+      hasAccessibilityNeeds: data.hasAccessibilityNeeds,
       notes: data.notes,
     });
   };
@@ -115,15 +157,56 @@ export default function Home() {
 
             {mutation.isPending && (
               <div className="text-center py-12">
-                <div className="text-6xl mb-4 animate-bounce">🤖</div>
-                <p className="text-gray-700 font-medium">
-                  AI is creating your perfect itinerary...
-                </p>
-                <p className="text-gray-500 text-sm mt-2">
-                  This may take a few seconds
-                </p>
+                {/* Travel Animation: Palm trees with plane */}
+                <div className="relative h-24 mb-6 flex items-center justify-center">
+                  {/* Left Palm Tree */}
+                  <div className="absolute left-1/4 text-5xl transform -translate-x-1/2">
+                    🌴
+                  </div>
+                  
+                  {/* Plane flying across */}
+                  <div className="absolute left-0 text-4xl animate-plane">
+                    ✈️
+                  </div>
+                  
+                  {/* Right Palm Tree */}
+                  <div className="absolute right-1/4 text-5xl transform translate-x-1/2">
+                    🌴
+                  </div>
+                </div>
+                
+                {/* Dynamic loading message with fade animation */}
+                <div className="min-h-[60px] flex flex-col items-center justify-center">
+                  <p className="text-gray-700 font-medium text-lg animate-pulse">
+                    {loadingMessage || '✨ AI is creating your perfect itinerary...'}
+                  </p>
+                  <p className="text-gray-500 text-sm mt-2">
+                    This may take 10-20 seconds
+                  </p>
+                </div>
               </div>
             )}
+            
+            <style jsx>{`
+              @keyframes fly-plane {
+                0% {
+                  left: 10%;
+                  transform: translateY(0) scale(1);
+                }
+                50% {
+                  left: 50%;
+                  transform: translateY(-10px) scale(1.2);
+                }
+                100% {
+                  left: 90%;
+                  transform: translateY(0) scale(1);
+                }
+              }
+              
+              .animate-plane {
+                animation: fly-plane 2.5s ease-in-out infinite;
+              }
+            `}</style>
 
             {result && !mutation.isPending && (
               <div className="space-y-4">
@@ -191,10 +274,10 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Public Itineraries Gallery */}
-        <div className="mt-16">
-          <ItineraryGallery />
-        </div>
+                {/* Public Itineraries Gallery */}
+                <div ref={galleryRef} className="mt-16">
+                  <ItineraryGallery isAdmin={isAdmin} />
+                </div>
       </main>
     </div>
   );
