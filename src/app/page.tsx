@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ItineraryForm } from '@/components/itinerary-form';
 import { ItineraryGallery } from '@/components/itinerary-gallery';
 import { generateItinerary } from '@/lib/actions/ai-actions';
@@ -8,35 +9,27 @@ import { toast } from 'sonner';
 import Link from 'next/link';
 
 export default function Home() {
-  const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState<any>(null);
+  const queryClient = useQueryClient();
 
-  const handleSubmit = async (data: any) => {
-    setIsGenerating(true);
-    setResult(null);
-
-    // Show loading toast
-    toast.loading('AI is generating your itinerary...', {
-      id: 'generating',
-      description: 'This may take 10-20 seconds',
-    });
-
-    try {
-      // Call real AI generation Server Action
-      const response = await generateItinerary({
-        destination: data.destination,
-        days: data.days,
-        travelers: data.travelers,
-        notes: data.notes,
+  // Use TanStack Query mutation for generating itinerary
+  const mutation = useMutation({
+    mutationFn: generateItinerary,
+    onMutate: () => {
+      // Show loading toast
+      toast.loading('AI is generating your itinerary...', {
+        id: 'generating',
+        description: 'This may take 10-20 seconds',
       });
-
+    },
+    onSuccess: (response, variables) => {
       // Dismiss loading toast
       toast.dismiss('generating');
 
       if (response.success) {
-        // Show success toast with save confirmation
+        // Show success toast
         toast.success('Itinerary generated and saved!', {
-          description: `${data.days}-day trip to ${response.data.city}`,
+          description: `${variables.days}-day trip to ${response.data.city}`,
           action: {
             label: 'View',
             onClick: () => window.location.href = `/itinerary/${response.data.id}`,
@@ -44,24 +37,36 @@ export default function Home() {
         });
 
         setResult({
-          ...data,
+          ...variables,
           aiPlan: response.data,
         });
+
+        // Invalidate queries to refresh gallery and tags
+        queryClient.invalidateQueries({ queryKey: ['public-itineraries'] });
+        queryClient.invalidateQueries({ queryKey: ['all-tags'] });
       } else {
-        // Show error toast
         toast.error('Failed to generate itinerary', {
           description: response.error,
         });
       }
-    } catch (error) {
+    },
+    onError: (error) => {
       toast.dismiss('generating');
       toast.error('Unexpected error occurred', {
         description: 'Please try again or contact support',
       });
       console.error('Generation error:', error);
-    } finally {
-      setIsGenerating(false);
-    }
+    },
+  });
+
+  const handleSubmit = (data: any) => {
+    setResult(null);
+    mutation.mutate({
+      destination: data.destination,
+      days: data.days,
+      travelers: data.travelers,
+      notes: data.notes,
+    });
   };
 
   return (
@@ -90,7 +95,7 @@ export default function Home() {
             <h2 className="text-2xl font-semibold mb-6 text-gray-900">
               Create Your Itinerary
             </h2>
-            <ItineraryForm onSubmit={handleSubmit} isLoading={isGenerating} />
+            <ItineraryForm onSubmit={handleSubmit} isLoading={mutation.isPending} />
           </div>
 
           {/* Preview/Result Section */}
@@ -99,7 +104,7 @@ export default function Home() {
               Your Itinerary
             </h2>
             
-            {!result && !isGenerating && (
+            {!result && !mutation.isPending && (
               <div className="text-center py-12">
                 <div className="text-6xl mb-4">🗺️</div>
                 <p className="text-gray-500">
@@ -108,7 +113,7 @@ export default function Home() {
               </div>
             )}
 
-            {isGenerating && (
+            {mutation.isPending && (
               <div className="text-center py-12">
                 <div className="text-6xl mb-4 animate-bounce">🤖</div>
                 <p className="text-gray-700 font-medium">
@@ -120,7 +125,7 @@ export default function Home() {
               </div>
             )}
 
-            {result && !isGenerating && (
+            {result && !mutation.isPending && (
               <div className="space-y-4">
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                   <h3 className="text-lg font-bold text-green-900 mb-2">

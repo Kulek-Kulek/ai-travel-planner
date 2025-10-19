@@ -24,6 +24,7 @@ export type Itinerary = {
   };
   tags: string[];
   is_private: boolean;
+  status?: string; // 'active', 'completed', 'archived'
   created_at: string;
 };
 
@@ -202,6 +203,75 @@ export async function updateItineraryPrivacy(
     return { success: true };
   } catch (error) {
     console.error('Error in updateItineraryPrivacy:', error);
+    return { success: false, error: 'An unexpected error occurred' };
+  }
+}
+
+/**
+ * Update itinerary status (mark as completed, active, or archived)
+ */
+export async function updateItineraryStatus(
+  id: string,
+  status: 'active' | 'completed' | 'archived'
+): Promise<ActionResult<void>> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      return { success: false, error: 'Not authenticated' };
+    }
+    
+    const { error } = await supabase
+      .from('itineraries')
+      .update({ status })
+      .eq('id', id)
+      .eq('user_id', user.id);
+    
+    if (error) {
+      console.error('Error updating status:', error);
+      return { success: false, error: 'Failed to update status' };
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error in updateItineraryStatus:', error);
+    return { success: false, error: 'An unexpected error occurred' };
+  }
+}
+
+/**
+ * Update itinerary basic details (destination, notes)
+ */
+export async function updateItinerary(
+  id: string,
+  updates: {
+    destination?: string;
+    notes?: string;
+  }
+): Promise<ActionResult<void>> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      return { success: false, error: 'Not authenticated' };
+    }
+    
+    const { error } = await supabase
+      .from('itineraries')
+      .update(updates)
+      .eq('id', id)
+      .eq('user_id', user.id);
+    
+    if (error) {
+      console.error('Error updating itinerary:', error);
+      return { success: false, error: 'Failed to update itinerary' };
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error in updateItinerary:', error);
     return { success: false, error: 'An unexpected error occurred' };
   }
 }
