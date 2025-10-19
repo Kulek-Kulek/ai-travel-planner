@@ -1,4 +1,5 @@
 import { getUser, signOut } from '@/lib/actions/auth-actions';
+import { isAdmin } from '@/lib/auth/admin';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
@@ -14,6 +15,7 @@ async function SignOutButton() {
 
 export async function NavHeader() {
   const user = await getUser();
+  const userIsAdmin = user ? await isAdmin() : false;
 
   return (
     <header className="bg-white shadow-sm border-b">
@@ -26,10 +28,10 @@ export async function NavHeader() {
             {user && (
               <nav className="flex space-x-4">
                 <Link
-                  href="/itineraries"
+                  href="/my-plans"
                   className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
                 >
-                  My Itineraries
+                  My Plans
                 </Link>
                 <Link
                   href="/profile"
@@ -37,6 +39,14 @@ export async function NavHeader() {
                 >
                   Profile
                 </Link>
+                {userIsAdmin && (
+                  <Link
+                    href="/admin/itineraries"
+                    className="text-red-600 hover:text-red-800 px-3 py-2 rounded-md text-sm font-medium font-semibold"
+                  >
+                    🛡️ Admin
+                  </Link>
+                )}
               </nav>
             )}
           </div>
@@ -67,4 +77,5 @@ export async function NavHeader() {
     </header>
   );
 }
+
 

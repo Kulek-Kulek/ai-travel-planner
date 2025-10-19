@@ -69,3 +69,4 @@ create trigger handle_profiles_updated_at
 -- Create indexes
 create index profiles_email_idx on profiles(email);
 
+
