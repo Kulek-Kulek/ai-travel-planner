@@ -2,6 +2,7 @@
 
 import { openrouter } from '@/lib/openrouter/client';
 import { createClient } from '@/lib/supabase/server';
+import { fetchDestinationPhoto } from '@/lib/pexels/client';
 import { z } from 'zod';
 
 // Input schema
@@ -9,7 +10,18 @@ const generateItinerarySchema = z.object({
   destination: z.string().min(1, 'Destination is required'),
   days: z.number().int().positive().max(30),
   travelers: z.number().int().positive().max(20),
+  startDate: z.date().optional(),
+  endDate: z.date().optional(),
+  children: z.number().int().min(0).max(10).optional(),
+  childAges: z.array(z.number().int().min(0).max(17)).optional(),
+  hasAccessibilityNeeds: z.boolean().optional(),
   notes: z.string().optional(),
+  keepExistingPhoto: z.boolean().optional(),
+  existingPhotoData: z.object({
+    image_url: z.string().nullable().optional(),
+    image_photographer: z.string().nullable().optional(),
+    image_photographer_url: z.string().nullable().optional(),
+  }).optional(),
 });
 
 // AI response schema matching your PRD
@@ -80,30 +92,50 @@ export async function generateItinerary(
     
     const validatedResponse = aiResponseSchema.parse(parsedResponse);
     
-    // 6. Generate AI tags for the itinerary
-    const tags = await generateTags({
-      destination: validated.destination,
-      days: validated.days,
-      travelers: validated.travelers,
-      notes: validated.notes,
-      aiPlan: validatedResponse,
-    });
+    // 6. Fetch destination photo and generate tags in parallel
+    // Now we pass the AI plan to the photo fetcher so it can search for specific places mentioned
+    // Skip photo fetch if editing and keeping existing photo
+    const photoPromise = validated.keepExistingPhoto && validated.existingPhotoData
+      ? Promise.resolve({
+          url: validated.existingPhotoData.image_url || null,
+          photographer: validated.existingPhotoData.image_photographer || null,
+          photographerUrl: validated.existingPhotoData.image_photographer_url || null,
+        })
+      : fetchDestinationPhoto(validated.destination, validated.notes, validatedResponse);
+    
+    const [photo, tags] = await Promise.all([
+      photoPromise,
+      generateTags({
+        destination: validated.destination,
+        days: validated.days,
+        travelers: validated.travelers,
+        notes: validated.notes,
+        aiPlan: validatedResponse,
+      }),
+    ]);
     
     // 7. Save to database
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     
-    const { data: savedItinerary, error: dbError } = await supabase
+    const { data: savedItinerary, error: dbError} = await supabase
       .from('itineraries')
       .insert({
         user_id: user?.id || null, // NULL for anonymous users
         destination: validated.destination,
         days: validated.days,
         travelers: validated.travelers,
+        start_date: validated.startDate?.toISOString().split('T')[0] || null,
+        end_date: validated.endDate?.toISOString().split('T')[0] || null,
+        children: validated.children || 0,
+        child_ages: validated.childAges || [],
         notes: validated.notes || null,
         ai_plan: validatedResponse,
         tags,
         is_private: false, // Default to public (users can change later)
+        image_url: photo?.url || null,
+        image_photographer: photo?.photographer || null,
+        image_photographer_url: photo?.photographerUrl || null,
       })
       .select('id')
       .single();
@@ -152,12 +184,58 @@ export async function generateItinerary(
 }
 
 function buildPrompt(params: z.infer<typeof generateItinerarySchema>): string {
+  // Build traveler description
+  let travelersDesc = `${params.travelers} adult${params.travelers > 1 ? 's' : ''}`;
+  if (params.children && params.children > 0) {
+    travelersDesc += ` and ${params.children} child${params.children > 1 ? 'ren' : ''}`;
+    if (params.childAges && params.childAges.length > 0) {
+      travelersDesc += ` (ages: ${params.childAges.join(', ')})`;
+    }
+  }
+
+  // Build date-specific instructions
+  let dateInstructions = '';
+  let dayTitleExample = '"Day 1"';
+  
+  if (params.startDate && params.endDate) {
+    const startDateStr = params.startDate.toLocaleDateString('en-US', { 
+      weekday: 'short', 
+      month: 'short', 
+      day: 'numeric' 
+    });
+    const endDateStr = params.endDate.toLocaleDateString('en-US', { 
+      weekday: 'short', 
+      month: 'short', 
+      day: 'numeric' 
+    });
+    
+    dateInstructions = `\nTravel dates: ${startDateStr} to ${endDateStr}`;
+    dayTitleExample = `"Day 1 - ${startDateStr}"`;
+    
+    // Generate all day titles with actual dates
+    const dayTitles: string[] = [];
+    const currentDate = new Date(params.startDate);
+    for (let i = 0; i < params.days; i++) {
+      const dayStr = currentDate.toLocaleDateString('en-US', { 
+        weekday: 'short', 
+        month: 'short', 
+        day: 'numeric' 
+      });
+      dayTitles.push(`Day ${i + 1} - ${dayStr}`);
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    dateInstructions += `\n\nIMPORTANT: Use these EXACT day titles in order:\n${dayTitles.map((t, i) => `${i + 1}. "${t}"`).join('\n')}`;
+  }
+
   return `Generate a ${params.days}-day travel itinerary for ${params.destination}.
 
-Number of travelers: ${params.travelers}
+Number of travelers: ${travelersDesc}${dateInstructions}
 ${params.notes ? `Additional notes: ${params.notes}` : ''}
 
 IMPORTANT: Detect the language used in the user's notes and respond in that SAME language. If no notes provided or notes are in English, respond in English. Match the user's language for all text content (place names, descriptions, etc.).
+${params.children && params.children > 0 ? `\nIMPORTANT: This trip includes children (ages ${params.childAges?.join(', ') || 'unspecified'}). Include child-friendly activities, appropriate timing, and family-suitable venues.` : ''}
+${params.hasAccessibilityNeeds ? `\nIMPORTANT: This trip requires accessibility accommodations. ONLY include venues with wheelchair access, elevators, accessible restrooms, and mobility-friendly facilities. Avoid places with many stairs, narrow passages, or difficult terrain. Prioritize accessible transportation options.` : ''}
 
 Create a detailed day-by-day travel plan including attractions, food suggestions, and estimated visit times. 
 Each day should include multiple places to visit with timing recommendations.
@@ -167,7 +245,7 @@ Return ONLY a JSON object (no markdown, no extra text) with this EXACT structure
   "city": "${params.destination}",
   "days": [
     {
-      "title": "Day 1" (or "Dzień 1" for Polish, etc. - match user's language),
+      "title": ${dayTitleExample} ${params.startDate ? '(use the EXACT titles provided above)' : '(or "Dzień 1" for Polish, etc. - match user\'s language)'},
       "places": [
         {
           "name": "Place name",

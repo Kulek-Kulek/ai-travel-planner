@@ -1,6 +1,7 @@
 import { getItinerary } from '@/lib/actions/itinerary-actions';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { ItineraryActions } from '@/components/itinerary-actions';
 import { createClient } from '@/lib/supabase/server';
 
@@ -17,7 +18,7 @@ export default async function ItineraryPage({
   }
 
   const itinerary = result.data;
-  const { ai_plan, destination, days, travelers, notes, tags, created_at, user_id } = itinerary;
+  const { ai_plan, destination, days, travelers, notes, tags, created_at, user_id, image_url, image_photographer, image_photographer_url } = itinerary;
 
   // Check if current user is the owner
   const supabase = await createClient();
@@ -44,6 +45,34 @@ export default async function ItineraryPage({
             </Link>
           )}
         </div>
+
+        {/* Destination Image */}
+        {image_url && (
+          <div className="relative w-full h-48 md:h-64 rounded-lg overflow-hidden shadow-lg mb-6">
+            <Image
+              src={image_url}
+              alt={`${ai_plan.city || destination} - Travel destination`}
+              fill
+              className="object-cover"
+              priority
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1200px"
+            />
+            {/* Photo attribution overlay */}
+            {image_photographer && image_photographer_url && (
+              <div className="absolute bottom-0 right-0 bg-black/10 text-white text-xs px-2 py-1 m-2 rounded opacity-10">
+                Photo by{' '}
+                <a
+                  href={image_photographer_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-blue-200"
+                >
+                  {image_photographer}
+                </a>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Header Card */}
         <div className="bg-white rounded-lg shadow-lg p-6 md:p-8 mb-6">
