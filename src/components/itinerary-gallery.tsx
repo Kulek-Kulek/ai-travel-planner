@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ItineraryCard } from './itinerary-card';
 import { Button } from './ui/button';
 import { getPublicItineraries, getAllTags } from '@/lib/actions/itinerary-actions';
@@ -85,7 +85,7 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
   };
 
   // Admin: Toggle status
-  const handleToggleStatus = async (id: string, currentStatus: string) => {
+  const handleToggleStatus = async (id: string) => {
     // For admin view, we don't need status toggle on gallery
     // Redirect to edit page instead
     window.location.href = `/itinerary/${id}/edit`;
@@ -202,7 +202,7 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
               showActions={isAdmin}
               onTogglePrivacy={isAdmin ? handleTogglePrivacy : undefined}
               onToggleStatus={isAdmin ? handleToggleStatus : undefined}
-              onDelete={isAdmin ? (id, destination) => handleDelete(id) : undefined}
+              onDelete={isAdmin ? (id) => handleDelete(id) : undefined}
             />
           ))}
         </div>

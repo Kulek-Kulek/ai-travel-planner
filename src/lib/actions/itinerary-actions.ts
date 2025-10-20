@@ -1,7 +1,6 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
-import { z } from 'zod';
 
 // Itinerary from database
 export type Itinerary = {
