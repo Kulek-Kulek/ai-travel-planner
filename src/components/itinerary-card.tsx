@@ -275,7 +275,11 @@ export function ItineraryCard({
 
   // Wrap with Link only if not showing actions (public gallery)
   if (!showActions) {
-    return <Link href={`/itinerary/${id}`}>{cardContent}</Link>;
+    return (
+      <Link href={`/itinerary/${id}`} prefetch>
+        {cardContent}
+      </Link>
+    );
   }
 
   return cardContent;

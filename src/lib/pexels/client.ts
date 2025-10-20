@@ -21,6 +21,8 @@ import { createClient } from 'pexels';
 import { createApi } from 'unsplash-js';
 import { openrouter } from '@/lib/openrouter/client';
 
+const photoDebug = process.env.NEXT_PUBLIC_PHOTO_DEBUG === 'true';
+
 const pexelsClient = process.env.PEXELS_API_KEY 
   ? createClient(process.env.PEXELS_API_KEY)
   : null;
@@ -63,7 +65,7 @@ export async function fetchDestinationPhoto(
 ): Promise<PhotoResult | null> {
   try {
     const searchQuery = buildSearchQuery(destination, notes, aiPlan);
-    console.log(`🔍 Searching both Pexels and Unsplash for: "${searchQuery}"`);
+    if (photoDebug) console.log(`🔍 Searching both Pexels and Unsplash for: "${searchQuery}"`);
 
     // Fetch from both sources in parallel
     const [pexelsPhotos, unsplashPhotos] = await Promise.all([
@@ -78,17 +80,17 @@ export async function fetchDestinationPhoto(
     ];
 
     if (allPhotos.length === 0) {
-      console.warn(`No photos found for ${destination}, trying fallback`);
+      if (photoDebug) console.warn(`No photos found for ${destination}, trying fallback`);
       return fetchFallbackPhoto(destination);
     }
 
-    console.log(`📸 Found ${allPhotos.length} photos total (${pexelsPhotos.length} Pexels + ${unsplashPhotos.length} Unsplash)`);
+    if (photoDebug) console.log(`📸 Found ${allPhotos.length} photos total (${pexelsPhotos.length} Pexels + ${unsplashPhotos.length} Unsplash)`);
 
     // AI Verification: Let AI pick the best from both sources
     const enableAIVerification = process.env.ENABLE_AI_PHOTO_VERIFICATION !== 'false';
     
     if (enableAIVerification && process.env.OPENROUTER_API_KEY && allPhotos.length > 1) {
-      console.log(`🤖 AI will pick the best photo from ${allPhotos.length} candidates`);
+      if (photoDebug) console.log(`🤖 AI will pick the best photo from ${allPhotos.length} candidates`);
       
       // Build context from AI plan
       const planLandmarks = extractLandmarksFromPlan(aiPlan);
@@ -99,13 +101,13 @@ export async function fetchDestinationPhoto(
       const verifiedPhoto = await verifyPhotoWithAI(destination, notes, allPhotos, searchQuery, planContext);
       
       if (verifiedPhoto) {
-        console.log(`✅ AI selected best photo for ${destination}`);
+        if (photoDebug) console.log(`✅ AI selected best photo for ${destination}`);
         return verifiedPhoto;
       }
       
-      console.warn(`⚠️ AI verification failed, using smart random selection`);
+      if (photoDebug) console.warn(`⚠️ AI verification failed, using smart random selection`);
     } else {
-      console.log(`📸 AI verification disabled, using smart random selection`);
+      if (photoDebug) console.log(`📸 AI verification disabled, using smart random selection`);
     }
     
     // Smart Random Selection: Prefer photos from the top results
@@ -119,7 +121,7 @@ export async function fetchDestinationPhoto(
       photographerUrl: selectedPhoto.photographerUrl,
     };
   } catch (error) {
-    console.error('Error fetching destination photo:', error);
+    if (photoDebug) console.error('Error fetching destination photo:', error);
     return null;
   }
 }
@@ -129,7 +131,7 @@ export async function fetchDestinationPhoto(
  */
 async function fetchFromPexels(query: string): Promise<UnifiedPhoto[]> {
   if (!pexelsClient) {
-    console.log('Pexels API not configured, skipping');
+    if (photoDebug) console.log('Pexels API not configured, skipping');
     return [];
   }
 
@@ -143,7 +145,7 @@ async function fetchFromPexels(query: string): Promise<UnifiedPhoto[]> {
     });
 
     if ('error' in result || !result.photos || result.photos.length === 0) {
-      console.log('No Pexels photos found');
+      if (photoDebug) console.log('No Pexels photos found');
       return [];
     }
 
@@ -155,7 +157,7 @@ async function fetchFromPexels(query: string): Promise<UnifiedPhoto[]> {
       imageUrl: photo.src.large,
     }));
   } catch (error) {
-    console.error('Pexels fetch error:', error);
+    if (photoDebug) console.error('Pexels fetch error:', error);
     return [];
   }
 }
@@ -165,7 +167,7 @@ async function fetchFromPexels(query: string): Promise<UnifiedPhoto[]> {
  */
 async function fetchFromUnsplash(query: string): Promise<UnifiedPhoto[]> {
   if (!unsplashClient) {
-    console.log('Unsplash API not configured, skipping');
+    if (photoDebug) console.log('Unsplash API not configured, skipping');
     return [];
   }
 
@@ -179,7 +181,7 @@ async function fetchFromUnsplash(query: string): Promise<UnifiedPhoto[]> {
     });
 
     if (result.errors || !result.response || result.response.results.length === 0) {
-      console.log('No Unsplash photos found');
+      if (photoDebug) console.log('No Unsplash photos found');
       return [];
     }
 
@@ -191,7 +193,7 @@ async function fetchFromUnsplash(query: string): Promise<UnifiedPhoto[]> {
       imageUrl: photo.urls.regular,
     }));
   } catch (error) {
-    console.error('Unsplash fetch error:', error);
+    if (photoDebug) console.error('Unsplash fetch error:', error);
     return [];
   }
 }
@@ -210,7 +212,7 @@ async function verifyPhotoWithAI(
   try {
     // Skip AI verification if OpenRouter is not configured
     if (!process.env.OPENROUTER_API_KEY) {
-      console.warn('OpenRouter not configured, skipping AI photo verification');
+      if (photoDebug) console.warn('OpenRouter not configured, skipping AI photo verification');
       return null;
     }
 
@@ -222,7 +224,7 @@ async function verifyPhotoWithAI(
       photographer: photo.photographer,
     }));
     
-    console.log(`📋 Evaluating ${photos.length} photos for ${destination}:`, 
+    if (photoDebug) console.log(`📋 Evaluating ${photos.length} photos for ${destination}:`, 
       photoDescriptions.map(p => `[${p.source}] ${p.alt}`));
 
     const prompt = `You are a travel photo curator for a TOURIST/TRAVEL APP. Select inspiring, positive photos that make people want to visit ${destination}.
@@ -282,24 +284,24 @@ Pick highest score. Set bestPhotoIndex to -1 ONLY if ALL photos score below 5.`;
 
     const content = completion.choices[0]?.message?.content;
     if (!content) {
-      console.warn('No AI response for photo verification');
+      if (photoDebug) console.warn('No AI response for photo verification');
       return null;
     }
 
     const result = JSON.parse(content);
     const { bestPhotoIndex, reason, scores } = result;
 
-    console.log(`🤖 AI scores for ${destination}:`, scores);
-    console.log(`🎯 AI decision: Photo ${bestPhotoIndex + 1}, Reason: ${reason}`);
+    if (photoDebug) console.log(`🤖 AI scores for ${destination}:`, scores);
+    if (photoDebug) console.log(`🎯 AI decision: Photo ${bestPhotoIndex + 1}, Reason: ${reason}`);
 
     if (bestPhotoIndex === -1 || bestPhotoIndex >= photos.length) {
-      console.warn(`⚠️ AI rejected all photos for ${destination}: ${reason}`);
-      console.warn(`📊 Photo scores were:`, scores);
+      if (photoDebug) console.warn(`⚠️ AI rejected all photos for ${destination}: ${reason}`);
+      if (photoDebug) console.warn(`📊 Photo scores were:`, scores);
       return null;
     }
 
     const selectedPhoto = photos[bestPhotoIndex];
-    console.log(`✅ AI selected photo ${bestPhotoIndex + 1}/${photos.length} from ${selectedPhoto.source.toUpperCase()}: ${reason}`);
+    if (photoDebug) console.log(`✅ AI selected photo ${bestPhotoIndex + 1}/${photos.length} from ${selectedPhoto.source.toUpperCase()}: ${reason}`);
 
     return {
       url: selectedPhoto.imageUrl,
@@ -307,7 +309,7 @@ Pick highest score. Set bestPhotoIndex to -1 ONLY if ALL photos score below 5.`;
       photographerUrl: selectedPhoto.photographerUrl,
     };
   } catch (error) {
-    console.error('❌ Error verifying photo with AI:', error);
+    if (photoDebug) console.error('❌ Error verifying photo with AI:', error);
     return null;
   }
 }
@@ -366,7 +368,7 @@ function buildSearchQuery(destination: string, notes?: string, aiPlan?: AIPlan):
   if (planLandmarks.length > 0) {
     // Use the first landmark mentioned in the plan
     const firstLandmark = planLandmarks[0];
-    console.log(`🎯 Using landmark from AI plan: ${firstLandmark}`);
+    if (photoDebug) console.log(`🎯 Using landmark from AI plan: ${firstLandmark}`);
     return `${firstLandmark} ${destination}`;
   }
 
@@ -533,7 +535,7 @@ async function fetchFallbackPhoto(destination: string): Promise<PhotoResult | nu
         const topPhotos = result.photos.slice(0, 6);
         const randomIndex = Math.floor(Math.random() * topPhotos.length);
         const photo = topPhotos[randomIndex];
-        console.log(`📸 Selected fallback photo for ${destination} from ${query}`);
+        if (photoDebug) console.log(`📸 Selected fallback photo for ${destination} from ${query}`);
         return {
           url: photo.src.large,
           photographer: photo.photographer,
@@ -544,7 +546,7 @@ async function fetchFallbackPhoto(destination: string): Promise<PhotoResult | nu
     
     return null;
   } catch (error) {
-    console.error('Error fetching fallback photo:', error);
+    if (photoDebug) console.error('Error fetching fallback photo:', error);
     return null;
   }
 }
