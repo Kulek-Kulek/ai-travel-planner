@@ -9,8 +9,36 @@ import { getUserRole } from '@/lib/auth/admin';
 import { toast } from 'sonner';
 import Link from 'next/link';
 
+type FormData = {
+  destination: string;
+  days: number;
+  travelers: number;
+  startDate?: Date;
+  endDate?: Date;
+  children?: number;
+  childAges?: number[];
+  hasAccessibilityNeeds?: boolean;
+  notes?: string;
+};
+
+type ResultData = FormData & {
+  aiPlan?: {
+    id: string;
+    city: string;
+    days: Array<{
+      title: string;
+      places: Array<{
+        name: string;
+        desc: string;
+        time: string;
+      }>;
+    }>;
+    tags?: string[];
+  };
+};
+
 export default function Home() {
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<ResultData | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const queryClient = useQueryClient();
@@ -96,7 +124,7 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [mutation.isPending]);
 
-  const handleSubmit = (data: any) => {
+  const handleSubmit = (data: FormData) => {
     setResult(null);
     mutation.mutate({
       destination: data.destination,
@@ -224,11 +252,11 @@ export default function Home() {
                 </div>
 
                 {/* Show first 2 days as preview */}
-                {result.aiPlan?.days?.slice(0, 2).map((day: any, dayIndex: number) => (
+                {result.aiPlan?.days?.slice(0, 2).map((day, dayIndex) => (
                   <div key={dayIndex} className="border-l-4 border-blue-500 pl-4 space-y-3">
                     <h4 className="font-semibold text-gray-900">{day.title}</h4>
                     
-                    {day.places?.slice(0, 3).map((place: any, placeIndex: number) => (
+                    {day.places?.slice(0, 3).map((place, placeIndex) => (
                       <div key={placeIndex} className="bg-gray-50 rounded-lg p-3">
                         <p className="font-medium text-gray-900">{place.name}</p>
                         <p className="text-sm text-gray-600 mt-1">{place.desc}</p>
@@ -240,7 +268,7 @@ export default function Home() {
                   </div>
                 ))}
 
-                {result.aiPlan?.days?.length > 2 && (
+                {result.aiPlan?.days && result.aiPlan.days.length > 2 && (
                   <p className="text-sm text-gray-500 text-center">
                     + {result.aiPlan.days.length - 2} more days...
                   </p>
@@ -262,17 +290,19 @@ export default function Home() {
                   </div>
                 )}
 
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <p className="text-green-800 text-sm">
-                    ✅ <strong>Itinerary saved!</strong> View your full itinerary or browse more plans below.
-                  </p>
-                  <Link
-                    href={`/itinerary/${result.aiPlan.id}`}
-                    className="inline-block mt-2 text-green-700 font-medium hover:underline"
-                  >
-                    View Full Itinerary →
-                  </Link>
-                </div>
+                {result.aiPlan?.id && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <p className="text-green-800 text-sm">
+                      ✅ <strong>Itinerary saved!</strong> View your full itinerary or browse more plans below.
+                    </p>
+                    <Link
+                      href={`/itinerary/${result.aiPlan.id}`}
+                      className="inline-block mt-2 text-green-700 font-medium hover:underline"
+                    >
+                      View Full Itinerary →
+                    </Link>
+                  </div>
+                )}
               </div>
             )}
           </div>

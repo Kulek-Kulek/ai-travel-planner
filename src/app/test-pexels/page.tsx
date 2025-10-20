@@ -4,8 +4,16 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 
+type PexelsTestResult = {
+  photo?: {
+    url: string;
+    photographer: string;
+  };
+  message?: string;
+};
+
 export default function TestPexelsPage() {
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<PexelsTestResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,7 +31,7 @@ export default function TestPexelsPage() {
       } else {
         setResult(data);
       }
-    } catch (err) {
+    } catch {
       setError('Failed to test Pexels API');
     }
     

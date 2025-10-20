@@ -72,7 +72,7 @@ export function DeleteItineraryDialog({
                 />
                 {confirmText && !isMatch && (
                   <div className="text-sm text-red-600">
-                    Destination doesn't match. Please type exactly: {destination}
+                    Destination doesn&apos;t match. Please type exactly: {destination}
                   </div>
                 )}
                 {isMatch && (
