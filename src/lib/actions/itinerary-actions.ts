@@ -10,6 +10,11 @@ export type Itinerary = {
   destination: string;
   days: number;
   travelers: number;
+  start_date?: string | null;
+  end_date?: string | null;
+  children?: number;
+  child_ages?: number[];
+  has_accessibility_needs?: boolean;
   notes: string | null;
   ai_plan: {
     city: string;
