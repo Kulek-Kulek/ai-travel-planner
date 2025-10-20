@@ -85,7 +85,7 @@ export async function generateItinerary(
     let parsedResponse;
     try {
       parsedResponse = JSON.parse(content);
-    } catch (parseError) {
+    } catch {
       console.error('AI response parse error:', content);
       return { success: false, error: 'Invalid response from AI. Please try again.' };
     }

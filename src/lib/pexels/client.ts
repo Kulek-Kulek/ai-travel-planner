@@ -17,7 +17,7 @@
  * ENABLE_AI_PHOTO_VERIFICATION=false
  */
 
-import { createClient, Photo } from 'pexels';
+import { createClient } from 'pexels';
 import { createApi } from 'unsplash-js';
 import { openrouter } from '@/lib/openrouter/client';
 
