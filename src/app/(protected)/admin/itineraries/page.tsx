@@ -7,9 +7,17 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import { DeleteItineraryDialog } from '@/components/delete-itinerary-dialog';
 
+type AdminStats = {
+  totalItineraries: number;
+  publicItineraries: number;
+  privateItineraries: number;
+  anonymousItineraries: number;
+  totalUsers: number;
+};
+
 export default function AdminItinerariesPage() {
   const [itineraries, setItineraries] = useState<AdminItinerary[]>([]);
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<AdminStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'public' | 'private' | 'anonymous'>('all');
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; id: string; destination: string }>({
@@ -20,6 +28,7 @@ export default function AdminItinerariesPage() {
 
   useEffect(() => {
     loadData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter]);
 
   const loadData = async () => {

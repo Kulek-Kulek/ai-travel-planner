@@ -35,7 +35,7 @@ export default async function ProfilePage() {
               Profile Preferences Coming Soon 🚀
             </h2>
             <p className="text-blue-700">
-              In the next phase, you'll be able to set:
+              In the next phase, you&apos;ll be able to set:
             </p>
             <ul className="list-disc list-inside text-blue-700 mt-2 space-y-1">
               <li>Travel interests and preferences</li>
