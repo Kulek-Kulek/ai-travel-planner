@@ -143,9 +143,33 @@ export async function generateItinerary(
     
     if (dbError || !savedItinerary) {
       console.error('Database save error:', dbError);
+      console.error('Error details:', JSON.stringify(dbError, null, 2));
+      console.error('Saved itinerary:', savedItinerary);
+      
+      // Provide more specific error messages
+      if (dbError) {
+        const errorMessage = dbError.message || 'Unknown database error';
+        console.error('Supabase error message:', errorMessage);
+        
+        // Check for common issues
+        if (errorMessage.includes('permission') || errorMessage.includes('policy')) {
+          return { 
+            success: false, 
+            error: 'Database permission error. Please check RLS policies or try signing in.' 
+          };
+        }
+        
+        if (errorMessage.includes('violates')) {
+          return { 
+            success: false, 
+            error: 'Database constraint violation. Please check your input data.' 
+          };
+        }
+      }
+      
       return { 
         success: false, 
-        error: 'Generated itinerary but failed to save. Please try again.' 
+        error: 'Generated itinerary but failed to save. Please try again or contact support.' 
       };
     }
     

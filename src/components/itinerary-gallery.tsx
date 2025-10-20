@@ -17,7 +17,7 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
   const queryClient = useQueryClient();
 
   // Fetch itineraries with TanStack Query
-  const { data: itinerariesData, isLoading } = useQuery({
+  const { data: itinerariesData, isLoading, isFetching } = useQuery({
     queryKey: ['public-itineraries', selectedTags],
     queryFn: async () => {
       const result = await getPublicItineraries({
@@ -158,6 +158,9 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
             ? `Filtered Itineraries (${total})`
             : `Explore Itineraries (${total})`}
         </h2>
+        {(isLoading || isFetching) && (
+          <span className="text-sm text-gray-500 animate-pulse">Loading…</span>
+        )}
       </div>
 
       {/* Loading State */}
