@@ -2,6 +2,7 @@ import { getUser, signOut } from '@/lib/actions/auth-actions';
 import { isAdmin } from '@/lib/auth/admin';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { HideOnScroll } from '@/components/hide-on-scroll';
 
 async function SignOutButton() {
   return (
@@ -18,9 +19,11 @@ export async function NavHeader() {
   const userIsAdmin = user ? await isAdmin() : false;
 
   return (
-    <header className="bg-white shadow-sm border-b">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
+    <>
+      <HideOnScroll height={64}>
+        <header className="bg-white/90 backdrop-blur shadow-sm border-b">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-8">
             <Link href="/" className="text-xl font-bold text-gray-900">
               ✈️ AI Travel Planner
@@ -72,9 +75,13 @@ export async function NavHeader() {
               </>
             )}
           </div>
-        </div>
-      </div>
-    </header>
+            </div>
+          </div>
+        </header>
+      </HideOnScroll>
+      {/* Spacer to offset fixed header height */}
+      <div className="h-16" />
+    </>
   );
 }
 
