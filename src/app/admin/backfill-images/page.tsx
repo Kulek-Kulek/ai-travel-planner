@@ -52,7 +52,7 @@ export default function BackfillImagesPage() {
           description: data.error,
         });
       }
-    } catch (error) {
+    } catch {
       toast.dismiss('clearing');
       toast.error('Failed to clear images');
     }
@@ -153,7 +153,7 @@ export default function BackfillImagesPage() {
           <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-6">
             <h2 className="font-semibold text-orange-900 mb-2">🔧 Migrate from Unsplash</h2>
             <p className="text-sm text-orange-800 mb-3">
-              If you're seeing errors about Unsplash images, click below to clear them first:
+              If you&apos;re seeing errors about Unsplash images, click below to clear them first:
             </p>
             <Button
               onClick={handleClearUnsplash}

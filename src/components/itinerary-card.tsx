@@ -41,9 +41,7 @@ export function ItineraryCard({
     is_private, 
     status, 
     user_id, 
-    image_url, 
-    image_photographer, 
-    image_photographer_url 
+    image_url
   } = itinerary;
   
   // Get first few places as preview

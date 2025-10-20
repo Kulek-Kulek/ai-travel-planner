@@ -273,7 +273,7 @@ export default function EditItineraryPage() {
             {/* Warning Box */}
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
               <p className="text-sm text-yellow-800">
-                <strong>⚠️ Important:</strong> Clicking "Regenerate with AI" will create a completely new itinerary 
+                <strong>⚠️ Important:</strong> Clicking &quot;Regenerate with AI&quot; will create a completely new itinerary 
                 with fresh AI-generated content. The current itinerary will be replaced.
               </p>
             </div>
