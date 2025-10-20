@@ -129,6 +129,7 @@ export async function generateItinerary(
         end_date: validated.endDate?.toISOString().split('T')[0] || null,
         children: validated.children || 0,
         child_ages: validated.childAges || [],
+        has_accessibility_needs: validated.hasAccessibilityNeeds || false,
         notes: validated.notes || null,
         ai_plan: validatedResponse,
         tags,

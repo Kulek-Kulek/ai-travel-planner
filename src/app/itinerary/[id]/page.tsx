@@ -18,7 +18,24 @@ export default async function ItineraryPage({
   }
 
   const itinerary = result.data;
-  const { ai_plan, destination, days, travelers, notes, tags, created_at, user_id, image_url, image_photographer, image_photographer_url } = itinerary;
+  const { 
+    ai_plan, 
+    destination, 
+    days, 
+    travelers, 
+    start_date, 
+    end_date, 
+    children, 
+    child_ages, 
+    has_accessibility_needs,
+    notes, 
+    tags, 
+    created_at, 
+    user_id, 
+    image_url, 
+    image_photographer, 
+    image_photographer_url 
+  } = itinerary;
 
   // Check if current user is the owner
   const supabase = await createClient();
@@ -81,16 +98,42 @@ export default async function ItineraryPage({
           </h1>
           
           <div className="flex flex-wrap items-center gap-4 text-gray-600 mb-4">
-            <span className="flex items-center gap-2">
-              <span className="text-xl">📅</span>
-              <span>{days} {days === 1 ? 'day' : 'days'}</span>
-            </span>
+            {/* Date range if available */}
+            {start_date && end_date ? (
+              <span className="flex items-center gap-2">
+                <span className="text-xl">📅</span>
+                <span>{new Date(start_date).toLocaleDateString('en-GB')} - {new Date(end_date).toLocaleDateString('en-GB')} ({days} {days === 1 ? 'day' : 'days'})</span>
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <span className="text-xl">📅</span>
+                <span>{days} {days === 1 ? 'day' : 'days'}</span>
+              </span>
+            )}
+            
+            {/* Travelers */}
             <span className="flex items-center gap-2">
               <span className="text-xl">👥</span>
-              <span>{travelers} {travelers === 1 ? 'traveler' : 'travelers'}</span>
+              <span>
+                {travelers} adult{travelers > 1 ? 's' : ''}
+                {children && children > 0 && (
+                  <>, {children} {children === 1 ? 'child' : 'children'}
+                  {child_ages && child_ages.length > 0 && ` (ages: ${child_ages.join(', ')})`}</>
+                )}
+              </span>
             </span>
+            
+            {/* Accessibility */}
+            {has_accessibility_needs && (
+              <span className="flex items-center gap-2 text-blue-600 font-medium">
+                <span className="text-xl">♿</span>
+                <span>Accessible</span>
+              </span>
+            )}
+            
+            {/* Created date */}
             <span className="flex items-center gap-2">
-              <span className="text-xl">📅</span>
+              <span className="text-xl">📆</span>
               <span>Created {new Date(created_at).toLocaleDateString()}</span>
             </span>
           </div>

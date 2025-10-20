@@ -18,6 +18,13 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Form,
   FormControl,
   FormDescription,
@@ -318,11 +325,6 @@ export const ItineraryForm = ({ onSubmit, isLoading = false }: ItineraryFormProp
                     disabled={isLoading}
                   />
                 </FormControl>
-                {watchStartDate && watchEndDate && (
-                  <FormDescription>
-                    ✅ Auto-calculated from dates
-                  </FormDescription>
-                )}
                 <FormMessage />
               </FormItem>
             )}
@@ -390,28 +392,34 @@ export const ItineraryForm = ({ onSubmit, isLoading = false }: ItineraryFormProp
                 Ages of Children <span className="text-red-500">*</span>
               </FormLabel>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                {childAgesInput.map((_, index) => (
-                  <Input
+                {Array.from({ length: watchChildren }, (_, index) => (
+                  <Select
                     key={index}
-                    type="number"
-                    min="0"
-                    max="17"
-                    placeholder={`Child ${index + 1} age`}
-                    value={childAgesInput[index]}
-                    onChange={(e) => {
+                    value={childAgesInput[index] || ''}
+                    onValueChange={(value) => {
                       const newAges = [...childAgesInput];
-                      newAges[index] = e.target.value;
+                      newAges[index] = value;
                       setChildAgesInput(newAges);
                       
                       // Update form value
                       const ages = newAges
-                        .map(age => parseInt(age))
-                        .filter(age => !isNaN(age));
+                        .filter(age => age !== '')
+                        .map(age => parseInt(age));
                       form.setValue('childAges', ages);
                     }}
                     disabled={isLoading}
-                    className="w-full"
-                  />
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder={`Child ${index + 1} age`} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 17 }, (_, i) => i + 1).map((age) => (
+                        <SelectItem key={age} value={age.toString()}>
+                          {age} {age === 1 ? 'year' : 'years'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 ))}
               </div>
               {form.formState.errors.childAges && (
