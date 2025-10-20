@@ -25,7 +25,26 @@ export function ItineraryCard({
   onToggleStatus,
   onDelete 
 }: ItineraryCardProps) {
-  const { id, destination, days, travelers, tags, ai_plan, created_at, is_private, status, user_id, image_url, image_photographer, image_photographer_url } = itinerary;
+  const { 
+    id, 
+    destination, 
+    days, 
+    travelers, 
+    start_date, 
+    end_date, 
+    children, 
+    child_ages, 
+    has_accessibility_needs,
+    tags, 
+    ai_plan, 
+    created_at, 
+    is_private, 
+    status, 
+    user_id, 
+    image_url, 
+    image_photographer, 
+    image_photographer_url 
+  } = itinerary;
   
   // Get first few places as preview
   const previewPlaces = ai_plan.days
@@ -63,13 +82,40 @@ export function ItineraryCard({
             </span>
           )}
         </div>
-        <div className="flex items-center gap-3 text-sm text-gray-600 mb-2">
-          <span className="flex items-center gap-1">
-            📅 {days} {days === 1 ? 'day' : 'days'}
-          </span>
-          <span className="flex items-center gap-1">
-            👥 {travelers} {travelers === 1 ? 'traveler' : 'travelers'}
-          </span>
+        <div className="space-y-1 mb-2">
+          {/* Date range if available */}
+          {start_date && end_date && (
+            <div className="flex items-center gap-1 text-sm text-gray-600">
+              <span>📅</span>
+              <span>{new Date(start_date).toLocaleDateString('en-GB')} - {new Date(end_date).toLocaleDateString('en-GB')}</span>
+            </div>
+          )}
+          {!start_date && (
+            <div className="flex items-center gap-1 text-sm text-gray-600">
+              <span>📅</span>
+              <span>{days} {days === 1 ? 'day' : 'days'}</span>
+            </div>
+          )}
+          
+          {/* Travelers info */}
+          <div className="flex items-center gap-1 text-sm text-gray-600">
+            <span>👥</span>
+            <span>
+              {travelers} adult{travelers > 1 ? 's' : ''}
+              {children && children > 0 && (
+                <>, {children} {children === 1 ? 'child' : 'children'} 
+                {child_ages && child_ages.length > 0 && ` (ages: ${child_ages.join(', ')})`}</>
+              )}
+            </span>
+          </div>
+          
+          {/* Accessibility indicator */}
+          {has_accessibility_needs && (
+            <div className="flex items-center gap-1 text-sm text-blue-600">
+              <span>♿</span>
+              <span>Accessible</span>
+            </div>
+          )}
         </div>
         
         {/* Privacy and Status badges (only when showActions is true) */}
