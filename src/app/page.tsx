@@ -215,7 +215,11 @@ export default function Home() {
                     {result.aiPlan?.city || result.destination}
                   </h3>
                   <p className="text-green-700 text-sm">
-                    {result.days} days • {result.travelers} traveler{result.travelers > 1 ? 's' : ''}
+                    {result.days} days • {result.travelers} adult{result.travelers > 1 ? 's' : ''}
+                    {result.children && result.children > 0 && (
+                      <>, {result.children} {result.children === 1 ? 'child' : 'children'}</>
+                    )}
+                    {result.hasAccessibilityNeeds && <> • ♿ Accessible</>}
                   </p>
                 </div>
 
