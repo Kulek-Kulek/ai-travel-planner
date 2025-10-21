@@ -33,7 +33,7 @@ export function HideOnScroll({ children, height = 64 }: HideOnScrollProps) {
 
   return (
     <div
-      className={`fixed inset-x-0 top-0 z-50 transform-gpu transition-transform duration-300 ${
+      className={`fixed inset-x-0 top-0 z-50 transform-gpu transition-transform duration-300 bg-white backdrop-blur shadow-sm border-b ${
         hidden ? '-translate-y-full' : 'translate-y-0'
       }`}
       style={{ height }}

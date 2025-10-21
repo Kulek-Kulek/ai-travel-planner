@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {
+const nextConfig: NextConfig & { turbopack?: { root?: string } } = {
+  turbopack: {
+    // Set the workspace root explicitly to avoid "inferred workspace root" warnings
+    root: __dirname,
+  },
   images: {
     remotePatterns: [
       {
