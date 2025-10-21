@@ -5,21 +5,23 @@ import { Toaster } from "@/components/ui/sonner";
 import { NavHeader } from "@/components/nav-header";
 import { RouteProgress } from "@/components/route-progress";
 import { BackToTop } from "@/components/back-to-top";
-import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
+import { Manrope, IBM_Plex_Mono } from "next/font/google";
 
 export const metadata: Metadata = {
   title: "AI Travel Planner",
   description: "Generate personalized travel itineraries with AI",
 };
 
-const fontSans = Plus_Jakarta_Sans({
+const fontSans = Manrope({
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
   display: "swap",
   variable: "--font-geist-sans",
 });
 
-const fontMono = JetBrains_Mono({
+const fontMono = IBM_Plex_Mono({
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
   display: "swap",
   variable: "--font-geist-mono",
 });
