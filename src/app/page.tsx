@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ItineraryForm } from '@/components/itinerary-form';
 import { ItineraryGallery } from '@/components/itinerary-gallery';
+import { Masthead } from '@/components/masthead';
 import { generateItinerary } from '@/lib/actions/ai-actions';
 import { getUserRole } from '@/lib/auth/admin';
 import { toast } from 'sonner';
@@ -43,6 +44,7 @@ export default function Home() {
   const [loadingMessage, setLoadingMessage] = useState('');
   const queryClient = useQueryClient();
   const galleryRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Check if user is admin
@@ -139,40 +141,45 @@ export default function Home() {
     });
   };
 
+  const handlePlanTripScroll = () => {
+    if (formRef.current) {
+      formRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      {/* Hero Section */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">
-            ✈️ AI Travel Planner
-          </h1>
-          <p className="text-xl md:text-2xl text-blue-100 mb-6">
-            Generate personalized travel itineraries in seconds
-          </p>
-          <p className="text-lg text-blue-50">
-            Create, save, and discover amazing travel plans powered by AI
-          </p>
-        </div>
-      </div>
+    <div className="min-h-screen bg-slate-50">
+      <Masthead onPlanTrip={handlePlanTripScroll} />
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <main className="relative z-10 mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
         {/* Form and Preview Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-16">
+        <div ref={formRef} className="-mt-16 grid grid-cols-1 gap-10 lg:grid-cols-[1.05fr_0.95fr]">
           {/* Form Section */}
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <h2 className="text-2xl font-semibold mb-6 text-gray-900">
-              Create Your Itinerary
+          <div className="rounded-3xl border border-slate-200 bg-white/90 p-8 shadow-[0_40px_100px_-60px_rgba(30,64,175,0.6)] backdrop-blur-lg">
+            <h2 className="text-2xl font-semibold text-slate-900">
+              Create an itinerary
             </h2>
-            <ItineraryForm onSubmit={handleSubmit} isLoading={mutation.isPending} />
+            <p className="mt-1 text-sm text-slate-500">
+              Tell us about the travelers, and we’ll draft a balanced plan with signature experiences.
+            </p>
+
+            <div className="mt-5">
+              <ItineraryForm onSubmit={handleSubmit} isLoading={mutation.isPending} />
+            </div>
           </div>
 
           {/* Preview/Result Section */}
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <h2 className="text-2xl font-semibold mb-6 text-gray-900">
-              Your Itinerary
-            </h2>
+          <div className="rounded-3xl border border-slate-200 bg-white/80 p-8 shadow-[0_45px_90px_-70px_rgba(15,23,42,0.5)] backdrop-blur-xl">
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-2xl font-semibold text-slate-900">Preview</h2>
+              <span className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                {mutation.isPending ? 'Generating' : result ? 'Ready to share' : 'Awaiting details'}
+              </span>
+            </div>
             
             {!result && !mutation.isPending && (
               <div className="text-center py-12">
@@ -205,10 +212,10 @@ export default function Home() {
                 
                 {/* Dynamic loading message with fade animation */}
                 <div className="min-h-[60px] flex flex-col items-center justify-center">
-                  <p className="text-gray-700 font-medium text-lg animate-pulse">
+                  <p className="text-indigo-900 font-medium text-lg animate-pulse">
                     {loadingMessage || '✨ AI is creating your perfect itinerary...'}
                   </p>
-                  <p className="text-gray-500 text-sm mt-2">
+                  <p className="text-indigo-900/60 text-sm mt-2">
                     This may take 10-20 seconds
                   </p>
                 </div>
@@ -238,11 +245,11 @@ export default function Home() {
 
             {result && !mutation.isPending && (
               <div className="space-y-4">
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <h3 className="text-lg font-bold text-green-900 mb-2">
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4">
+                  <h3 className="text-lg font-semibold text-emerald-900 mb-1">
                     {result.aiPlan?.city || result.destination}
                   </h3>
-                  <p className="text-green-700 text-sm">
+                  <p className="text-emerald-800 text-sm">
                     {result.days} days • {result.travelers} adult{result.travelers > 1 ? 's' : ''}
                     {result.children && result.children > 0 && (
                       <>, {result.children} {result.children === 1 ? 'child' : 'children'}</>
@@ -253,14 +260,14 @@ export default function Home() {
 
                 {/* Show first 2 days as preview */}
                 {result.aiPlan?.days?.slice(0, 2).map((day, dayIndex) => (
-                  <div key={dayIndex} className="border-l-4 border-blue-500 pl-4 space-y-3">
-                    <h4 className="font-semibold text-gray-900">{day.title}</h4>
+                  <div key={dayIndex} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                    <h4 className="font-semibold text-slate-900">{day.title}</h4>
                     
                     {day.places?.slice(0, 3).map((place, placeIndex) => (
-                      <div key={placeIndex} className="bg-gray-50 rounded-lg p-3">
-                        <p className="font-medium text-gray-900">{place.name}</p>
-                        <p className="text-sm text-gray-600 mt-1">{place.desc}</p>
-                        <p className="text-xs text-gray-500 mt-2">
+                      <div key={placeIndex} className="mt-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                        <p className="font-medium text-slate-900">{place.name}</p>
+                        <p className="text-sm text-slate-500 mt-1">{place.desc}</p>
+                        <p className="text-xs text-slate-400 mt-2">
                           ⏱️ {place.time}
                         </p>
                       </div>
@@ -269,19 +276,19 @@ export default function Home() {
                 ))}
 
                 {result.aiPlan?.days && result.aiPlan.days.length > 2 && (
-                  <p className="text-sm text-gray-500 text-center">
+                  <p className="text-sm text-slate-500 text-center">
                     + {result.aiPlan.days.length - 2} more days...
                   </p>
                 )}
 
                 {result.aiPlan?.tags && result.aiPlan.tags.length > 0 && (
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <p className="text-sm font-medium text-gray-700 mb-2">🏷️ Tags:</p>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-sm font-medium text-slate-700 mb-2">🏷️ Tags:</p>
                     <div className="flex flex-wrap gap-2">
                       {result.aiPlan.tags.map((tag: string, idx: number) => (
                         <span
                           key={idx}
-                          className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
+                          className="inline-block rounded-full bg-indigo-100 px-2 py-1 text-xs font-medium text-indigo-700"
                         >
                           {tag}
                         </span>
@@ -291,13 +298,13 @@ export default function Home() {
                 )}
 
                 {result.aiPlan?.id && (
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <p className="text-green-800 text-sm">
+                  <div className="rounded-2xl border border-emerald-100 bg-emerald-50/80 p-4">
+                    <p className="text-emerald-800 text-sm">
                       ✅ <strong>Itinerary saved!</strong> View your full itinerary or browse more plans below.
                     </p>
                     <Link
                       href={`/itinerary/${result.aiPlan.id}`}
-                      className="inline-block mt-2 text-green-700 font-medium hover:underline"
+                      className="mt-3 inline-block text-sm font-semibold text-emerald-700 hover:underline"
                     >
                       View Full Itinerary →
                     </Link>
@@ -308,8 +315,8 @@ export default function Home() {
           </div>
         </div>
 
-                {/* Public Itineraries Gallery */}
-                <div ref={galleryRef} className="mt-16">
+        {/* Public Itineraries Gallery */}
+        <div id="public-itineraries" ref={galleryRef} className="mt-24">
                   <ItineraryGallery isAdmin={isAdmin} />
                 </div>
       </main>
