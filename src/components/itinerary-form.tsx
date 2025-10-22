@@ -194,77 +194,76 @@ export const ItineraryForm = ({
     <Form {...form}>
       <form
         onSubmit={form.handleSubmit(handleFormSubmit, handleFormError)}
-        className="space-y-6"
+        className="space-y-10"
       >
-        {/* Trip Brief */}
-        <FormField
-          control={form.control}
-          name="notes"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-lg font-semibold text-slate-900">
-                Describe your ideal trip
-              </FormLabel>
-              <FormDescription className="text-sm text-slate-500">
-                Prefer to brief the AI directly? Share destinations, dates,
-                travel style, must-see moments, or any constraints in your own
-                words.
-              </FormDescription>
-              <FormControl>
-                <div className="rounded-3xl border border-indigo-100 bg-indigo-50/60 p-1 shadow-[0_20px_60px_-45px_rgba(79,70,229,0.75)]">
-                  <Textarea
-                    placeholder="e.g., Craft a relaxed 6-day escape in Kyoto and Osaka for two food lovers. Include tea ceremonies, hidden ramen bars, and a day trip to Nara."
-                    rows={10}
-                    className="min-h-[200px] resize-y rounded-[26px] border-0 bg-white/90 px-5 py-4 text-base leading-7 text-slate-900 shadow-sm focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-0"
-                    {...field}
-                    disabled={isLoading}
-                  />
-                </div>
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        {/* Trip Essentials */}
-        <div className="space-y-6 rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-[0_25px_80px_-65px_rgba(15,23,42,0.35)]">
-          <div className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-              Trip essentials
-            </h3>
-            <p className="text-sm text-slate-500">
-              Tell us the destination, travelers, and either how long the trip
-              lasts or the exact dates. Provide at least one of those two to
-              continue.
-            </p>
-          </div>
-
+        <section className="space-y-4">
           <FormField
             control={form.control}
-            name="destination"
+            name="notes"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>
-                  Where would you like to travel?{" "}
-                  <span className="text-red-500">*</span>
+                <FormLabel className="text-lg font-semibold text-slate-900">
+                  Describe your ideal trip
                 </FormLabel>
-                <FormDescription>
-                  City, region, or country. We’ll take care of the rest.
+                <FormDescription className="text-sm text-slate-500">
+                  Prefer to brief the AI directly? Share destinations, dates,
+                  travel style, must-see moments, or any constraints in your own
+                  words.
                 </FormDescription>
                 <FormControl>
-                  <Input
-                    placeholder="e.g., Paris, France"
-                    {...field}
-                    disabled={isLoading}
-                  />
+                  <div className="rounded-3xl border border-indigo-100 bg-indigo-50/60 p-1 shadow-[0_20px_60px_-45px_rgba(79,70,229,0.75)]">
+                    <Textarea
+                      placeholder="e.g., Craft a relaxed 6-day escape in Kyoto and Osaka for two food lovers. Include tea ceremonies, hidden ramen bars, and a day trip to Nara."
+                      rows={10}
+                      className="min-h-[200px] resize-y rounded-[26px] border-0 bg-white/90 px-5 py-4 text-base leading-7 text-slate-900 shadow-sm focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-0"
+                      {...field}
+                      disabled={isLoading}
+                    />
+                  </div>
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
+        </section>
 
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 mb-1">
-            {/* Number of Days */}
+        <section className="space-y-6 rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-[0_25px_80px_-65px_rgba(15,23,42,0.35)]">
+          <div className="space-y-2">
+            <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+              Trip essentials
+            </h3>
+            <p className="text-sm text-slate-500">
+              Tell us the destination, trip length, and number of adults. Add
+              travel dates if you already know them.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+            <FormField
+              control={form.control}
+              name="destination"
+              render={({ field }) => (
+                <FormItem className="flex h-full flex-col">
+                  <div className="space-y-1">
+                    <FormLabel>
+                      Destination <span className="text-red-500">*</span>
+                    </FormLabel>
+                    <FormDescription>City, region, or country.</FormDescription>
+                  </div>
+                  <FormControl>
+                    <Input
+                      placeholder="e.g., Paris, France"
+                      {...field}
+                      disabled={isLoading}
+                    />
+                  </FormControl>
+                  <div className="mt-auto pt-2">
+                    <FormMessage />
+                  </div>
+                </FormItem>
+              )}
+            />
+
             <FormField
               control={form.control}
               name="days"
@@ -275,8 +274,7 @@ export const ItineraryForm = ({
                       Number of Days <span className="text-red-500">*</span>
                     </FormLabel>
                     <FormDescription>
-                      Between 1 and 30 days. Leave blank if you pick travel
-                      dates instead.
+                      Between 1 and 30. Leave blank if you set dates instead.
                     </FormDescription>
                   </div>
                   <FormControl>
@@ -323,7 +321,6 @@ export const ItineraryForm = ({
               )}
             />
 
-            {/* Number of Travelers */}
             <FormField
               control={form.control}
               name="travelers"
@@ -331,11 +328,10 @@ export const ItineraryForm = ({
                 <FormItem className="flex h-full flex-col">
                   <div className="space-y-1">
                     <FormLabel>
-                      Number of adults (18+){" "}
-                      <span className="text-red-500">*</span>
+                      Number of adults (18+) <span className="text-red-500">*</span>
                     </FormLabel>
                     <FormDescription>
-                      Max 20 travelers. Include everyone joining the trip.
+                      Max 20 adults. Include everyone joining the trip.
                     </FormDescription>
                   </div>
                   <FormControl>
@@ -345,7 +341,7 @@ export const ItineraryForm = ({
                       max="20"
                       {...field}
                       onChange={(e) =>
-                        field.onChange(parseInt(e.target.value) || 1)
+                        field.onChange(parseInt(e.target.value, 10) || 1)
                       }
                       disabled={isLoading}
                     />
@@ -378,123 +374,221 @@ export const ItineraryForm = ({
             />
           </div>
 
-          <div className="space-y-2">
-            <h4 className="text-sm font-medium text-slate-900">
-              Travel dates (optional)
-            </h4>
-            <p className="text-sm text-slate-500">
-              Selecting both start and end dates will auto-fill the trip length.
-            </p>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {/* Start Date */}
-              <FormField
-                control={form.control}
-                name="startDate"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Start Date</FormLabel>
-                    <Popover
-                      open={startDateOpen}
-                      onOpenChange={setStartDateOpen}
-                    >
-                      <PopoverTrigger asChild>
-                        <Button
-                          type="button"
-                          variant={"outline"}
-                          className={cn(
-                            "w-full pl-3 text-left font-normal",
-                            !field.value && "text-muted-foreground",
-                          )}
-                          disabled={isLoading}
-                        >
-                          {field.value ? (
-                            format(field.value, "dd/MM/yyyy")
-                          ) : (
-                            <span>Pick a date</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={(date) => {
-                            console.log("Start date selected:", date);
-                            field.onChange(date ?? undefined);
-                            if (date) {
-                              setStartDateOpen(false);
-                            }
-                          }}
-                          disabled={(date) =>
-                            isBefore(date, startOfDay(new Date()))
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <FormField
+              control={form.control}
+              name="startDate"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel>Start Date</FormLabel>
+                  <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className={cn(
+                          "w-full pl-3 text-left font-normal",
+                          !field.value && "text-muted-foreground",
+                        )}
+                        disabled={isLoading}
+                      >
+                        {field.value ? (
+                          format(field.value, "dd/MM/yyyy")
+                        ) : (
+                          <span>Pick a date</span>
+                        )}
+                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={field.value}
+                        onSelect={(date) => {
+                          field.onChange(date ?? undefined);
+                          if (date) {
+                            setStartDateOpen(false);
                           }
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                        }}
+                        disabled={(date) =>
+                          isBefore(date, startOfDay(new Date()))
+                        }
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-              {/* End Date */}
-              <FormField
-                control={form.control}
-                name="endDate"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>End Date</FormLabel>
-                    <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          type="button"
-                          variant={"outline"}
-                          className={cn(
-                            "w-full pl-3 text-left font-normal",
-                            !field.value && "text-muted-foreground",
-                          )}
-                          disabled={isLoading}
-                        >
-                          {field.value ? (
-                            format(field.value, "dd/MM/yyyy")
-                          ) : (
-                            <span>Pick a date</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={(date) => {
-                            console.log("End date selected:", date);
-                            field.onChange(date ?? undefined);
-                            if (date) {
-                              setEndDateOpen(false);
-                            }
-                          }}
-                          disabled={(date) => {
-                            if (watchStartDate) {
-                              return isBefore(date, watchStartDate);
-                            }
-                            return isBefore(date, startOfDay(new Date()));
-                          }}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            <FormField
+              control={form.control}
+              name="endDate"
+              render={({ field }) => (
+                <FormItem className="flex flex-col">
+                  <FormLabel>End Date</FormLabel>
+                  <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className={cn(
+                          "w-full pl-3 text-left font-normal",
+                          !field.value && "text-muted-foreground",
+                        )}
+                        disabled={isLoading}
+                      >
+                        {field.value ? (
+                          format(field.value, "dd/MM/yyyy")
+                        ) : (
+                          <span>Pick a date</span>
+                        )}
+                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={field.value}
+                        onSelect={(date) => {
+                          field.onChange(date ?? undefined);
+                          if (date) {
+                            setEndDateOpen(false);
+                          }
+                        }}
+                        disabled={(date) => {
+                          if (watchStartDate) {
+                            return isBefore(date, watchStartDate);
+                          }
+                          return isBefore(date, startOfDay(new Date()));
+                        }}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </div>
+        </section>
+
+        <section className="space-y-6 rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-[0_20px_60px_-55px_rgba(15,23,42,0.4)]">
+          <div className="space-y-2">
+            <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+              Additional details (optional)
+            </h3>
+            <p className="text-sm text-slate-500">
+              These details help AI tailor activities, pacing, and logistics for
+              everyone joining.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <FormField
+              control={form.control}
+              name="children"
+              render={({ field }) => (
+                <FormItem className="flex h-full flex-col">
+                  <div className="space-y-1">
+                    <FormLabel>Children</FormLabel>
+                    <FormDescription>
+                      Guests under 18. Leave blank if none.
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="10"
+                      value={field.value && field.value > 0 ? field.value : ""}
+                      onChange={(e) => {
+                        const numValue = parseInt(e.target.value, 10);
+                        const value =
+                          e.target.value === "" ||
+                          Number.isNaN(numValue) ||
+                          numValue === 0
+                            ? undefined
+                            : numValue;
+                        field.onChange(value);
+                      }}
+                      disabled={isLoading}
+                      placeholder="0"
+                    />
+                  </FormControl>
+                  <div className="mt-auto pt-2">
+                    <FormMessage />
+                  </div>
+                </FormItem>
+              )}
+            />
+          </div>
+
+          {watchChildren && watchChildren > 0 && (
+            <div className="space-y-3">
+              <FormLabel>Ages of Children (optional but helpful)</FormLabel>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+                {Array.from({ length: watchChildren || 0 }, (_, index) => (
+                  <Select
+                    key={index}
+                    value={childAgesInput[index] || ""}
+                    onValueChange={(value) => {
+                      const newAges = [...childAgesInput];
+                      newAges[index] = value;
+                      setChildAgesInput(newAges);
+
+                      const ages = newAges
+                        .filter((age) => age !== "")
+                        .map((age) => parseInt(age, 10));
+                      form.setValue("childAges", ages);
+                    }}
+                    disabled={isLoading}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder={`Child ${index + 1} age`} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 17 }, (_, i) => i + 1).map((age) => (
+                        <SelectItem key={age} value={age.toString()}>
+                          {age} {age === 1 ? "year" : "years"}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <FormField
+            control={form.control}
+            name="hasAccessibilityNeeds"
+            render={({ field }) => (
+              <FormItem className="flex flex-row items-center justify-between rounded-2xl border border-slate-200 bg-white/90 p-4">
+                <div className="space-y-0.5">
+                  <FormLabel className="text-base">
+                    Accessibility Requirements
+                  </FormLabel>
+                  <FormDescription>
+                    Enable wheelchair access, elevator availability, and other
+                    mobility considerations
+                  </FormDescription>
+                </div>
+                <FormControl>
+                  <Switch
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                    disabled={isLoading}
+                  />
+                </FormControl>
+              </FormItem>
+            )}
+          />
 
           <FormField
             control={form.control}
             name="model"
             render={({ field }) => (
-              <FormItem className="space-y-2">
+              <FormItem>
                 <FormLabel>AI provider</FormLabel>
                 <FormDescription>
                   Choose the model that will plan your trip. Providers vary in
@@ -527,123 +621,12 @@ export const ItineraryForm = ({
               </FormItem>
             )}
           />
-        </div>
+        </section>
 
-        {/* Children (Optional) */}
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <FormField
-              control={form.control}
-              name="children"
-              render={({ field }) => (
-                <FormItem className="flex h-full flex-col">
-                  <div className="space-y-1">
-                    <FormLabel>Children (Optional)</FormLabel>
-                    <FormDescription>
-                      Add guests under 18 so we can suggest family-friendly
-                      picks.
-                    </FormDescription>
-                  </div>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      min="0"
-                      max="10"
-                      value={field.value && field.value > 0 ? field.value : ""}
-                      onChange={(e) => {
-                        const numValue = parseInt(e.target.value);
-                        const value =
-                          e.target.value === "" ||
-                          isNaN(numValue) ||
-                          numValue === 0
-                            ? undefined
-                            : numValue;
-                        field.onChange(value);
-                      }}
-                      disabled={isLoading}
-                      placeholder="0"
-                    />
-                  </FormControl>
-                  <div className="mt-auto pt-2">
-                    <FormMessage />
-                  </div>
-                </FormItem>
-              )}
-            />
-          </div>
-
-          {/* Child Ages (Conditional) */}
-          {watchChildren && watchChildren > 0 && (
-            <div className="space-y-3">
-              <FormLabel>Ages of Children (optional but helpful)</FormLabel>
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-                {Array.from({ length: watchChildren }, (_, index) => (
-                  <Select
-                    key={index}
-                    value={childAgesInput[index] || ""}
-                    onValueChange={(value) => {
-                      const newAges = [...childAgesInput];
-                      newAges[index] = value;
-                      setChildAgesInput(newAges);
-
-                      // Update form value
-                      const ages = newAges
-                        .filter((age) => age !== "")
-                        .map((age) => parseInt(age));
-                      form.setValue("childAges", ages);
-                    }}
-                    disabled={isLoading}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder={`Child ${index + 1} age`} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 17 }, (_, i) => i + 1).map(
-                        (age) => (
-                          <SelectItem key={age} value={age.toString()}>
-                            {age} {age === 1 ? "year" : "years"}
-                          </SelectItem>
-                        ),
-                      )}
-                    </SelectContent>
-                  </Select>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Accessibility Needs */}
-        <FormField
-          control={form.control}
-          name="hasAccessibilityNeeds"
-          render={({ field }) => (
-            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-              <div className="space-y-0.5">
-                <FormLabel className="text-base">
-                  Accessibility Requirements
-                </FormLabel>
-                <FormDescription>
-                  Enable wheelchair access, elevator availability, and other
-                  mobility considerations
-                </FormDescription>
-              </div>
-              <FormControl>
-                <Switch
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                  disabled={isLoading}
-                />
-              </FormControl>
-            </FormItem>
-          )}
-        />
-
-        {/* Submit Button */}
         <Button type="submit" className="w-full" disabled={isLoading} size="lg">
           {isLoading ? (
             <>
-              <span className="animate-spin mr-2">⏳</span>
+              <span className="mr-2 animate-spin">⏳</span>
               Generating Your Itinerary...
             </>
           ) : (
