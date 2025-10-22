@@ -122,7 +122,7 @@ export async function generateItinerary(
       try {
         const parsed = JSON.parse(rawContent);
         validatedResponse = aiResponseSchema.parse(parsed);
-      } catch (parseErr) {
+      } catch {
         // Try extracting JSON from response
         const start = rawContent.indexOf("{");
         const end = rawContent.lastIndexOf("}");
@@ -459,7 +459,6 @@ Example: ["rome", "italy", "europe", "3-5 days", "city break", "couple", "histor
       ...OPENROUTER_BUDGET_FIRST_ORDER.filter((m) => m !== params.model),
     ];
     let completion;
-    let usedModel: string | null = null;
     for (const modelId of tagModels) {
       try {
         completion = await openrouter.chat.completions.create({
@@ -470,7 +469,6 @@ Example: ["rome", "italy", "europe", "3-5 days", "city break", "couple", "histor
           max_tokens: 500,
         });
         if (completion) {
-          usedModel = modelId;
           break;
         }
       } catch {
