@@ -72,7 +72,7 @@ const itineraryFormSchema = z
       .max(500, "Notes must be less than 500 characters")
       .optional(),
     model: z.enum(OPENROUTER_MODEL_VALUES, {
-      invalid_type_error: "Select an AI provider",
+      message: "Select an AI provider",
     }),
   })
   .superRefine((data, ctx) => {
