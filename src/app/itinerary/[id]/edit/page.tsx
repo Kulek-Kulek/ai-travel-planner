@@ -1,72 +1,73 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
-import { getItinerary } from '@/lib/actions/itinerary-actions';
-import { generateItinerary } from '@/lib/actions/ai-actions';
-import type { Itinerary } from '@/lib/actions/itinerary-actions';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import Link from 'next/link';
-import { toast } from 'sonner';
+import { useState, useEffect } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { getItinerary } from "@/lib/actions/itinerary-actions";
+import { generateItinerary } from "@/lib/actions/ai-actions";
+import type { Itinerary } from "@/lib/actions/itinerary-actions";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import Link from "next/link";
+import { toast } from "sonner";
+import { DEFAULT_OPENROUTER_MODEL } from "@/lib/openrouter/models";
 
 export default function EditItineraryPage() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
-  
+
   const [itinerary, setItinerary] = useState<Itinerary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRegenerating, setIsRegenerating] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState('');
+  const [loadingMessage, setLoadingMessage] = useState("");
   const [days, setDays] = useState(3);
   const [travelers, setTravelers] = useState(1);
   const [hasAccessibilityNeeds, setHasAccessibilityNeeds] = useState(false);
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useState("");
 
   useEffect(() => {
     async function loadItinerary() {
       const result = await getItinerary(id);
-      
+
       if (!result.success || !result.data) {
-        toast.error('Itinerary not found or access denied');
-        router.push('/my-plans');
+        toast.error("Itinerary not found or access denied");
+        router.push("/my-plans");
         return;
       }
-      
+
       // Check ownership - only owner can edit
       if (!result.data.user_id) {
-        toast.error('Cannot edit anonymous itineraries');
-        router.push('/my-plans');
+        toast.error("Cannot edit anonymous itineraries");
+        router.push("/my-plans");
         return;
       }
-      
+
       setItinerary(result.data);
       setDays(result.data.days);
       setTravelers(result.data.travelers);
-      setNotes(result.data.notes || '');
+      setNotes(result.data.notes || "");
       setIsLoading(false);
     }
-    
+
     loadItinerary();
   }, [id, router]);
 
   // Cycle through loading messages while regenerating
   useEffect(() => {
     if (!isRegenerating) {
-      setLoadingMessage('');
+      setLoadingMessage("");
       return;
     }
 
     const messages = [
-      '🔍 Analyzing updated preferences...',
-      '🌍 Re-exploring destination...',
-      '🎨 Crafting new itinerary...',
-      '🗺️ Replanning activities...',
-      '✨ Finalizing changes...',
+      "🔍 Analyzing updated preferences...",
+      "🌍 Re-exploring destination...",
+      "🎨 Crafting new itinerary...",
+      "🗺️ Replanning activities...",
+      "✨ Finalizing changes...",
     ];
 
     let currentIndex = 0;
@@ -82,17 +83,17 @@ export default function EditItineraryPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!itinerary) return;
-    
+
     // Validation
     if (days < 1 || days > 30) {
-      toast.error('Days must be between 1 and 30');
+      toast.error("Days must be between 1 and 30");
       return;
     }
-    
+
     if (travelers < 1 || travelers > 20) {
-      toast.error('Travelers must be between 1 and 20');
+      toast.error("Travelers must be between 1 and 20");
       return;
     }
 
@@ -106,6 +107,7 @@ export default function EditItineraryPage() {
         travelers,
         hasAccessibilityNeeds,
         notes,
+        model: DEFAULT_OPENROUTER_MODEL, // Use default model for regeneration
         keepExistingPhoto: true, // Don't fetch new photo
         existingPhotoData: {
           image_url: itinerary.image_url,
@@ -115,19 +117,20 @@ export default function EditItineraryPage() {
       });
 
       if (result.success) {
-        toast.success('✅ Itinerary regenerated successfully!', {
-          description: 'Your plan has been updated with new AI-generated content',
+        toast.success("✅ Itinerary regenerated successfully!", {
+          description:
+            "Your plan has been updated with new AI-generated content",
         });
         router.push(`/itinerary/${result.data.id}`);
       } else {
-        toast.error('Failed to regenerate itinerary', {
+        toast.error("Failed to regenerate itinerary", {
           description: result.error,
         });
         setIsRegenerating(false);
       }
     } catch (error) {
-      toast.error('Unexpected error occurred');
-      console.error('Regeneration error:', error);
+      toast.error("Unexpected error occurred");
+      console.error("Regeneration error:", error);
       setIsRegenerating(false);
     }
   };
@@ -172,7 +175,10 @@ export default function EditItineraryPage() {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Destination (Read-only) */}
             <div>
-              <Label htmlFor="destination" className="block text-sm font-medium text-gray-700 mb-2">
+              <Label
+                htmlFor="destination"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
                 Destination
               </Label>
               <Input
@@ -183,7 +189,8 @@ export default function EditItineraryPage() {
                 className="w-full bg-gray-100 cursor-not-allowed"
               />
               <p className="text-sm text-gray-500 mt-1">
-                💡 Destination cannot be changed. Want a different destination? Create a new itinerary instead.
+                💡 Destination cannot be changed. Want a different destination?
+                Create a new itinerary instead.
               </p>
             </div>
 
@@ -191,7 +198,10 @@ export default function EditItineraryPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Number of Days */}
               <div>
-                <Label htmlFor="days" className="block text-sm font-medium text-gray-700 mb-2">
+                <Label
+                  htmlFor="days"
+                  className="block text-sm font-medium text-gray-700 mb-2"
+                >
                   Number of Days
                 </Label>
                 <Input
@@ -205,14 +215,15 @@ export default function EditItineraryPage() {
                   required
                   className="w-full"
                 />
-                <p className="text-sm text-gray-500 mt-1">
-                  1-30 days
-                </p>
+                <p className="text-sm text-gray-500 mt-1">1-30 days</p>
               </div>
 
               {/* Number of Travelers */}
               <div>
-                <Label htmlFor="travelers" className="block text-sm font-medium text-gray-700 mb-2">
+                <Label
+                  htmlFor="travelers"
+                  className="block text-sm font-medium text-gray-700 mb-2"
+                >
                   Number of Travelers
                 </Label>
                 <Input
@@ -226,9 +237,7 @@ export default function EditItineraryPage() {
                   required
                   className="w-full"
                 />
-                <p className="text-sm text-gray-500 mt-1">
-                  1-20 travelers
-                </p>
+                <p className="text-sm text-gray-500 mt-1">1-20 travelers</p>
               </div>
             </div>
 
@@ -239,7 +248,8 @@ export default function EditItineraryPage() {
                   Accessibility Requirements
                 </Label>
                 <p className="text-sm text-gray-500">
-                  Enable wheelchair access, elevator availability, and other mobility considerations
+                  Enable wheelchair access, elevator availability, and other
+                  mobility considerations
                 </p>
               </div>
               <Switch
@@ -252,7 +262,10 @@ export default function EditItineraryPage() {
 
             {/* Notes / Preferences */}
             <div>
-              <Label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-2">
+              <Label
+                htmlFor="notes"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
                 Travel Preferences & Notes (Optional)
               </Label>
               <Textarea
@@ -266,15 +279,17 @@ export default function EditItineraryPage() {
                 maxLength={500}
               />
               <p className="text-sm text-gray-500 mt-1">
-                Tell AI about your preferences, interests, dietary needs, or special requirements (max 500 characters)
+                Tell AI about your preferences, interests, dietary needs, or
+                special requirements (max 500 characters)
               </p>
             </div>
 
             {/* Warning Box */}
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
               <p className="text-sm text-yellow-800">
-                <strong>⚠️ Important:</strong> Clicking &quot;Regenerate with AI&quot; will create a completely new itinerary 
-                with fresh AI-generated content. The current itinerary will be replaced.
+                <strong>⚠️ Important:</strong> Clicking &quot;Regenerate with
+                AI&quot; will create a completely new itinerary with fresh
+                AI-generated content. The current itinerary will be replaced.
               </p>
             </div>
 
@@ -288,7 +303,7 @@ export default function EditItineraryPage() {
               >
                 {isRegenerating ? (
                   <span className="animate-pulse">
-                    {loadingMessage || '✨ Regenerating...'}
+                    {loadingMessage || "✨ Regenerating..."}
                   </span>
                 ) : (
                   <>
@@ -319,7 +334,9 @@ export default function EditItineraryPage() {
               <li>Update days, travelers, or notes above</li>
               <li>AI will generate a completely new itinerary</li>
               <li>Destination stays the same ({itinerary.destination})</li>
-              <li>This will create a NEW itinerary (your old one will remain)</li>
+              <li>
+                This will create a NEW itinerary (your old one will remain)
+              </li>
             </ul>
           </div>
         </div>
@@ -327,4 +344,3 @@ export default function EditItineraryPage() {
     </div>
   );
 }
-
