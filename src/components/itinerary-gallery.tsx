@@ -111,6 +111,18 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
         </div>
       )}
 
+      {/* Results Header */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-900">
+          {selectedTags.length > 0 
+            ? `Filtered Itineraries (${total})`
+            : `Explore Itineraries (${total})`}
+        </h2>
+        {(isLoading || isFetching) && (
+          <span className="text-sm text-gray-500 animate-pulse">Loading…</span>
+        )}
+      </div>
+
       {/* Filter Section */}
       {allTags.length > 0 && (
         <div className="bg-white rounded-lg shadow-sm p-5 border border-gray-200">
@@ -129,7 +141,7 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
               </Button>
             )}
           </div>
-          
+
           <div className="flex flex-wrap gap-2">
             {popularTags.map(tag => {
               const isSelected = selectedTags.includes(tag);
@@ -150,18 +162,6 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
           </div>
         </div>
       )}
-
-      {/* Results Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">
-          {selectedTags.length > 0 
-            ? `Filtered Itineraries (${total})`
-            : `Explore Itineraries (${total})`}
-        </h2>
-        {(isLoading || isFetching) && (
-          <span className="text-sm text-gray-500 animate-pulse">Loading…</span>
-        )}
-      </div>
 
       {/* Loading State */}
       {isLoading && (
