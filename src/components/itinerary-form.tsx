@@ -43,7 +43,7 @@ const itineraryFormSchema = z
       .min(2, 'Destination must be at least 2 characters')
       .max(100, 'Destination must be less than 100 characters'),
     days: z
-      .number({ invalid_type_error: 'Trip length must be a number' })
+      .number({ message: 'Trip length must be a number' })
       .int('Number of days must be a whole number')
       .min(0, 'Trip length cannot be negative')
       .max(30, 'Trip cannot exceed 30 days'),
