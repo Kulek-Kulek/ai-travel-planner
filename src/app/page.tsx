@@ -136,7 +136,7 @@ export default function Home() {
 
     const interval = setInterval(() => {
       setProgress((p) => {
-        let delta = (Math.random() * 3 + 1) * progressDirection; // 1-4 each tick
+        const delta = (Math.random() * 3 + 1) * progressDirection; // 1-4 each tick
         let next = p + delta;
         if (next >= 99) {
           next = 99;
