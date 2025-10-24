@@ -229,7 +229,7 @@ export const ItineraryForm = ({
 
         <section className="space-y-6 rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-[0_25px_80px_-65px_rgba(15,23,42,0.35)]">
           <div className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+            <h3 className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-400">
               Trip essentials
             </h3>
             <p className="text-sm text-slate-500">

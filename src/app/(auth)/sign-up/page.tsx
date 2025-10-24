@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useEffect } from 'react';
 import { signUp } from '@/lib/actions/auth-actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,8 +10,24 @@ import Link from 'next/link';
 export default function SignUpPage() {
   const [isPending, startTransition] = useTransition();
   const [errors, setErrors] = useState<Record<string, string[]>>({});
+  const [draftId, setDraftId] = useState<string>('');
+
+  // Read itineraryId from URL on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('itineraryId');
+    if (id) {
+      setDraftId(id);
+    }
+  }, []);
 
   const handleSubmit = async (formData: FormData) => {
+    // Save itineraryId to sessionStorage so it persists through auth redirect
+    if (draftId) {
+      sessionStorage.setItem('itineraryId', draftId);
+      console.log("🔍 DEBUG: Saved itineraryId to sessionStorage:", draftId);
+    }
+    
     startTransition(async () => {
       const result = await signUp(formData);
       if (result?.error) {
@@ -29,19 +45,22 @@ export default function SignUpPage() {
         </div>
 
         <form action={handleSubmit} className="space-y-6">
-          {/* Full Name */}
+          {/* Name */}
           <div className="space-y-2">
-            <Label htmlFor="fullName">Full Name</Label>
+            <Label htmlFor="name">Name</Label>
             <Input
-              id="fullName"
-              name="fullName"
+              id="name"
+              name="name"
               type="text"
-              placeholder="John Doe"
+              placeholder="Kris, Kris Smith, or any nickname"
               required
               disabled={isPending}
             />
-            {errors.fullName && (
-              <p className="text-sm text-red-600">{errors.fullName[0]}</p>
+            <p className="text-xs text-gray-500">
+              This will appear on your itineraries (e.g., "by Kris")
+            </p>
+            {errors.name && (
+              <p className="text-sm text-red-600">{errors.name[0]}</p>
             )}
           </div>
 
@@ -78,6 +97,22 @@ export default function SignUpPage() {
             )}
           </div>
 
+          {/* Confirm Password */}
+          <div className="space-y-2">
+            <Label htmlFor="confirmPassword">Confirm Password</Label>
+            <Input
+              id="confirmPassword"
+              name="confirmPassword"
+              type="password"
+              placeholder="••••••••"
+              required
+              disabled={isPending}
+            />
+            {errors.confirmPassword && (
+              <p className="text-sm text-red-600">{errors.confirmPassword[0]}</p>
+            )}
+          </div>
+
           {/* General errors */}
           {errors.general && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
@@ -93,7 +128,10 @@ export default function SignUpPage() {
 
         <div className="mt-6 text-center text-sm text-gray-600">
           Already have an account?{' '}
-          <Link href="/sign-in" className="text-blue-600 hover:underline font-medium">
+          <Link 
+            href={draftId ? `/sign-in?itineraryId=${draftId}` : "/sign-in"} 
+            className="text-blue-600 hover:underline font-medium"
+          >
             Sign in
           </Link>
         </div>

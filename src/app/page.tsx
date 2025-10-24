@@ -2,11 +2,13 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ItineraryForm } from "@/components/itinerary-form";
+import { ItineraryFormAIEnhanced } from "@/components/itinerary-form-ai-enhanced";
 import { ItineraryGallery } from "@/components/itinerary-gallery";
 import { Masthead } from "@/components/masthead";
 import { generateItinerary } from "@/lib/actions/ai-actions";
+import { saveDraftItinerary, loadDraftItinerary, claimDraftItinerary } from "@/lib/actions/itinerary-actions";
 import { getUserRole } from "@/lib/auth/admin";
+import { getUser } from "@/lib/actions/auth-actions";
 import { toast } from "sonner";
 import Link from "next/link";
 import type { OpenRouterModel } from "@/lib/openrouter/models";
@@ -44,6 +46,8 @@ type ResultData = FormData & {
 export default function Home() {
   const [result, setResult] = useState<ResultData | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [sessionId] = useState(() => crypto.randomUUID()); // Generate session ID once
   const [loadingMessage, setLoadingMessage] = useState("");
   const [progress, setProgress] = useState(0);
   const [progressDirection, setProgressDirection] = useState<1 | -1>(1);
@@ -51,9 +55,12 @@ export default function Home() {
   const [userCancelled, setUserCancelled] = useState(false);
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [openDayIndex, setOpenDayIndex] = useState<number | null>(null);
+  const [hasCreatedPlanWhileLoggedOut, setHasCreatedPlanWhileLoggedOut] = useState(false);
   const queryClient = useQueryClient();
   const galleryRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLDivElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
+  const authBannerRef = useRef<HTMLDivElement>(null);
   const cancelledRef = useRef(false);
   const dayButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
@@ -62,6 +69,122 @@ export default function Home() {
     getUserRole().then((role) => {
       setIsAdmin(role === "admin");
     });
+  }, []);
+
+  // Check authentication status on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const user = await getUser();
+        const isAuth = !!user;
+        setIsAuthenticated(isAuth);
+        
+        // If user is now authenticated, clear the "created plan while logged out" flags
+        if (isAuth) {
+          sessionStorage.removeItem('createdPlanWhileLoggedOut');
+          sessionStorage.removeItem('draftItineraryId');
+          setHasCreatedPlanWhileLoggedOut(false);
+        }
+      } catch {
+        setIsAuthenticated(false);
+      }
+    };
+    checkAuth();
+    
+    // Check if user created a plan while logged out (persisted in sessionStorage)
+    const createdPlanWhileLoggedOut = sessionStorage.getItem('createdPlanWhileLoggedOut');
+    if (createdPlanWhileLoggedOut === 'true') {
+      setHasCreatedPlanWhileLoggedOut(true);
+    }
+  }, []);
+
+  // Load itinerary from URL param or sessionStorage if present
+  useEffect(() => {
+    console.log("🔍 DEBUG: Home page mounted, checking for itineraryId");
+    
+    const params = new URLSearchParams(window.location.search);
+    let itineraryId = params.get("itineraryId");
+    console.log("🔍 DEBUG: itineraryId from URL:", itineraryId);
+    
+    // If not in URL, check sessionStorage for a recently created draft
+    if (!itineraryId) {
+      console.log("🔍 DEBUG: Not in URL, checking sessionStorage...");
+      const stored = sessionStorage.getItem('draftItineraryId');
+      if (stored) {
+        itineraryId = stored;
+        console.log("🔍 DEBUG: ✅ Found draftItineraryId in sessionStorage:", itineraryId);
+      }
+    }
+    
+    console.log("🔍 DEBUG: Final itineraryId to use:", itineraryId);
+    
+    if (itineraryId) {
+      const loadItinerary = async () => {
+        try {
+          console.log("🔍 DEBUG: Loading itinerary with ID:", itineraryId);
+          const response = await fetch(`/api/itineraries/${itineraryId}`);
+          console.log("🔍 DEBUG: API response status:", response.status);
+          
+          if (response.ok) {
+            const data = await response.json();
+            console.log("🔍 DEBUG: API response success:", data.success);
+            
+            if (data.success && data.data) {
+              const itinerary = data.data;
+              console.log("🔍 DEBUG: ✅ Setting result with itinerary:", itinerary.destination);
+              setResult({
+                destination: itinerary.destination,
+                days: itinerary.days,
+                travelers: itinerary.travelers,
+                notes: itinerary.notes,
+                children: itinerary.children,
+                childAges: itinerary.child_ages,
+                hasAccessibilityNeeds: itinerary.has_accessibility_needs,
+                aiPlan: itinerary.ai_plan,
+                model: "anthropic/claude-3-haiku" as const,
+              });
+              setHasSubmitted(true);
+              console.log("🔍 DEBUG: ✅ Result set successfully!");
+              
+              // If this is a draft, check if user is now authenticated and claim it
+              if (itinerary.status === 'draft') {
+                getUser().then((user) => {
+                  if (user) {
+                    console.log("🔍 DEBUG: Claiming draft itinerary for authenticated user");
+                    claimDraftItinerary(itineraryId!).then((result) => {
+                      if (result.success) {
+                        console.log("🔍 DEBUG: ✅ Draft claimed successfully");
+                        toast.success("Itinerary saved to your account!", {
+                          description: "Your travel plan is now permanently saved",
+                        });
+                        // Refresh gallery to show the newly published itinerary
+                        queryClient.invalidateQueries({ queryKey: ["public-itineraries"] });
+                      } else {
+                        console.error("🔍 DEBUG: ❌ Failed to claim draft:", result.error);
+                      }
+                    });
+                  }
+                });
+              }
+              
+              // Clean up URL but keep draftItineraryId in sessionStorage
+              window.history.replaceState({}, document.title, window.location.pathname);
+            } else {
+              console.error("🔍 DEBUG: ❌ API response not successful:", data);
+            }
+          } else {
+            console.error("🔍 DEBUG: ❌ API response not OK, status:", response.status);
+            const errorData = await response.json();
+            console.error("🔍 DEBUG: API error:", errorData);
+          }
+        } catch (error) {
+          console.error("❌ Failed to load itinerary:", error);
+        }
+      };
+      loadItinerary();
+    } else {
+      console.log("🔍 DEBUG: ❌ No itineraryId found in URL or sessionStorage");
+    }
   }, []);
 
   // Use TanStack Query mutation for generating itinerary
@@ -75,10 +198,10 @@ export default function Home() {
       }
       if (response.success) {
         // Show success toast
-        toast.success("Itinerary generated and saved!", {
+        toast.success("Itinerary generated!", {
           description: `${variables.days}-day trip to ${response.data.city}`,
           action: {
-            label: "View",
+            label: "View Full Plan",
             onClick: () =>
               (window.location.href = `/itinerary/${response.data.id}`),
           },
@@ -88,16 +211,37 @@ export default function Home() {
         setProgressDirection(1);
         setProgress(100);
 
-        setResult({
+        const resultData = {
           ...variables,
           aiPlan: response.data,
-        });
+        };
+
+        setResult(resultData);
 
         // Invalidate queries to refresh gallery and tags
         queryClient.invalidateQueries({ queryKey: ["public-itineraries"] });
         queryClient.invalidateQueries({ queryKey: ["all-tags"] });
 
-        // Keep the user on the preview; no auto-scroll
+        // Store state for non-authenticated users
+        if (!isAuthenticated) {
+          // Mark that this user created a plan while logged out
+          sessionStorage.setItem('createdPlanWhileLoggedOut', 'true');
+          sessionStorage.setItem('draftItineraryId', response.data.id);
+          setHasCreatedPlanWhileLoggedOut(true);
+          
+          // Scroll to auth banner
+          setTimeout(() => {
+            if (authBannerRef.current) {
+              authBannerRef.current.scrollIntoView({
+                behavior: "smooth",
+                block: "center",
+              });
+            }
+          }, 500);
+        }
+
+        // NO auto-redirect - let user see preview first
+        // They can click the banner buttons to sign in if needed
       } else {
         toast.error("Failed to generate itinerary", {
           description: response.error,
@@ -114,7 +258,10 @@ export default function Home() {
 
   // Staged progress + steps while generating
   useEffect(() => {
-    if (!mutation.isPending) {
+    // Keep progress bar moving until we have the result AND it's not pending
+    const shouldShowProgress = mutation.isPending || (hasSubmitted && !result && !userCancelled);
+    
+    if (!shouldShowProgress) {
       setLoadingMessage("");
       setProgress(0);
       setCurrentStep(0);
@@ -156,7 +303,7 @@ export default function Home() {
     }, 350);
 
     return () => clearInterval(interval);
-  }, [mutation.isPending]);
+  }, [mutation.isPending, hasSubmitted, result, userCancelled, progressDirection]);
 
   const handleCancelLoading = () => {
     cancelledRef.current = true;
@@ -170,16 +317,35 @@ export default function Home() {
   // Open first day by default once result arrives
   useEffect(() => {
     if (result?.aiPlan?.days && result.aiPlan.days.length > 0) {
-      setOpenDayIndex(0);
+      setOpenDayIndex(0); // Always open first day
     } else {
       setOpenDayIndex(null);
     }
   }, [result]);
 
   const handleSubmit = (data: FormData) => {
+    // Don't allow submission if user already created a plan while logged out
+    if (!isAuthenticated && hasCreatedPlanWhileLoggedOut) {
+      toast.error("Please sign in first", {
+        description: "Create a free account to generate another itinerary",
+      });
+      return;
+    }
+    
     setResult(null);
     setHasSubmitted(true);
     setUserCancelled(false);
+    
+    // Scroll to preview area immediately
+    setTimeout(() => {
+      if (previewRef.current) {
+        previewRef.current.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }
+    }, 100);
+    
     mutation.mutate({
       destination: data.destination,
       days: data.days,
@@ -201,6 +367,18 @@ export default function Home() {
         block: "start",
       });
     }
+  };
+
+  // Handle redirecting to sign-in/sign-up after saving draft
+  const handleAuthRedirect = async (authPage: 'sign-in' | 'sign-up') => {
+    if (!result || !result.aiPlan) return;
+    
+    // The itinerary was already saved by generateItinerary
+    // Store it in sessionStorage so it persists through navigation
+    const itineraryId = result.aiPlan.id;
+    sessionStorage.setItem('itineraryId', itineraryId);
+    console.log("🔍 DEBUG: Redirecting to " + authPage + " with itineraryId:", itineraryId);
+    window.location.href = `/${authPage}?itineraryId=${itineraryId}`;
   };
 
   return (
@@ -230,9 +408,12 @@ export default function Home() {
             </p>
 
             <div className="mt-5">
-              <ItineraryForm
+              <ItineraryFormAIEnhanced
                 onSubmit={handleSubmit}
                 isLoading={mutation.isPending}
+                modelOverride="anthropic/claude-3.5-haiku"
+                isAuthenticated={isAuthenticated}
+                hasResult={!!result || hasCreatedPlanWhileLoggedOut}
               />
             </div>
           </div>
@@ -240,8 +421,71 @@ export default function Home() {
           {/* Preview/Result Section */}
           {hasSubmitted && ((mutation.isPending && !userCancelled) || result) && (
             <div
+              ref={previewRef}
               className="rounded-3xl border border-slate-200 bg-white/80 p-8 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.35)] backdrop-blur-xl"
             >
+              {/* Auth Banner - shown when not authenticated and preview is ready */}
+              {!isAuthenticated && result && !mutation.isPending && (
+                <div 
+                  ref={authBannerRef}
+                  className="mb-6 rounded-2xl border-2 border-indigo-300 bg-gradient-to-r from-indigo-50 via-blue-50 to-indigo-50 p-6 shadow-md"
+                >
+                  <div className="flex flex-col gap-4">
+                    <div className="flex-1 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl">🔐</span>
+                        <h3 className="text-xl font-semibold text-slate-900">
+                          Sign in to save your itinerary
+                        </h3>
+                      </div>
+                      <p className="text-sm text-slate-700 leading-relaxed">
+                        Your personalized travel plan is ready! Create a free account to unlock all features:
+                      </p>
+                      <ul className="space-y-2 text-sm text-slate-700">
+                        <li className="flex items-start gap-2">
+                          <span className="text-green-600 font-bold mt-0.5">✓</span>
+                          <span><strong>100% Free</strong> – No hidden costs or subscriptions</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="text-green-600 font-bold mt-0.5">✓</span>
+                          <span><strong>Quick Setup</strong> – Takes only 30 seconds to create an account</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="text-green-600 font-bold mt-0.5">✓</span>
+                          <span><strong>Full Control</strong> – Edit, update, and regenerate your plans anytime</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="text-green-600 font-bold mt-0.5">✓</span>
+                          <span><strong>Save & Share</strong> – Access your itineraries from any device and share with friends</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="text-red-600 font-bold mt-0.5">⚠</span>
+                          <span className="text-red-700"><strong>Without an account</strong> – This plan will be lost when you close this page</span>
+                        </li>
+                      </ul>
+                    </div>
+                    <div className="flex flex-col gap-3 sm:flex-row">
+                      <Button 
+                        size="lg" 
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-lg transition-shadow"
+                        onClick={() => handleAuthRedirect('sign-up')}
+                      >
+                        <span className="mr-2">✨</span>
+                        Create Free Account
+                      </Button>
+                      <Button 
+                        size="lg" 
+                        variant="outline" 
+                        className="border-indigo-300 hover:bg-indigo-50"
+                        onClick={() => handleAuthRedirect('sign-in')}
+                      >
+                        Already have an account? Sign in
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center justify-between gap-4">
                 <h2 className="text-2xl font-semibold text-slate-900">Preview</h2>
                 <span
@@ -252,185 +496,232 @@ export default function Home() {
                       : "bg-emerald-100 text-emerald-700"
                   }`}
                 >
-                  {mutation.isPending && !userCancelled ? "Generating" : "Ready to share"}
+                  {mutation.isPending && !userCancelled ? "Generating" : "Ready"}
                 </span>
               </div>
 
-              <div className="mt-6 space-y-6">
-              {!result && !mutation.isPending && (
-                <div className="py-10">
-                  <div className="mx-auto max-w-sm text-center">
-                    <div className="mx-auto mb-4 size-12 rounded-xl bg-slate-100 text-slate-400 grid place-content-center">🧭</div>
-                    <h3 className="text-base font-semibold text-slate-900">Your preview will appear here</h3>
-                    <p className="mt-2 text-sm text-slate-500">Tell us about your trip to get a tailored plan with daily highlights.</p>
-                  </div>
-                </div>
-              )}
-
-              {mutation.isPending && !userCancelled && (
-                <div role="status" aria-live="polite" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-base font-semibold text-slate-900">Crafting your itinerary…</h3>
-                    <span className="text-xs text-slate-500">~10–20s</span>
-                  </div>
-
-                  <div className="mt-4">
-                    <div className="h-2 w-full rounded-full bg-slate-200">
-                      <div
-                        className="h-2 rounded-full bg-indigo-600 transition-[width] duration-300 ease-out"
-                        style={{ width: `${Math.min(100, Math.max(progress, 6))}%` }}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-valuenow={Math.floor(progress)}
-                        role="progressbar"
-                      />
-                    </div>
-                    <p className="mt-2 text-sm text-slate-600">{loadingMessage || "Getting things ready"}</p>
-                  </div>
-
-                  <ul className="mt-4 grid gap-2 text-sm text-slate-500 sm:grid-cols-2">
-                    {['Analyzing your preferences','Exploring destination highlights','Curating balanced daily plan','Selecting showcase photos','Adding final touches'].map((label, idx) => (
-                      <li key={idx} className="flex items-center gap-2">
-                        <span className={`inline-grid size-5 place-content-center rounded-full border ${idx < currentStep ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-slate-400 border-slate-200'}`}>
-                          {idx < currentStep ? '✓' : '•'}
-                        </span>
-                        <span className={`${idx === currentStep ? 'text-slate-700' : ''}`}>{label}</span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="text-xs text-slate-500">You can stop and edit details if needed.</p>
-                    <div className="flex justify-end gap-2">
-                      <Button variant="outline" size="sm" onClick={handleCancelLoading}>Stop and edit details</Button>
+                <div className="mt-6 space-y-6">
+                {!result && !mutation.isPending && (
+                  <div className="py-10">
+                    <div className="mx-auto max-w-sm text-center">
+                      <div className="mx-auto mb-4 size-12 rounded-xl bg-slate-100 text-slate-400 grid place-content-center">🧭</div>
+                      <h3 className="text-base font-semibold text-slate-900">Your preview will appear here</h3>
+                      <p className="mt-2 text-sm text-slate-500">Tell us about your trip to get a tailored plan with daily highlights.</p>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
+                {mutation.isPending && !userCancelled && (
+                  <div role="status" aria-live="polite" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-base font-semibold text-slate-900">Crafting your itinerary…</h3>
+                      <span className="text-xs text-slate-500">~10–20s</span>
+                    </div>
 
-              {result && !mutation.isPending && (
-                <div className="space-y-4">
-                  <div className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-emerald-100/60 p-4">
-                    <h3 className="mb-1 text-lg font-semibold text-emerald-900">
-                      {result.aiPlan?.city || result.destination}
-                    </h3>
-                    <p className="text-sm text-emerald-800">
-                      {result.days} days • {result.travelers} adult
-                      {result.travelers > 1 ? "s" : ""}
-                      {result.children && result.children > 0 && (
-                        <>
-                          , {result.children}{" "}
-                          {result.children === 1 ? "child" : "children"}
-                        </>
-                      )}
-                      {result.hasAccessibilityNeeds && <> • ♿ Accessible</>}
-                    </p>
-                  </div>
+                    <div className="mt-4">
+                      <div className="h-2 w-full rounded-full bg-slate-200">
+                        <div
+                          className="h-2 rounded-full bg-indigo-600 transition-[width] duration-300 ease-out"
+                          style={{ width: `${Math.min(100, Math.max(progress, 6))}%` }}
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          aria-valuenow={Math.floor(progress)}
+                          role="progressbar"
+                        />
+                      </div>
+                      <p className="mt-2 text-sm text-slate-600">{loadingMessage || "Getting things ready"}</p>
+                    </div>
 
-                  {/* Daily plan breakdown */}
-                  {result.aiPlan?.days?.map((day, dayIndex) => {
-                    const isOpen = openDayIndex === dayIndex;
-                    const panelId = `day-panel-${dayIndex}`;
-                    return (
-                      <div
-                        key={dayIndex}
-                        className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4"
-                      >
-                        <button
-                          type="button"
-                          className="flex w-full items-center justify-between gap-3 text-left"
-                          aria-expanded={isOpen}
-                          aria-controls={panelId}
-                          onClick={() => setOpenDayIndex(isOpen ? null : dayIndex)}
-                          onKeyDown={(e) => {
-                            const key = e.key;
-                            const total = result.aiPlan?.days?.length || 0;
-                            if (!total) return;
-                            if (key === "ArrowDown" || key === "ArrowRight") {
-                              e.preventDefault();
-                              const next = openDayIndex == null ? 0 : Math.min(total - 1, (openDayIndex as number) + 1);
-                              setOpenDayIndex(next);
-                              setTimeout(() => dayButtonRefs.current[next]?.focus(), 0);
-                            } else if (key === "ArrowUp" || key === "ArrowLeft") {
-                              e.preventDefault();
-                              const prev = openDayIndex == null ? 0 : Math.max(0, (openDayIndex as number) - 1);
-                              setOpenDayIndex(prev);
-                              setTimeout(() => dayButtonRefs.current[prev]?.focus(), 0);
-                            } else if (key === "Home") {
-                              e.preventDefault();
-                              setOpenDayIndex(0);
-                              setTimeout(() => dayButtonRefs.current[0]?.focus(), 0);
-                            } else if (key === "End") {
-                              e.preventDefault();
-                              const last = total - 1;
-                              setOpenDayIndex(last);
-                              setTimeout(() => dayButtonRefs.current[last]?.focus(), 0);
-                            }
-                          }}
-                          ref={(el) => {
-                            dayButtonRefs.current[dayIndex] = el;
-                          }}
-                        >
-                          <h4 className="font-semibold text-slate-900">{day.title}</h4>
-                          <span className="text-xs text-slate-500">
-                            {day.places?.length || 0} stop{(day.places?.length || 0) === 1 ? "" : "s"}
+                    <ul className="mt-4 grid gap-2 text-sm text-slate-500 sm:grid-cols-2">
+                      {['Analyzing your preferences','Exploring destination highlights','Curating balanced daily plan','Selecting showcase photos','Adding final touches'].map((label, idx) => (
+                        <li key={idx} className="flex items-center gap-2">
+                          <span className={`inline-grid size-5 place-content-center rounded-full border ${idx < currentStep ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-slate-400 border-slate-200'}`}>
+                            {idx < currentStep ? '✓' : '•'}
                           </span>
-                        </button>
+                          <span className={`${idx === currentStep ? 'text-slate-700' : ''}`}>{label}</span>
+                        </li>
+                      ))}
+                    </ul>
 
-                        {isOpen && (
-                          <div id={panelId} className="mt-3">
-                            {day.places?.map((place, placeIndex) => (
-                              <div
-                                key={placeIndex}
-                                className="mt-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm"
-                              >
-                                <p className="font-medium text-slate-900">{place.name}</p>
-                                <p className="text-sm text-slate-500 mt-1">{place.desc}</p>
-                                <p className="text-xs text-slate-400 mt-2">⏱️ {place.time}</p>
-                              </div>
-                            ))}
-                          </div>
+                    <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-xs text-slate-500">You can stop and edit details if needed.</p>
+                      <div className="flex justify-end gap-2">
+                        <Button variant="outline" size="sm" onClick={handleCancelLoading}>Stop and edit details</Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+
+                {result && !mutation.isPending && (
+                  <div className="space-y-4">
+                    <div className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-emerald-100/60 p-4">
+                      <h3 className="mb-1 text-lg font-semibold text-emerald-900">
+                        {result.aiPlan?.city || result.destination}
+                      </h3>
+                      <p className="text-sm text-emerald-800">
+                        {result.days} days • {result.travelers} adult
+                        {result.travelers > 1 ? "s" : ""}
+                        {result.children && result.children > 0 && (
+                          <>
+                            , {result.children}{" "}
+                            {result.children === 1 ? "child" : "children"}
+                          </>
                         )}
-                      </div>
-                    );
-                  })}
-
-                  {result.aiPlan?.tags && result.aiPlan.tags.length > 0 && (
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                      <p className="text-sm font-medium text-slate-700 mb-2">
-                        🏷️ Tags:
+                        {result.hasAccessibilityNeeds && <> • ♿ Accessible</>}
                       </p>
-                      <div className="flex flex-wrap gap-2">
-                        {result.aiPlan.tags.map((tag: string, idx: number) => (
-                          <span
-                            key={idx}
-                            className="inline-block rounded-full bg-indigo-100 px-2 py-1 text-xs font-medium text-indigo-700"
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
                     </div>
-                  )}
 
-                  {result.aiPlan?.id && (
-                    <div className="rounded-2xl border border-emerald-100 bg-emerald-50/80 p-4">
-                      <p className="text-emerald-800 text-sm">
-                        ✅ <strong>Itinerary saved!</strong> You can open the full itinerary or explore more plans below.
-                      </p>
-                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                        <Button asChild size="lg" className="w-full">
-                          <Link href={`/itinerary/${result.aiPlan.id}`}>Open full itinerary</Link>
-                        </Button>
-                        <Button variant="outline" size="lg" className="w-full" onClick={handlePlanTripScroll}>
-                          Plan another trip
-                        </Button>
+                    {/* Daily plan breakdown */}
+                    {result.aiPlan?.days?.map((day, dayIndex) => {
+                      const isOpen = openDayIndex === dayIndex;
+                      const panelId = `day-panel-${dayIndex}`;
+                      const isFirstDay = dayIndex === 0;
+                      const isLocked = !isAuthenticated && !isFirstDay;
+                      
+                      return (
+                        <div
+                          key={dayIndex}
+                          className={`rounded-2xl border border-slate-200 bg-slate-50/70 p-4 ${isLocked ? 'opacity-60' : ''}`}
+                        >
+                          <div className="space-y-2">
+                            <button
+                              type="button"
+                              className={`flex w-full items-center justify-between gap-3 text-left ${isLocked ? 'cursor-not-allowed' : ''}`}
+                              aria-expanded={isOpen}
+                              aria-controls={panelId}
+                              onClick={() => {
+                                if (!isLocked) {
+                                  setOpenDayIndex(isOpen ? null : dayIndex);
+                                }
+                              }}
+                              disabled={isLocked}
+                              onKeyDown={(e) => {
+                                if (isLocked) return;
+                                const key = e.key;
+                                const total = result.aiPlan?.days?.length || 0;
+                                if (!total) return;
+                                if (key === "ArrowDown" || key === "ArrowRight") {
+                                  e.preventDefault();
+                                  const next = openDayIndex == null ? 0 : Math.min(total - 1, (openDayIndex as number) + 1);
+                                  setOpenDayIndex(next);
+                                  setTimeout(() => dayButtonRefs.current[next]?.focus(), 0);
+                                } else if (key === "ArrowUp" || key === "ArrowLeft") {
+                                  e.preventDefault();
+                                  const prev = openDayIndex == null ? 0 : Math.max(0, (openDayIndex as number) - 1);
+                                  setOpenDayIndex(prev);
+                                  setTimeout(() => dayButtonRefs.current[prev]?.focus(), 0);
+                                } else if (key === "Home") {
+                                  e.preventDefault();
+                                  setOpenDayIndex(0);
+                                  setTimeout(() => dayButtonRefs.current[0]?.focus(), 0);
+                                } else if (key === "End") {
+                                  e.preventDefault();
+                                  const last = total - 1;
+                                  setOpenDayIndex(last);
+                                  setTimeout(() => dayButtonRefs.current[last]?.focus(), 0);
+                                }
+                              }}
+                              ref={(el) => {
+                                dayButtonRefs.current[dayIndex] = el;
+                              }}
+                            >
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-semibold text-slate-900">{day.title}</h4>
+                                {isLocked && (
+                                  <span className="text-xs text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">🔒</span>
+                                )}
+                              </div>
+                              <span className="text-xs text-slate-500">
+                                {day.places?.length || 0} stop{(day.places?.length || 0) === 1 ? "" : "s"}
+                              </span>
+                            </button>
+                            
+                            {isLocked && (
+                              <p className="text-xs text-slate-500 italic pl-2">
+                                Sign in to unlock this day
+                              </p>
+                            )}
+                          </div>
+
+                          {isOpen && (
+                            <div id={panelId} className="mt-3 relative">
+                              {day.places?.map((place, placeIndex) => {
+                                // For non-authenticated users on first day, blur bottom half
+                                const shouldBlur = !isAuthenticated && isFirstDay && placeIndex >= Math.ceil(day.places.length / 2);
+                                
+                                return (
+                                  <div
+                                    key={placeIndex}
+                                    className={`mt-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm ${shouldBlur ? 'blur-[0.5px] select-none pointer-events-none' : ''}`}
+                                  >
+                                    <p className="font-medium text-slate-900">{place.name}</p>
+                                    <p className="text-sm text-slate-500 mt-1">{place.desc}</p>
+                                    <p className="text-xs text-slate-400 mt-2">⏱️ {place.time}</p>
+                                  </div>
+                                );
+                              })}
+                              
+                              {/* Sign up overlay for first day when not authenticated */}
+                              {!isAuthenticated && isFirstDay && (
+                                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-100 via-slate-50/95 to-transparent pt-12 pb-4 flex items-end justify-center">
+                                  <div className="text-center px-4 py-3 rounded-2xl bg-white/80 backdrop-blur-sm border border-indigo-200 shadow-lg max-w-sm mx-auto">
+                                    <div className="flex items-center justify-center gap-2 mb-2">
+                                      <span className="text-2xl">✈️</span>
+                                      <p className="text-base font-bold text-slate-900">
+                                        See Your Complete Journey
+                                      </p>
+                                    </div>
+                                    <p className="text-sm text-slate-600 mb-1">
+                                      Sign up free to see all <span className="font-semibold text-indigo-600">{result.aiPlan?.days?.length || 0} days</span>
+                                    </p>
+                                    <p className="text-xs text-slate-500">
+                                      Plus edit, save, and share your plans
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {result.aiPlan?.tags && result.aiPlan.tags.length > 0 && (
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <p className="text-sm font-medium text-slate-700 mb-2">
+                          🏷️ Tags:
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {result.aiPlan.tags.map((tag: string, idx: number) => (
+                            <span
+                              key={idx}
+                              className="inline-block rounded-full bg-indigo-100 px-2 py-1 text-xs font-medium text-indigo-700"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              )}
+                    )}
+
+                    {result.aiPlan?.id && (
+                      <div className="rounded-2xl border border-emerald-100 bg-emerald-50/80 p-4">
+                        <p className="text-emerald-800 text-sm">
+                          ✅ <strong>Itinerary saved!</strong> You can open the full itinerary or explore more plans below.
+                        </p>
+                        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                          <Button size="lg" className="w-full" onClick={() => window.location.href = `/itinerary/${result.aiPlan?.id}`} disabled={!isAuthenticated}>
+                            Open full itinerary
+                          </Button>
+                          <Button variant="outline" size="lg" className="w-full" onClick={handlePlanTripScroll} disabled={!isAuthenticated}>
+                            Plan another trip
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
