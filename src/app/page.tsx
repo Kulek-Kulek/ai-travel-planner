@@ -6,11 +6,10 @@ import { ItineraryFormAIEnhanced } from "@/components/itinerary-form-ai-enhanced
 import { ItineraryGallery } from "@/components/itinerary-gallery";
 import { Masthead } from "@/components/masthead";
 import { generateItinerary } from "@/lib/actions/ai-actions";
-import { saveDraftItinerary, loadDraftItinerary, claimDraftItinerary } from "@/lib/actions/itinerary-actions";
+import { claimDraftItinerary } from "@/lib/actions/itinerary-actions";
 import { getUserRole } from "@/lib/auth/admin";
 import { getUser } from "@/lib/actions/auth-actions";
 import { toast } from "sonner";
-import Link from "next/link";
 import type { OpenRouterModel } from "@/lib/openrouter/models";
 import { Button } from "@/components/ui/button";
 
@@ -47,7 +46,6 @@ export default function Home() {
   const [result, setResult] = useState<ResultData | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [sessionId] = useState(() => crypto.randomUUID()); // Generate session ID once
   const [loadingMessage, setLoadingMessage] = useState("");
   const [progress, setProgress] = useState(0);
   const [progressDirection, setProgressDirection] = useState<1 | -1>(1);
@@ -185,7 +183,7 @@ export default function Home() {
     } else {
       console.log("🔍 DEBUG: ❌ No itineraryId found in URL or sessionStorage");
     }
-  }, []);
+  }, [queryClient]);
 
   // Use TanStack Query mutation for generating itinerary
   const mutation = useMutation({

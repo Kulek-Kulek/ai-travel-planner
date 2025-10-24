@@ -406,7 +406,7 @@ export const ItineraryForm = ({
                 </FormLabel>
                 <FormDescription className="text-sm text-slate-500">
                   Tell us about your travel plans in your own words. Include where you want to go, 
-                  for how long, who's traveling, and what you'd like to experience.
+                  for how long, who&apos;s traveling, and what you&apos;d like to experience.
                 </FormDescription>
                 <FormControl>
                   <div className="rounded-3xl border border-indigo-100 bg-indigo-50/60 p-1 shadow-[0_20px_60px_-45px_rgba(79,70,229,0.75)]">
@@ -443,7 +443,7 @@ export const ItineraryForm = ({
                 {watchNotes && watchNotes.length >= 20 && (
                   <div className="mt-4 space-y-2 rounded-2xl border border-slate-200 bg-white/80 p-4">
                     <p className="text-sm font-medium text-slate-700">
-                      What we've understood so far:
+                      What we&apos;ve understood so far:
                     </p>
                     <div className="space-y-1.5">
                       <div className="flex items-center gap-2 text-sm">

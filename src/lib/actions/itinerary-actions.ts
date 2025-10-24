@@ -2,6 +2,19 @@
 
 import { createClient } from '@/lib/supabase/server';
 
+// AI Plan structure
+export type AIPlan = {
+  city: string;
+  days: Array<{
+    title: string;
+    places: Array<{
+      name: string;
+      desc: string;
+      time: string;
+    }>;
+  }>;
+};
+
 // Itinerary from database
 export type Itinerary = {
   id: string;
@@ -81,7 +94,7 @@ export async function getPublicItineraries(
     
     // For each itinerary with a user_id, fetch the creator's name
     const itinerariesWithNames = await Promise.all(
-      (data || []).map(async (itinerary: any) => {
+      (data || []).map(async (itinerary: Itinerary) => {
         if (!itinerary.user_id) {
           return { ...itinerary, creator_name: null };
         }
@@ -393,7 +406,7 @@ export async function saveDraftItinerary(
     childAges?: number[];
     hasAccessibilityNeeds?: boolean;
     notes?: string;
-    aiPlan: any;
+    aiPlan: AIPlan;
   },
   sessionId: string
 ): Promise<{ id: string; error?: string }> {
@@ -441,7 +454,7 @@ export async function loadDraftItinerary(
   childAges?: number[];
   hasAccessibilityNeeds?: boolean;
   notes?: string;
-  aiPlan: any;
+  aiPlan: AIPlan;
 } | null> {
   const supabase = await createClient();
 
