@@ -287,7 +287,7 @@ export async function updateItineraryPrivacy(
  */
 export async function updateItineraryStatus(
   id: string,
-  status: 'draft' | 'published'
+  status: 'draft' | 'published' | 'active' | 'completed'
 ): Promise<ActionResult<void>> {
   try {
     const supabase = await createClient();
