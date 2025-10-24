@@ -76,7 +76,7 @@ export function ProfileSettingsForm({ initialName, email }: ProfileSettingsFormP
       <div className="bg-white rounded-lg border border-gray-200 p-6">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Display Name</h2>
         <p className="text-sm text-gray-600 mb-4">
-          This name will appear on your itineraries in the public gallery (e.g., "by Kris")
+          This name will appear on your itineraries in the public gallery (e.g., &quot;by Kris&quot;)
         </p>
         
         <form action={handleNameSubmit} className="space-y-4">
