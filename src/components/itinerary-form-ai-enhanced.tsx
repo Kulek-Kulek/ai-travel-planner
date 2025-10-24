@@ -232,7 +232,8 @@ export const ItineraryFormAIEnhanced = ({
     return () => {
       if (timeout) clearTimeout(timeout);
     };
-  }, [watchNotes]); // Only depend on watchNotes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchNotes]); // Only depend on watchNotes to trigger extraction
 
   // Auto-calculate days when dates are selected, BUT only if days weren't already extracted from description
   useEffect(() => {
