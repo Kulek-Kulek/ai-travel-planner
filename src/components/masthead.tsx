@@ -1,17 +1,57 @@
 "use client";
 
 import Link from "next/link";
+import { useState, useEffect } from "react";
+import { getPublicItineraries } from "@/lib/actions/itinerary-actions";
+import type { Itinerary } from "@/lib/actions/itinerary-actions";
 
 type MastheadProps = {
   onPlanTrip: () => void;
 };
 
 export function Masthead({ onPlanTrip }: MastheadProps) {
+  const [itineraries, setItineraries] = useState<Itinerary[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchItineraries = async () => {
+      setIsLoading(true);
+      const result = await getPublicItineraries({ limit: 20 });
+      if (result.success && result.data.itineraries.length > 0) {
+        // Shuffle and take 5 random itineraries with 3+ days
+        const shuffled = [...result.data.itineraries]
+          .filter(itinerary => itinerary.days >= 3)
+          .sort(() => Math.random() - 0.5)
+          .slice(0, Math.min(5, result.data.itineraries.length));
+        setItineraries(shuffled);
+      }
+      setIsLoading(false);
+    };
+
+    fetchItineraries();
+  }, []);
+
+  useEffect(() => {
+    if (itineraries.length > 1 && !isLoading) {
+      const interval = setInterval(() => {
+        setCurrentIndex((prevIndex) => (prevIndex + 1) % itineraries.length);
+      }, 5000); // Auto-slide every 5 seconds
+      return () => clearInterval(interval);
+    }
+  }, [itineraries.length, isLoading]);
+
+  const currentItinerary = itineraries[currentIndex];
+
+  const handleDotClick = (index: number) => {
+    setCurrentIndex(index);
+  };
+
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-indigo-950 via-indigo-900 to-blue-900 text-white">
+    <section className="relative overflow-hidden bg-gradient-to-br from-indigo-900 via-indigo-800 to-violet-300 text-white">
       <div aria-hidden className="pointer-events-none absolute inset-0">
-        <div className="absolute -left-24 -top-40 h-72 w-72 rounded-full bg-indigo-500/40 blur-3xl" />
-        <div className="absolute bottom-[-6rem] right-[-4rem] h-80 w-80 rounded-full bg-sky-500/30 blur-3xl" />
+        <div className="absolute -left-24 -top-40 h-72 w-72 rounded-full bg-violet-400/50 blur-3xl" />
+        <div className="absolute bottom-[-6rem] right-[-4rem] h-80 w-80 rounded-full bg-purple-300/40 blur-3xl" />
       </div>
 
       <div className="relative mx-auto flex max-w-7xl flex-col gap-16 px-4 py-20 sm:px-6 lg:flex-row lg:items-center lg:gap-20 lg:px-8">
@@ -93,45 +133,80 @@ export function Masthead({ onPlanTrip }: MastheadProps) {
         <div className="flex-1">
           <div className="relative">
             <div aria-hidden className="absolute inset-0 -translate-y-4 scale-95 rounded-[2.25rem] bg-indigo-500/40 blur-2xl" />
-            <div className="relative overflow-hidden rounded-[2rem] border border-white/15 bg-white/10 p-8 shadow-2xl backdrop-blur">
-              <div className="flex items-center justify-between text-xs font-medium uppercase tracking-wide text-indigo-100/80">
-                <span>Live preview</span>
-                <span>Generated 3m ago</span>
-              </div>
-              <h3 className="mt-6 text-2xl font-semibold">Kyoto cultural escape</h3>
-              <p className="mt-3 text-sm leading-6 text-indigo-100/80">
-                Sunrise at Fushimi Inari, tea ceremony in Gion, and a bamboo forest stroll crafted for a curious couple.
-              </p>
+            <div className="relative overflow-hidden rounded-[2rem] border border-white/15 bg-white/10 p-8 shadow-2xl backdrop-blur h-[450px] flex flex-col">
+              {isLoading || !currentItinerary ? (
+                <div className="flex items-center justify-center h-96">
+                  <div className="text-center">
+                    <div className="mb-4 inline-block h-8 w-8 animate-spin rounded-full border-4 border-white/30 border-t-white"></div>
+                    <p className="text-sm text-white/60">Loading trips...</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between text-xs font-medium uppercase tracking-wide text-indigo-100/80">
+                    <span>Live preview</span>
+                    <span>{currentItinerary.days}-day plan</span>
+                  </div>
+                  <h3 className="mt-6 text-2xl font-semibold line-clamp-1">{currentItinerary.destination}</h3>
+                  <p className="mt-3 text-sm leading-6 text-indigo-100/80 line-clamp-2">
+                    {currentItinerary.notes || `A curated ${currentItinerary.days}-day experience for ${currentItinerary.travelers} ${currentItinerary.travelers === 1 ? "traveler" : "travelers"}.`}
+                  </p>
 
-              <ul className="mt-8 space-y-4 text-sm text-indigo-100">
-                <li className="flex items-start gap-3">
-                  <span className="mt-1 text-lg">🌅</span>
-                  <div>
-                    <p className="font-semibold text-white">Daybreak temple stroll</p>
-                    <p className="text-indigo-100/80">Beat the crowds at Fushimi Inari and capture sweeping city views.</p>
-                  </div>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="mt-1 text-lg">🍵</span>
-                  <div>
-                    <p className="font-semibold text-white">Private tea ceremony</p>
-                    <p className="text-indigo-100/80">Reconnect with tradition in a hidden machiya house.</p>
-                  </div>
-                </li>
-                <li className="flex items-start gap-3">
-                  <span className="mt-1 text-lg">🎋</span>
-                  <div>
-                    <p className="font-semibold text-white">Arashiyama evening walk</p>
-                    <p className="text-indigo-100/80">Finish with lantern-lit paths through the bamboo grove.</p>
-                  </div>
-                </li>
-              </ul>
+                  <ul className="mt-4 space-y-0 text-sm text-indigo-100 flex-1 min-h-0 overflow-hidden">
+                    {currentItinerary.ai_plan?.days?.slice(0, 3).map((day, idx) => (
+                      <li key={idx} className="flex items-start gap-2 h-14">
+                        <span className="mt-0.5 text-lg flex-shrink-0" aria-hidden>
+                          {["🌅", "🌤️", "🌙"][idx] || "✨"}
+                        </span>
+                        <div className="min-w-0 flex-1 overflow-hidden">
+                          <p className="font-semibold text-white line-clamp-1 h-5">{day.title}</p>
+                          <p className="text-indigo-100/80 text-xs line-clamp-2 leading-4 h-8">
+                            {day.places?.[0]?.desc || "Explore this destination's highlights"}
+                          </p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
 
-              <div className="mt-10 flex flex-wrap gap-3 text-xs font-semibold uppercase tracking-wide text-indigo-100">
-                <span className="rounded-full bg-white/10 px-3 py-2">7-day plan</span>
-                <span className="rounded-full bg-white/10 px-3 py-2">Premium clients</span>
-                <span className="rounded-full bg-white/10 px-3 py-2">Multi-language</span>
-              </div>
+                  <div className="mt-auto pt-6 space-y-3">
+                    <div className="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-wide text-indigo-100">
+                      <span className="rounded-full bg-white/10 px-3 py-2">{currentItinerary.days}-day plan</span>
+                      {currentItinerary.travelers && (
+                        <span className="rounded-full bg-white/10 px-3 py-2">
+                          {currentItinerary.travelers} {currentItinerary.travelers === 1 ? "traveler" : "travelers"}
+                        </span>
+                      )}
+                      {currentItinerary.tags?.[0] && (
+                        <span className="rounded-full bg-white/10 px-3 py-2 line-clamp-1">{currentItinerary.tags[0]}</span>
+                      )}
+                    </div>
+                    {currentItinerary.creator_name && (
+                      <div className="text-sm text-indigo-100/90">
+                        <span className="text-indigo-200/70">by</span>{' '}
+                        <span className="font-medium text-white">{currentItinerary.creator_name}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Navigation Dots */}
+                  {itineraries.length > 1 && (
+                    <div className="mt-6 flex justify-center gap-3">
+                      {itineraries.map((_, index) => (
+                        <button
+                          key={index}
+                          onClick={() => handleDotClick(index)}
+                          className={`h-2 rounded-full transition-all duration-300 ${
+                            index === currentIndex
+                              ? "w-8 bg-white"
+                              : "w-2 bg-white/40 hover:bg-white/60"
+                          }`}
+                          aria-label={`Go to trip ${index + 1}`}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>

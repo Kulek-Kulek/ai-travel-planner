@@ -226,26 +226,36 @@ export async function generateItinerary(
       data: { user },
     } = await supabase.auth.getUser();
 
+    // For non-authenticated users, save as draft (won't show in public gallery)
+    // For authenticated users, save as published (will show in gallery)
+    const isAnonymous = !user?.id;
+
+    const insertData = {
+      user_id: user?.id || null, // NULL for anonymous users
+      destination: validated.destination,
+      days: validated.days,
+      travelers: validated.travelers,
+      start_date: validated.startDate?.toISOString().split("T")[0] || null,
+      end_date: validated.endDate?.toISOString().split("T")[0] || null,
+      children: validated.children || 0,
+      child_ages: validated.childAges || [],
+      has_accessibility_needs: validated.hasAccessibilityNeeds || false,
+      notes: validated.notes || null,
+      ai_plan: validatedResponse,
+      tags,
+      is_private: false, // Default to public (users can change later)
+      image_url: photo?.url || null,
+      image_photographer: photo?.photographer || null,
+      image_photographer_url: photo?.photographerUrl || null,
+      status: isAnonymous ? "draft" : "published", // Drafts for anonymous users
+    };
+
+    console.log("🔍 DEBUG: Inserting itinerary with data:", JSON.stringify(insertData, null, 2));
+    console.log("🔍 DEBUG: Status value type:", typeof insertData.status, "Value:", insertData.status);
+
     const { data: savedItinerary, error: dbError } = await supabase
       .from("itineraries")
-      .insert({
-        user_id: user?.id || null, // NULL for anonymous users
-        destination: validated.destination,
-        days: validated.days,
-        travelers: validated.travelers,
-        start_date: validated.startDate?.toISOString().split("T")[0] || null,
-        end_date: validated.endDate?.toISOString().split("T")[0] || null,
-        children: validated.children || 0,
-        child_ages: validated.childAges || [],
-        has_accessibility_needs: validated.hasAccessibilityNeeds || false,
-        notes: validated.notes || null,
-        ai_plan: validatedResponse,
-        tags,
-        is_private: false, // Default to public (users can change later)
-        image_url: photo?.url || null,
-        image_photographer: photo?.photographer || null,
-        image_photographer_url: photo?.photographerUrl || null,
-      })
+      .insert(insertData)
       .select("id")
       .single();
 

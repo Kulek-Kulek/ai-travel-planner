@@ -1,0 +1,830 @@
+"use client";
+
+/**
+ * AI-Enhanced Itinerary Form
+ * 
+ * This version uses AI for extraction instead of regex patterns.
+ * More accurate but requires API calls (costs money and adds latency).
+ * 
+ * Use this if the regex-based extraction isn't accurate enough.
+ */
+
+import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { toast } from "sonner";
+import { format, differenceInDays, isBefore, startOfDay } from "date-fns";
+import { Calendar as CalendarIcon, CheckCircle2, AlertCircle, Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Calendar } from "@/components/ui/calendar";
+import { Switch } from "@/components/ui/switch";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { cn } from "@/lib/utils";
+import {
+  DEFAULT_OPENROUTER_MODEL,
+  OPENROUTER_MODEL_OPTIONS,
+  OPENROUTER_MODEL_VALUES,
+} from "@/lib/openrouter/models";
+import { extractTravelInfoWithAI } from "@/lib/actions/extract-travel-info";
+import { type ExtractedTravelInfo } from "@/lib/types/extract-travel-info-types";
+import { calculateExtractionConfidence } from "@/lib/utils/extract-travel-info-utils";
+
+// Validation schema
+const itineraryFormSchema = z
+  .object({
+    destination: z
+      .string()
+      .min(2, "Destination must be at least 2 characters")
+      .max(100, "Destination must be less than 100 characters"),
+    days: z
+      .number({ message: "Trip length must be a number" })
+      .int("Number of days must be a whole number")
+      .min(1, "Trip length must be at least 1 day")
+      .max(30, "Trip cannot exceed 30 days"),
+    travelers: z
+      .number()
+      .int("Number of travelers must be a whole number")
+      .min(1, "At least 1 traveler required")
+      .max(20, "Maximum 20 travelers allowed"),
+    startDate: z.date().optional(),
+    endDate: z.date().optional(),
+    children: z
+      .number()
+      .int()
+      .min(0)
+      .max(10, "Maximum 10 children allowed")
+      .optional(),
+    childAges: z.array(z.number().int().min(0).max(17)).optional(),
+    hasAccessibilityNeeds: z.boolean().optional(),
+    notes: z
+      .string()
+      .min(20, "Please provide at least 20 characters describing your trip")
+      .max(500, "Notes must be less than 500 characters"),
+    model: z.enum(OPENROUTER_MODEL_VALUES, {
+      message: "Select an AI provider",
+    }),
+  })
+  .superRefine((data, ctx) => {
+    if (
+      (data.startDate && !data.endDate) ||
+      (!data.startDate && data.endDate)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Select both start and end dates or leave both empty.",
+        path: ["endDate"],
+      });
+    }
+  });
+
+export type ItineraryFormData = z.infer<typeof itineraryFormSchema>;
+
+interface ItineraryFormProps {
+  onSubmit: (data: ItineraryFormData) => void;
+  isLoading?: boolean;
+  modelOverride?: string; // Allow overriding the default model based on user tier
+  isAuthenticated?: boolean; // Whether the user is logged in
+  hasResult?: boolean; // Whether a plan was already generated
+}
+
+export const ItineraryFormAIEnhanced = ({
+  onSubmit,
+  isLoading = false,
+  modelOverride,
+  isAuthenticated = false,
+  hasResult = false,
+}: ItineraryFormProps) => {
+  const [childAgesInput, setChildAgesInput] = useState<string[]>([]);
+  const [startDateOpen, setStartDateOpen] = useState(false);
+  const [endDateOpen, setEndDateOpen] = useState(false);
+  const [showDetailedFields, setShowDetailedFields] = useState(false);
+  const [extractedInfo, setExtractedInfo] = useState<ExtractedTravelInfo | null>(null);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractionTimeout, setExtractionTimeout] = useState<NodeJS.Timeout | null>(null);
+
+  const form = useForm<ItineraryFormData>({
+    resolver: zodResolver(itineraryFormSchema),
+    defaultValues: {
+      destination: "",
+      days: 0,
+      travelers: 1,
+      children: undefined,
+      childAges: [],
+      hasAccessibilityNeeds: false,
+      notes: "",
+      model: DEFAULT_OPENROUTER_MODEL,
+    },
+  });
+
+  const watchChildren = form.watch("children");
+  const watchStartDate = form.watch("startDate");
+  const watchEndDate = form.watch("endDate");
+  const watchNotes = form.watch("notes");
+
+  // AI-powered extraction with debouncing
+  useEffect(() => {
+    // Clear existing timeout
+    if (extractionTimeout) {
+      clearTimeout(extractionTimeout);
+    }
+
+    // Don't extract if too short
+    if (!watchNotes || watchNotes.trim().length < 10) {
+      setExtractedInfo(null);
+      return;
+    }
+
+    // Set new timeout - extract after user stops typing for 1.5 seconds
+    const timeout = setTimeout(async () => {
+      setIsExtracting(true);
+      
+      try {
+        // Use modelOverride if provided (for tier-based model selection)
+        const extracted = modelOverride 
+          ? await extractTravelInfoWithAI(watchNotes, modelOverride)
+          : await extractTravelInfoWithAI(watchNotes);
+        setExtractedInfo(extracted);
+
+        // Auto-fill fields if they're empty
+        if (extracted.destination && !form.getValues("destination")) {
+          form.setValue("destination", extracted.destination, { shouldValidate: false });
+        }
+        if (extracted.days && !form.getValues("days")) {
+          form.setValue("days", extracted.days, { shouldValidate: false });
+        }
+        if (extracted.travelers && form.getValues("travelers") === 1) {
+          form.setValue("travelers", extracted.travelers, { shouldValidate: false });
+        }
+        if (extracted.children && !form.getValues("children")) {
+          form.setValue("children", extracted.children, { shouldValidate: false });
+          console.log("Setting children to:", extracted.children);
+        }
+        
+        // Pre-fill child ages if extracted
+        if (extracted.childAges && extracted.childAges.length > 0 && !form.getValues("childAges")?.length) {
+          form.setValue("childAges", extracted.childAges, { shouldValidate: false });
+          setChildAgesInput(extracted.childAges.map(age => age.toString()));
+          console.log("Setting childAges to:", extracted.childAges);
+        }
+        
+        if (extracted.hasAccessibilityNeeds) {
+          form.setValue("hasAccessibilityNeeds", true, { shouldValidate: false });
+        }
+
+        // Parse and set dates if provided
+        if (extracted.startDate && !form.getValues("startDate")) {
+          try {
+            const startDate = new Date(extracted.startDate);
+            if (!isNaN(startDate.getTime())) {
+              form.setValue("startDate", startDate, { shouldValidate: false });
+              console.log("Setting startDate to:", startDate);
+            }
+          } catch (error) {
+            console.error("Failed to parse startDate:", extracted.startDate, error);
+          }
+        }
+        if (extracted.endDate && !form.getValues("endDate")) {
+          try {
+            const endDate = new Date(extracted.endDate);
+            if (!isNaN(endDate.getTime())) {
+              form.setValue("endDate", endDate, { shouldValidate: false });
+              console.log("Setting endDate to:", endDate);
+            }
+          } catch (error) {
+            console.error("Failed to parse endDate:", extracted.endDate, error);
+          }
+        }
+      } catch (error) {
+        console.error("Extraction error:", error);
+        toast.error("Failed to analyze your description", {
+          description: "You can still fill in the fields manually",
+        });
+      } finally {
+        setIsExtracting(false);
+      }
+    }, 1500);
+
+    setExtractionTimeout(timeout);
+
+    return () => {
+      if (timeout) clearTimeout(timeout);
+    };
+  }, [watchNotes]); // Only depend on watchNotes
+
+  // Auto-calculate days when dates are selected, BUT only if days weren't already extracted from description
+  useEffect(() => {
+    if (watchStartDate && watchEndDate) {
+      // Only auto-calculate if days wasn't explicitly set by extraction
+      const shouldAutoCalculate = !extractedInfo?.days || form.getValues("days") === 0;
+      if (shouldAutoCalculate) {
+        const daysDiff = differenceInDays(watchEndDate, watchStartDate) + 1;
+        if (daysDiff > 0 && daysDiff <= 30) {
+          form.setValue("days", daysDiff);
+        }
+      }
+    }
+  }, [watchStartDate, watchEndDate, form, extractedInfo?.days]);
+
+  // Update child ages input fields when number of children changes
+  useEffect(() => {
+    if (!watchChildren || watchChildren <= 0) {
+      setChildAgesInput([]);
+      form.setValue("childAges", []);
+      return;
+    }
+
+    const nextLength = watchChildren;
+    setChildAgesInput((prev) => {
+      const next = [...prev];
+      next.length = nextLength;
+      for (let i = 0; i < nextLength; i += 1) {
+        if (typeof next[i] === "undefined") {
+          next[i] = "";
+        }
+      }
+      return next;
+    });
+  }, [watchChildren, form]);
+
+  const handleFormSubmit = (data: ItineraryFormData) => {
+    // Capitalize destination
+    const capitalizedData = {
+      ...data,
+      destination: data.destination
+        .split(" ")
+        .map(
+          (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase(),
+        )
+        .join(" "),
+      children: data.children ?? 0,
+      childAges: data.childAges ?? [],
+    };
+
+    onSubmit(capitalizedData);
+  };
+
+  const handleFormError = () => {
+    setShowDetailedFields(true);
+    
+    toast.error("Please provide missing information", {
+      description: "We need a few more details to generate your perfect itinerary",
+    });
+  };
+
+  // Check what's extracted/filled
+  const hasDestination = extractedInfo?.destination !== null || form.getValues("destination");
+  const hasDays = extractedInfo?.days !== null || (form.getValues("days") && form.getValues("days") > 0);
+  const hasTravelers = extractedInfo?.travelers !== null || form.getValues("travelers") > 0;
+  
+  const confidence = extractedInfo ? calculateExtractionConfidence(extractedInfo) : 0;
+  
+  // Check if form should be disabled (user created plan while logged out)
+  const isFormDisabled = !isAuthenticated && hasResult;
+
+  return (
+    <Form {...form}>
+      <form
+        onSubmit={form.handleSubmit(handleFormSubmit, handleFormError)}
+        className="space-y-10"
+      >
+        <section className="space-y-4">
+          <FormField
+            control={form.control}
+            name="notes"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-lg font-semibold text-slate-900">
+                  Describe your ideal trip
+                </FormLabel>
+                <FormDescription className="text-sm text-slate-500">
+                  Tell us about your travel plans in your own words. Our AI will extract the key details automatically.
+                </FormDescription>
+                <FormControl>
+                  <div className={`rounded-3xl border border-indigo-100 bg-indigo-50/60 p-1 shadow-[0_20px_60px_-45px_rgba(79,70,229,0.75)] ${isFormDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                    <Textarea
+                      placeholder="e.g., I'm planning a 6-day trip to Kyoto and Osaka for two adults. We're food lovers interested in tea ceremonies, hidden ramen bars, and a day trip to Nara. We'll be traveling in spring."
+                      rows={10}
+                      className="min-h-[130px] resize-y rounded-[26px] border-0 bg-white/90 px-5 py-4 text-base leading-7 text-slate-900 shadow-sm focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-0"
+                      {...field}
+                      disabled={isLoading || isFormDisabled}
+                    />
+                  </div>
+                </FormControl>
+                {isFormDisabled && (
+                  <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 mt-2">
+                    ℹ️ Sign in to create more itineraries
+                  </p>
+                )}
+                <FormMessage />
+
+                {/* AI Analysis Status */}
+                {isExtracting && (
+                  <div className="flex items-center gap-2 text-sm text-indigo-600">
+                    <Sparkles className="h-4 w-4 animate-pulse" />
+                    <span>AI is analyzing your description...</span>
+                  </div>
+                )}
+
+                {/* AI Extraction Results */}
+                {extractedInfo && !isExtracting && watchNotes.length >= 10 && (
+                  <div className="mt-4 space-y-3 rounded-2xl border border-slate-200 bg-white/80 p-4">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium text-slate-700">
+                        AI-powered analysis complete
+                      </p>
+                      <div className="flex items-center gap-1.5">
+                        <Sparkles className="h-3.5 w-3.5 text-indigo-500" />
+                        <span className="text-xs font-medium text-slate-500">
+                          {confidence}% confidence
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2 text-sm">
+                        {hasDestination ? (
+                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <AlertCircle className="h-4 w-4 text-amber-500" />
+                        )}
+                        <span className={hasDestination ? "text-slate-700" : "text-amber-700"}>
+                          Destination: {form.getValues("destination") || extractedInfo.destination || "Not specified"}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center gap-2 text-sm">
+                        {hasDays ? (
+                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <AlertCircle className="h-4 w-4 text-amber-500" />
+                        )}
+                        <span className={hasDays ? "text-slate-700" : "text-amber-700"}>
+                          Trip length: {form.getValues("days") > 0 ? `${form.getValues("days")} days` : (extractedInfo.days ? `${extractedInfo.days} days` : "Not specified")}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center gap-2 text-sm">
+                        {hasTravelers ? (
+                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <AlertCircle className="h-4 w-4 text-amber-500" />
+                        )}
+                        <span className={hasTravelers ? "text-slate-700" : "text-amber-700"}>
+                          Travelers: {form.getValues("travelers") > 0 ? form.getValues("travelers") : (extractedInfo.travelers || "Not specified")}
+                        </span>
+                      </div>
+
+                      {(form.getValues("children") || extractedInfo.children) && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                          <span className="text-slate-700">
+                            Children: {form.getValues("children") || extractedInfo.children}
+                          </span>
+                        </div>
+                      )}
+
+                      {(watchStartDate || watchEndDate) && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                          <span className="text-slate-700">
+                            Dates: {watchStartDate ? format(watchStartDate, "dd/MM/yyyy") : "?"} - {watchEndDate ? format(watchEndDate, "dd/MM/yyyy") : "?"}
+                          </span>
+                        </div>
+                      )}
+
+                      {extractedInfo.travelStyle && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                          <span className="text-slate-700">
+                            Style: {extractedInfo.travelStyle}
+                          </span>
+                        </div>
+                      )}
+
+                      {extractedInfo.interests.length > 0 && (
+                        <div className="flex items-start gap-2 text-sm">
+                          <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5" />
+                          <span className="text-slate-700">
+                            Interests: {extractedInfo.interests.join(", ")}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Encouraging message about dates */}
+                    {hasDestination && hasDays && hasTravelers && !watchStartDate && !watchEndDate && (
+                      <div className="mt-3 rounded-lg bg-blue-50 border border-blue-200 p-3">
+                        <div className="flex items-start gap-2">
+                          <span className="text-blue-600 text-lg">💡</span>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-blue-900">
+                              Pro tip: Add your travel dates for a more precise plan!
+                            </p>
+                            <p className="text-xs text-blue-700 mt-1">
+                              Knowing your specific dates helps us recommend seasonal activities, 
+                              check for local events, and suggest the best times to visit attractions.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setShowDetailedFields(true)}
+                              className="mt-2 text-xs text-blue-600 hover:text-blue-700 underline font-medium"
+                            >
+                              Add travel dates now →
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Always show manual option */}
+                    <div className="mt-3 pt-3 border-t border-slate-200">
+                      <button
+                        type="button"
+                        onClick={() => setShowDetailedFields(!showDetailedFields)}
+                        className="text-sm text-indigo-600 hover:text-indigo-700 underline font-medium"
+                      >
+                        {showDetailedFields 
+                          ? "Hide detailed fields" 
+                          : ((!hasDestination || !hasDays || !hasTravelers) 
+                              ? "Fill in missing details manually" 
+                              : "Edit or add more details")}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </FormItem>
+            )}
+          />
+        </section>
+
+        {/* Detailed fields - same as smart form */}
+        {showDetailedFields && (
+          <section className={`space-y-6 rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-[0_25px_80px_-65px_rgba(15,23,42,0.35)] ${isFormDisabled ? 'opacity-50 pointer-events-none' : ''}`}>
+            <div className="space-y-2">
+              <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                Essential details
+              </h3>
+              <p className="text-sm text-slate-500">
+                Complete any missing information below.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+              <FormField
+                control={form.control}
+                name="destination"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Destination <span className="text-red-500">*</span></FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Paris, France" {...field} disabled={isLoading} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="days"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Number of Days <span className="text-red-500">*</span></FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min="1"
+                        max="30"
+                        value={field.value || ""}
+                        onChange={(e) => {
+                          const parsed = parseInt(e.target.value, 10);
+                          field.onChange(Number.isNaN(parsed) ? 0 : parsed);
+                        }}
+                        disabled={isLoading}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="travelers"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Number of adults <span className="text-red-500">*</span></FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min="1"
+                        max="20"
+                        {...field}
+                        onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 1)}
+                        disabled={isLoading}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Date pickers (optional but encouraged) */}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="startDate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Start Date <span className="text-slate-400">(optional)</span></FormLabel>
+                    <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className={cn(
+                            "w-full pl-3 text-left font-normal",
+                            !field.value && "text-muted-foreground",
+                          )}
+                          disabled={isLoading}
+                        >
+                          {field.value ? (
+                            format(field.value, "dd/MM/yyyy")
+                          ) : (
+                            <span>Pick a date</span>
+                          )}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={(date) => {
+                            field.onChange(date ?? undefined);
+                            if (date) {
+                              setStartDateOpen(false);
+                            }
+                          }}
+                          disabled={(date) =>
+                            isBefore(date, startOfDay(new Date()))
+                          }
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="endDate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>End Date <span className="text-slate-400">(optional)</span></FormLabel>
+                    <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className={cn(
+                            "w-full pl-3 text-left font-normal",
+                            !field.value && "text-muted-foreground",
+                          )}
+                          disabled={isLoading}
+                        >
+                          {field.value ? (
+                            format(field.value, "dd/MM/yyyy")
+                          ) : (
+                            <span>Pick a date</span>
+                          )}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={(date) => {
+                            field.onChange(date ?? undefined);
+                            if (date) {
+                              setEndDateOpen(false);
+                            }
+                          }}
+                          disabled={(date) => {
+                            if (watchStartDate) {
+                              return isBefore(date, watchStartDate);
+                            }
+                            return isBefore(date, startOfDay(new Date()));
+                          }}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Additional optional fields */}
+            <div className="space-y-4 pt-6 border-t border-slate-200">
+              <h4 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                Additional details (optional)
+              </h4>
+
+              {/* Children */}
+              <FormField
+                control={form.control}
+                name="children"
+                render={({ field }) => (
+                  <FormItem className="max-w-sm">
+                    <FormLabel>Number of Children <span className="text-slate-400">(optional)</span></FormLabel>
+                    <FormDescription>
+                      Guests under 18. Leave blank if none.
+                    </FormDescription>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min="0"
+                        max="10"
+                        value={field.value && field.value > 0 ? field.value : ""}
+                        onChange={(e) => {
+                          const numValue = parseInt(e.target.value, 10);
+                          const value =
+                            e.target.value === "" ||
+                            Number.isNaN(numValue) ||
+                            numValue === 0
+                              ? undefined
+                              : numValue;
+                          field.onChange(value);
+                        }}
+                        disabled={isLoading}
+                        placeholder="0"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Child ages if children > 0 */}
+              {watchChildren && watchChildren > 0 && (
+                <div className="space-y-3">
+                  <FormLabel>Ages of Children <span className="text-slate-400">(optional but helpful)</span></FormLabel>
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+                    {Array.from({ length: watchChildren || 0 }, (_, index) => (
+                      <Select
+                        key={index}
+                        value={childAgesInput[index] || ""}
+                        onValueChange={(value) => {
+                          const newAges = [...childAgesInput];
+                          newAges[index] = value;
+                          setChildAgesInput(newAges);
+
+                          const ages = newAges
+                            .filter((age) => age !== "")
+                            .map((age) => parseInt(age, 10));
+                          form.setValue("childAges", ages);
+                        }}
+                        disabled={isLoading}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder={`Child ${index + 1} age`} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 17 }, (_, i) => i + 1).map((age) => (
+                            <SelectItem key={age} value={age.toString()}>
+                              {age} {age === 1 ? "year" : "years"}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Accessibility */}
+              <FormField
+                control={form.control}
+                name="hasAccessibilityNeeds"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-2xl border border-slate-200 bg-white/90 p-4 mt-6">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">
+                        Accessibility Requirements
+                      </FormLabel>
+                      <FormDescription>
+                        Enable wheelchair access, elevator availability, and other mobility considerations
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        disabled={isLoading}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            </div>
+          </section>
+        )}
+
+        <section className={`space-y-6 rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-[0_20px_60px_-55px_rgba(15,23,42,0.4)] ${isFormDisabled ? 'opacity-50 pointer-events-none' : ''}`}>
+          <div className="space-y-2">
+            <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+              AI Settings
+            </h3>
+            <p className="text-sm text-slate-500">
+              Choose which AI model will generate your travel plan.
+            </p>
+          </div>
+
+          <div className="max-w-sm">
+            <FormField
+              control={form.control}
+              name="model"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>AI provider</FormLabel>
+                  <FormControl>
+                    <Select value={field.value} onValueChange={field.onChange} disabled={isLoading}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {OPENROUTER_MODEL_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </section>
+
+        <Button 
+          type="submit" 
+          className="w-full" 
+          disabled={isLoading || isExtracting || (hasResult && !isAuthenticated)} 
+          size="lg"
+        >
+          {isLoading ? (
+            <>
+              <span className="mr-2 animate-spin">⏳</span>
+              Generating Your Itinerary...
+            </>
+          ) : isExtracting ? (
+            <>
+              <span className="mr-2 animate-pulse">✨</span>
+              Analyzing Your Description...
+            </>
+          ) : (hasResult && !isAuthenticated) ? (
+            <>
+              <span className="mr-2">🔐</span>
+              Sign in to Create Another Plan
+            </>
+          ) : (
+            <>
+              <span className="mr-2">✨</span>
+              Generate Itinerary
+            </>
+          )}
+        </Button>
+      </form>
+    </Form>
+  );
+};
+
