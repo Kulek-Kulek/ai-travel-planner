@@ -1,11 +1,21 @@
 -- Migration: Add draft status and session tracking
 -- Purpose: Enable users to save draft itineraries before signing in
 
--- Add status column to itineraries (draft or published)
+-- Drop existing constraint if it exists
 ALTER TABLE itineraries 
-ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'published' CHECK (status IN ('draft', 'published'));
+DROP CONSTRAINT IF EXISTS itineraries_status_check;
 
--- Fix default if it was set incorrectly
+-- Update status column to support both draft/published AND active/completed
+-- This combines migration 003 (active/completed) with draft/published
+ALTER TABLE itineraries 
+ALTER COLUMN status DROP DEFAULT,
+ALTER COLUMN status TYPE TEXT;
+
+-- Add new combined constraint
+ALTER TABLE itineraries 
+ADD CONSTRAINT itineraries_status_check CHECK (status IN ('draft', 'published', 'active', 'completed', 'archived'));
+
+-- Set default to published for new records
 ALTER TABLE itineraries 
 ALTER COLUMN status SET DEFAULT 'published'::text;
 
@@ -18,5 +28,5 @@ CREATE INDEX IF NOT EXISTS idx_itineraries_status ON itineraries(status);
 CREATE INDEX IF NOT EXISTS idx_itineraries_session_id ON itineraries(session_id);
 
 -- Add comment
-COMMENT ON COLUMN itineraries.status IS 'draft for temporary plans before user signs in, published for saved itineraries';
+COMMENT ON COLUMN itineraries.status IS 'Status: draft (temporary), published (saved), active (upcoming trip), completed (finished trip), archived (old)';
 COMMENT ON COLUMN itineraries.session_id IS 'Temporary session ID for anonymous draft tracking before sign-in';

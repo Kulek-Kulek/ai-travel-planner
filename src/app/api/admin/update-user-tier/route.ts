@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { isUserAdmin } from "@/lib/auth/admin";
+import { isAdmin } from "@/lib/auth/admin";
 
 /**
  * API Route: Update User Subscription Tier
@@ -14,8 +14,8 @@ import { isUserAdmin } from "@/lib/auth/admin";
 export async function POST(request: NextRequest) {
   try {
     // Check if user is admin
-    const isAdmin = await isUserAdmin();
-    if (!isAdmin) {
+    const adminStatus = await isAdmin();
+    if (!adminStatus) {
       return NextResponse.json(
         { error: "Unauthorized - Admin access required" },
         { status: 403 }
