@@ -57,7 +57,7 @@ export default function SignUpPage() {
               disabled={isPending}
             />
             <p className="text-xs text-gray-500">
-              This will appear on your itineraries (e.g., "by Kris")
+              This will appear on your itineraries (e.g., &quot;by Kris&quot;)
             </p>
             {errors.name && (
               <p className="text-sm text-red-600">{errors.name[0]}</p>
