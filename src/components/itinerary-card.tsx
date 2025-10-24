@@ -40,7 +40,8 @@ export function ItineraryCard({
     created_at, 
     is_private, 
     status, 
-    user_id, 
+    user_id,
+    creator_name,
     image_url
   } = itinerary;
   
@@ -167,13 +168,22 @@ export function ItineraryCard({
       
       {/* Footer - different for gallery vs my plans */}
       {!showActions ? (
-        <div className="flex justify-between items-center pt-3 border-t border-gray-100">
-          <span className="text-xs text-gray-500">
-            {new Date(created_at).toLocaleDateString()}
-          </span>
-          <span className="text-sm text-blue-600 font-medium hover:underline">
-            View Details →
-          </span>
+        <div className="pt-3 border-t border-gray-100">
+          <div className="flex justify-between items-center">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-xs text-gray-500">
+                {new Date(created_at).toLocaleDateString()}
+              </span>
+              {creator_name && (
+                <span className="text-xs text-gray-600">
+                  <span className="text-gray-400">by</span> <span className="font-medium text-indigo-600">{creator_name}</span>
+                </span>
+              )}
+            </div>
+            <span className="text-sm text-blue-600 font-medium hover:underline">
+              View Details →
+            </span>
+          </div>
         </div>
       ) : (
         <>

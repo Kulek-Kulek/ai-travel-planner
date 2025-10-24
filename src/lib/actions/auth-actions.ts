@@ -6,11 +6,20 @@ import { createClient } from '@/lib/supabase/server';
 import { z } from 'zod';
 
 // Validation schemas
-const signUpSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
-  fullName: z.string().min(2, 'Full name must be at least 2 characters'),
-});
+const signUpSchema = z
+  .object({
+    email: z.string().email('Invalid email address'),
+    password: z.string().min(8, 'Password must be at least 8 characters'),
+    confirmPassword: z.string().min(1, 'Please confirm your password'),
+    name: z
+      .string()
+      .min(2, 'Name must be at least 2 characters')
+      .max(50, 'Name must be less than 50 characters'),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ['confirmPassword'],
+  });
 
 const signInSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -24,7 +33,8 @@ export async function signUp(formData: FormData) {
   const validatedFields = signUpSchema.safeParse({
     email: formData.get('email'),
     password: formData.get('password'),
-    fullName: formData.get('fullName'),
+    confirmPassword: formData.get('confirmPassword'),
+    name: formData.get('name'),
   });
 
   if (!validatedFields.success) {
@@ -33,7 +43,7 @@ export async function signUp(formData: FormData) {
     };
   }
 
-  const { email, password, fullName } = validatedFields.data;
+  const { email, password, name } = validatedFields.data;
 
   // Sign up user
   const { error } = await supabase.auth.signUp({
@@ -41,7 +51,7 @@ export async function signUp(formData: FormData) {
     password,
     options: {
       data: {
-        full_name: fullName,
+        name: name,
       },
     },
   });
@@ -53,6 +63,12 @@ export async function signUp(formData: FormData) {
   }
 
   revalidatePath('/', 'layout');
+  
+  // Preserve itineraryId in redirect if present
+  const itineraryId = formData.get('itineraryId');
+  if (itineraryId) {
+    redirect(`/?itineraryId=${itineraryId}`);
+  }
   redirect('/');
 }
 
@@ -86,6 +102,12 @@ export async function signIn(formData: FormData) {
   }
 
   revalidatePath('/', 'layout');
+  
+  // Preserve itineraryId in redirect if present
+  const itineraryId = formData.get('itineraryId');
+  if (itineraryId) {
+    redirect(`/?itineraryId=${itineraryId}`);
+  }
   redirect('/');
 }
 

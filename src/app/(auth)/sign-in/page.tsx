@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useEffect } from 'react';
 import { signIn } from '@/lib/actions/auth-actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,8 +10,24 @@ import Link from 'next/link';
 export default function SignInPage() {
   const [isPending, startTransition] = useTransition();
   const [errors, setErrors] = useState<Record<string, string[]>>({});
+  const [draftId, setDraftId] = useState<string>('');
+
+  // Read itineraryId from URL on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('itineraryId');
+    if (id) {
+      setDraftId(id);
+    }
+  }, []);
 
   const handleSubmit = async (formData: FormData) => {
+    // Save itineraryId to sessionStorage so it persists through auth redirect
+    if (draftId) {
+      sessionStorage.setItem('itineraryId', draftId);
+      console.log("🔍 DEBUG: Saved itineraryId to sessionStorage:", draftId);
+    }
+    
     startTransition(async () => {
       const result = await signIn(formData);
       if (result?.error) {
@@ -76,7 +92,10 @@ export default function SignInPage() {
 
         <div className="mt-6 text-center text-sm text-gray-600">
           Don&apos;t have an account?{' '}
-          <Link href="/sign-up" className="text-blue-600 hover:underline font-medium">
+          <Link 
+            href={draftId ? `/sign-up?itineraryId=${draftId}` : "/sign-up"} 
+            className="text-blue-600 hover:underline font-medium"
+          >
             Sign up
           </Link>
         </div>
