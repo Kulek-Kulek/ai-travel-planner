@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 interface MobileNavProps {
-  user: { email: string } | null;
+  user: { email?: string } | null;
   isAdmin: boolean;
 }
 
@@ -135,7 +135,7 @@ export function MobileNav({ user, isAdmin }: MobileNavProps) {
                 <div className="px-4 py-2 bg-gray-50 rounded-lg">
                   <p className="text-xs text-gray-500 mb-1">Signed in as</p>
                   <p className="text-sm font-medium text-gray-900 truncate">
-                    {user.email}
+                    {user.email || 'User'}
                   </p>
                 </div>
 
