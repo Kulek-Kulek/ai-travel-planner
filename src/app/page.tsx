@@ -82,6 +82,24 @@ export default function Home() {
           sessionStorage.removeItem('createdPlanWhileLoggedOut');
           sessionStorage.removeItem('draftItineraryId');
           setHasCreatedPlanWhileLoggedOut(false);
+          
+          // Check if there's a pending bucket list add
+          const pendingBucketListAdd = sessionStorage.getItem('pendingBucketListAdd');
+          if (pendingBucketListAdd) {
+            // Import and execute the add
+            import('@/lib/actions/itinerary-actions').then(({ addToBucketList }) => {
+              addToBucketList(pendingBucketListAdd).then((result) => {
+                if (result.success) {
+                  toast.success('Added to your bucket list! ❤️');
+                  // Invalidate queries to refresh bucket list state
+                  queryClient.invalidateQueries({ queryKey: ['bucket-list-ids'] });
+                  queryClient.invalidateQueries({ queryKey: ['bucket-list'] });
+                }
+              });
+            });
+            // Clear the pending add
+            sessionStorage.removeItem('pendingBucketListAdd');
+          }
         }
       } catch {
         setIsAuthenticated(false);
@@ -94,7 +112,7 @@ export default function Home() {
     if (createdPlanWhileLoggedOut === 'true') {
       setHasCreatedPlanWhileLoggedOut(true);
     }
-  }, []);
+  }, [queryClient]);
 
   // Load itinerary from URL param or sessionStorage if present
   useEffect(() => {
