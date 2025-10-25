@@ -3,7 +3,19 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ItineraryActions } from '@/components/itinerary-actions';
+import { ItineraryLikeButton } from '@/components/itinerary-like-button';
 import { createClient } from '@/lib/supabase/server';
+import { 
+  ArrowLeft, 
+  ClipboardList, 
+  Calendar, 
+  Users, 
+  Accessibility, 
+  CalendarDays, 
+  FileText, 
+  Tag, 
+  Clock 
+} from 'lucide-react';
 
 export default async function ItineraryPage({
   params,
@@ -34,7 +46,8 @@ export default async function ItineraryPage({
     user_id, 
     image_url, 
     image_photographer, 
-    image_photographer_url 
+    image_photographer_url,
+    likes 
   } = itinerary;
 
   // Check if current user is the owner
@@ -49,16 +62,16 @@ export default async function ItineraryPage({
         <div className="flex gap-4 mb-6">
           <Link
             href="/"
-            className="inline-flex items-center text-blue-600 hover:text-blue-800"
+            className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800"
           >
-            ← Back to Home
+            <ArrowLeft className="w-4 h-4" /> Back to Home
           </Link>
           {isOwner && (
             <Link
               href="/my-plans"
-              className="inline-flex items-center text-blue-600 hover:text-blue-800"
+              className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800"
             >
-              📋 My Plans
+              <ClipboardList className="w-4 h-4" /> My Plans
             </Link>
           )}
         </div>
@@ -93,27 +106,30 @@ export default async function ItineraryPage({
 
         {/* Header Card */}
         <div className="bg-white rounded-lg shadow-lg p-6 md:p-8 mb-6">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-            {ai_plan.city || destination}
-          </h1>
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 flex-1">
+              {ai_plan.city || destination}
+            </h1>
+            <ItineraryLikeButton itineraryId={id} initialLikes={likes} />
+          </div>
           
           <div className="flex flex-wrap items-center gap-4 text-gray-600 mb-4">
             {/* Date range if available */}
             {start_date && end_date ? (
               <span className="flex items-center gap-2">
-                <span className="text-xl">📅</span>
+                <Calendar className="w-5 h-5" />
                 <span>{new Date(start_date).toLocaleDateString('en-GB')} - {new Date(end_date).toLocaleDateString('en-GB')} ({days} {days === 1 ? 'day' : 'days'})</span>
               </span>
             ) : (
               <span className="flex items-center gap-2">
-                <span className="text-xl">📅</span>
+                <Calendar className="w-5 h-5" />
                 <span>{days} {days === 1 ? 'day' : 'days'}</span>
               </span>
             )}
             
             {/* Travelers */}
             <span className="flex items-center gap-2">
-              <span className="text-xl">👥</span>
+              <Users className="w-5 h-5" />
               <span>
                 {travelers} adult{travelers > 1 ? 's' : ''}
                 {children && children > 0 && (
@@ -126,22 +142,22 @@ export default async function ItineraryPage({
             {/* Accessibility */}
             {has_accessibility_needs && (
               <span className="flex items-center gap-2 text-blue-600 font-medium">
-                <span className="text-xl">♿</span>
+                <Accessibility className="w-5 h-5" />
                 <span>Accessible</span>
               </span>
             )}
             
             {/* Created date */}
             <span className="flex items-center gap-2">
-              <span className="text-xl">📆</span>
+              <CalendarDays className="w-5 h-5" />
               <span>Created {new Date(created_at).toLocaleDateString()}</span>
             </span>
           </div>
 
           {notes && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-              <p className="text-sm font-medium text-blue-900 mb-1">
-                📝 Travel Notes:
+              <p className="flex items-center gap-2 text-sm font-medium text-blue-900 mb-1">
+                <FileText className="w-4 h-4" /> Travel Notes:
               </p>
               <p className="text-blue-800">{notes}</p>
             </div>
@@ -153,8 +169,9 @@ export default async function ItineraryPage({
               {tags.map((tag, idx) => (
                 <span
                   key={idx}
-                  className="inline-block bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full border border-blue-200"
+                  className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full border border-blue-200"
                 >
+                  <Tag className="w-3 h-3" />
                   {tag}
                 </span>
               ))}
@@ -186,7 +203,7 @@ export default async function ItineraryPage({
                         </h3>
                         <p className="text-gray-700 mb-3">{place.desc}</p>
                         <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <span className="text-lg">⏱️</span>
+                          <Clock className="w-4 h-4" />
                           <span className="font-medium">{place.time}</span>
                         </div>
                       </div>
