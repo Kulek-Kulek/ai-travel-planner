@@ -16,11 +16,6 @@ async function SignOutButton() {
   );
 }
 
-async function SignOutAction() {
-  'use server';
-  await signOut();
-}
-
 export async function NavHeader() {
   const user = await getUser();
   const userIsAdmin = user ? await isAdmin() : false;

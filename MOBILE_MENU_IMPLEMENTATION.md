@@ -257,3 +257,4 @@ import { MobileNav } from '@/components/mobile-nav';
 - Smooth animations use GPU acceleration
 - Menu positioned with `fixed` positioning for reliability
 
+
