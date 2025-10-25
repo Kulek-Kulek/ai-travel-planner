@@ -102,6 +102,15 @@ export function MobileNav({ user, isAdmin }: MobileNavProps) {
                   <span className="font-medium">My Plans</span>
                 </Link>
 
+                {/* Bucket List */}
+                <Link
+                  href="/bucket-list"
+                  onClick={closeMenu}
+                  className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <span className="font-medium">Bucket List</span>
+                </Link>
+
                 {/* Profile */}
                 <Link
                   href="/profile"

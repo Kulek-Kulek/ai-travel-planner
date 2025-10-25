@@ -1,9 +1,11 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import type { Itinerary } from '@/lib/actions/itinerary-actions';
-import { likeItinerary } from '@/lib/actions/itinerary-actions';
+import { likeItinerary, addToBucketList, removeFromBucketList, isInBucketList } from '@/lib/actions/itinerary-actions';
 import { Button } from './ui/button';
+import { createClient } from '@/lib/supabase/client';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,17 +34,23 @@ import {
 interface ItineraryCardProps {
   itinerary: Itinerary;
   showActions?: boolean;
+  showBucketListActions?: boolean; // New prop for bucket list page
+  isInBucketList?: boolean; // Optional: if provided, skip the bucket list check
   onTogglePrivacy?: (id: string, currentPrivacy: boolean) => void;
   onToggleStatus?: (id: string, currentStatus: string) => void;
   onDelete?: (id: string, destination: string) => void;
+  onRemoveFromBucketList?: (id: string) => void; // New callback for removing from bucket list
 }
 
 export function ItineraryCard({ 
   itinerary, 
   showActions = false,
+  showBucketListActions = false,
+  isInBucketList: isInBucketListProp,
   onTogglePrivacy,
   onToggleStatus,
-  onDelete 
+  onDelete,
+  onRemoveFromBucketList
 }: ItineraryCardProps) {
   const { 
     id, 
@@ -65,6 +73,7 @@ export function ItineraryCard({
     likes
   } = itinerary;
   
+  const router = useRouter();
   const [currentLikes, setCurrentLikes] = useState(likes || 0);
   const [isLiking, setIsLiking] = useState(false);
   const [hasLiked, setHasLiked] = useState(() => {
@@ -76,6 +85,30 @@ export function ItineraryCard({
     return false;
   });
   const [justLiked, setJustLiked] = useState(false);
+  const [inBucketList, setInBucketList] = useState(isInBucketListProp ?? false);
+  const [isCheckingBucketList, setIsCheckingBucketList] = useState(isInBucketListProp === undefined);
+  const [isAddingToBucket, setIsAddingToBucket] = useState(false);
+  
+  // Check if itinerary is in bucket list on mount - only if not provided via props
+  useEffect(() => {
+    // Skip check if already provided via props
+    if (isInBucketListProp !== undefined) {
+      setInBucketList(isInBucketListProp);
+      setIsCheckingBucketList(false);
+      return;
+    }
+    
+    async function checkBucketListStatus() {
+      setIsCheckingBucketList(true);
+      const result = await isInBucketList(id);
+      if (result.success) {
+        setInBucketList(result.data);
+      }
+      setIsCheckingBucketList(false);
+    }
+    
+    checkBucketListStatus();
+  }, [id, isInBucketListProp]);
   
   const handleLike = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -120,6 +153,78 @@ export function ItineraryCard({
       toast.error('Something went wrong');
     } finally {
       setIsLiking(false);
+    }
+  };
+  
+  const handleAddToBucketList = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (isAddingToBucket) return;
+    
+    // Check if user is authenticated
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      // User not authenticated - store intent and redirect to sign-in
+      // Store the itinerary ID they want to add
+      sessionStorage.setItem('pendingBucketListAdd', id);
+      toast.info('Please sign in to save to your bucket list');
+      // Redirect back to current page after login
+      const currentPath = window.location.pathname;
+      router.push(`/sign-in?redirectTo=${currentPath}`);
+      return;
+    }
+    
+    setIsAddingToBucket(true);
+    
+    try {
+      const result = await addToBucketList(id);
+      
+      if (result.success) {
+        setInBucketList(true);
+        toast.success('Added to your bucket list! ❤️');
+      } else {
+        if (result.error === 'Already in your bucket list') {
+          setInBucketList(true);
+          toast.info('This itinerary is already in your bucket list!');
+        } else {
+          toast.error(result.error || 'Failed to add to bucket list');
+        }
+      }
+    } catch (error) {
+      console.error('Error adding to bucket list:', error);
+      toast.error('Something went wrong');
+    } finally {
+      setIsAddingToBucket(false);
+    }
+  };
+  
+  const handleRemoveFromBucketList = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // If on bucket list page (showBucketListActions), just trigger the callback
+    // The parent component will show a confirmation dialog
+    if (showBucketListActions && onRemoveFromBucketList) {
+      onRemoveFromBucketList(id);
+      return;
+    }
+    
+    // Otherwise, remove directly (for other pages)
+    try {
+      const result = await removeFromBucketList(id);
+      
+      if (result.success) {
+        setInBucketList(false);
+        toast.success('Removed from bucket list');
+      } else {
+        toast.error(result.error || 'Failed to remove from bucket list');
+      }
+    } catch (error) {
+      console.error('Error removing from bucket list:', error);
+      toast.error('Something went wrong');
     }
   };
   
@@ -265,20 +370,20 @@ export function ItineraryCard({
           </div>
           
           {/* Action buttons row */}
-          <div className="flex items-center gap-2 pt-3">
+          <div className="flex items-center gap-4 pt-3">
             {/* Like button */}
             <button
               onClick={handleLike}
               disabled={isLiking || hasLiked}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all ${
+              className={`flex items-center gap-1.5 transition-all ${
                 hasLiked
-                  ? 'bg-blue-100 text-blue-700 cursor-default'
-                  : 'bg-gray-100 text-gray-700 hover:bg-blue-50 hover:text-blue-600 active:scale-95'
+                  ? 'text-blue-600 cursor-default'
+                  : 'text-gray-500 hover:text-blue-600 active:scale-95'
               } ${isLiking ? 'opacity-50' : ''}`}
               title={hasLiked ? 'You liked this!' : 'Give this itinerary a thumbs up'}
             >
-              <span className="text-xs font-semibold min-w-[16px] text-center">{currentLikes}</span>
-              <ThumbsUp className={`w-4 h-4 ${justLiked ? 'animate-bounce' : ''}`} />
+              <span className="text-sm font-semibold min-w-[16px] text-center">{currentLikes}</span>
+              <ThumbsUp className={`w-5 h-5 ${justLiked ? 'animate-bounce' : ''} ${hasLiked ? 'fill-current' : ''}`} />
             </button>
             
             {/* Share button - placeholder */}
@@ -288,26 +393,61 @@ export function ItineraryCard({
                 e.stopPropagation();
                 toast.info('Share feature coming soon!');
               }}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-green-50 hover:text-green-600 transition-all active:scale-95"
+              className="text-gray-500 hover:text-green-600 transition-all active:scale-95"
               title="Share with friends (coming soon)"
             >
-              <Share2 className="w-4 h-4" />
+              <Share2 className="w-5 h-5" />
             </button>
             
-            {/* Bucket list button - placeholder */}
+            {/* Bucket list button */}
             <button
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                toast.info('Bucket list feature coming soon!');
-              }}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-red-50 hover:text-red-600 transition-all active:scale-95"
-              title="Add to bucket list (coming soon)"
+              onClick={inBucketList ? handleRemoveFromBucketList : handleAddToBucketList}
+              disabled={isAddingToBucket || isCheckingBucketList}
+              className={`transition-all ${
+                inBucketList
+                  ? 'text-red-600 hover:text-red-700 active:scale-95'
+                  : 'text-gray-500 hover:text-red-600 active:scale-95'
+              } ${(isAddingToBucket || isCheckingBucketList) ? 'opacity-50' : ''}`}
+              title={inBucketList ? 'Remove from bucket list' : 'Add to bucket list'}
             >
-              <Heart className="w-4 h-4" />
+              <Heart className={`w-5 h-5 ${inBucketList ? 'fill-current' : ''}`} />
             </button>
           </div>
         </div>
+      ) : showBucketListActions ? (
+        <>
+          {/* Bucket List Actions */}
+          <div className="pt-3 border-t border-gray-100 space-y-2">
+            <div className="flex justify-between items-center gap-2">
+              <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                <span className="text-xs text-gray-500">
+                  Added {new Date(created_at).toLocaleDateString()}
+                </span>
+                {creator_name && (
+                  <span className="text-xs text-gray-600 truncate">
+                    <span className="text-gray-400">by</span> <span className="font-medium text-indigo-600">{creator_name}</span>
+                  </span>
+                )}
+              </div>
+            </div>
+            
+            {/* Action buttons for bucket list */}
+            <div className="flex gap-2 pt-2">
+              <Link href={`/itinerary/${id}`} className="flex-1">
+                <Button variant="outline" size="sm" className="w-full gap-1.5">
+                  <Eye className="w-4 h-4" /> View
+                </Button>
+              </Link>
+              <button 
+                type="button"
+                onClick={handleRemoveFromBucketList}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-300 transition-colors"
+              >
+                <Heart className="w-4 h-4 fill-current" /> Remove
+              </button>
+            </div>
+          </div>
+        </>
       ) : (
         <>
           <p className="text-xs text-gray-500 mb-4">
@@ -407,7 +547,8 @@ export function ItineraryCard({
   );
 
   // Wrap with Link only if not showing actions (public gallery)
-  if (!showActions) {
+  // Don't wrap if showing bucket list actions or my plans actions
+  if (!showActions && !showBucketListActions) {
     return (
       <Link href={`/itinerary/${id}`} prefetch>
         {cardContent}

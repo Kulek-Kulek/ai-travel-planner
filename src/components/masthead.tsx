@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { getPublicItineraries } from "@/lib/actions/itinerary-actions";
-import type { Itinerary } from "@/lib/actions/itinerary-actions";
 import { Sparkles, Zap, Compass, Sunrise, Sun, Moon } from "lucide-react";
 
 type MastheadProps = {
@@ -11,28 +11,32 @@ type MastheadProps = {
 };
 
 export function Masthead({ onPlanTrip }: MastheadProps) {
-  const [itineraries, setItineraries] = useState<Itinerary[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
 
-  useEffect(() => {
-    const fetchItineraries = async () => {
-      setIsLoading(true);
-      const result = await getPublicItineraries({ limit: 20 });
-      if (result.success && result.data.itineraries.length > 0) {
-        // Shuffle and take 5 random itineraries with 3+ days
-        const shuffled = [...result.data.itineraries]
-          .filter(itinerary => itinerary.days >= 3)
-          .sort(() => Math.random() - 0.5)
-          .slice(0, Math.min(5, result.data.itineraries.length));
-        setItineraries(shuffled);
+  // Use TanStack Query with the same cache key as the gallery
+  const { data: itinerariesData, isLoading } = useQuery({
+    queryKey: ['public-itineraries', []], // Same key as gallery uses
+    queryFn: async () => {
+      const result = await getPublicItineraries({ limit: 20, tags: [] });
+      if (!result.success) {
+        return { itineraries: [], total: 0 };
       }
-      setIsLoading(false);
-    };
+      return result.data;
+    },
+    staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
+  });
 
-    fetchItineraries();
-  }, []);
+  // Memoize the carousel itineraries to avoid re-shuffling
+  const itineraries = useMemo(() => {
+    if (!itinerariesData?.itineraries.length) return [];
+    
+    // Shuffle and take 5 random itineraries with 3+ days
+    return [...itinerariesData.itineraries]
+      .filter(itinerary => itinerary.days >= 3)
+      .sort(() => Math.random() - 0.5)
+      .slice(0, Math.min(5, itinerariesData.itineraries.length));
+  }, [itinerariesData]);
 
   useEffect(() => {
     if (itineraries.length > 1 && !isLoading && !isPaused) {
