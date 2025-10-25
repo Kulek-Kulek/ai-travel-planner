@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ItineraryCard } from './itinerary-card';
 import { Button } from './ui/button';
-import { getPublicItineraries, getAllTags } from '@/lib/actions/itinerary-actions';
+import { getPublicItineraries, getAllTags, getBucketListIds } from '@/lib/actions/itinerary-actions';
 import { deleteItineraryAdmin, updateItineraryPrivacyAdmin } from '@/lib/actions/admin-actions';
+import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 
 interface ItineraryGalleryProps {
@@ -14,6 +15,7 @@ interface ItineraryGalleryProps {
 
 export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [bucketListIds, setBucketListIds] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
 
   // Fetch itineraries with TanStack Query
@@ -43,6 +45,36 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
       return result.data;
     },
   });
+  
+  // Fetch bucket list IDs for authenticated users
+  // Re-fetch whenever we navigate to this page or itineraries change
+  useEffect(() => {
+    async function loadBucketListIds() {
+      // Check if user is authenticated
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        setBucketListIds(new Set());
+        return;
+      }
+      
+      const result = await getBucketListIds();
+      if (result.success) {
+        setBucketListIds(new Set(result.data));
+      }
+    }
+    
+    loadBucketListIds();
+    
+    // Also listen for focus event to refresh when user returns from login
+    const handleFocus = () => {
+      loadBucketListIds();
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [itinerariesData]); // Re-fetch when itineraries data changes
 
   const itineraries = itinerariesData?.itineraries || [];
   const total = itinerariesData?.total || 0;
@@ -203,6 +235,7 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
               key={itinerary.id} 
               itinerary={itinerary}
               showActions={isAdmin}
+              isInBucketList={bucketListIds.has(itinerary.id)}
               onTogglePrivacy={isAdmin ? handleTogglePrivacy : undefined}
               onToggleStatus={isAdmin ? handleToggleStatus : undefined}
               onDelete={isAdmin ? (id) => handleDelete(id) : undefined}

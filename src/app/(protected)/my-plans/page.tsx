@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { getMyItineraries, updateItineraryPrivacy, updateItineraryStatus, deleteItinerary } from '@/lib/actions/itinerary-actions';
-import type { Itinerary } from '@/lib/actions/itinerary-actions';
+import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { getMyItineraries, updateItineraryPrivacy, updateItineraryStatus, deleteItinerary, getBucketListIds } from '@/lib/actions/itinerary-actions';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { ItineraryCard } from '@/components/itinerary-card';
@@ -12,30 +11,39 @@ import { toast } from 'sonner';
 
 export default function MyPlansPage() {
   const queryClient = useQueryClient();
-  const [itineraries, setItineraries] = useState<Itinerary[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; id: string; destination: string }>({
     open: false,
     id: '',
     destination: '',
   });
 
-  const fetchItineraries = async () => {
-    setIsLoading(true);
-    const result = await getMyItineraries();
-    
-    if (result.success) {
-      setItineraries(result.data);
-    } else {
-      toast.error('Failed to load your itineraries');
-    }
-    
-    setIsLoading(false);
-  };
+  // Use TanStack Query for better caching and performance
+  const { data: itineraries = [], isLoading: isLoadingItineraries } = useQuery({
+    queryKey: ['my-itineraries'],
+    queryFn: async () => {
+      const result = await getMyItineraries();
+      if (!result.success) {
+        toast.error('Failed to load your itineraries');
+        return [];
+      }
+      return result.data;
+    },
+    staleTime: 2 * 60 * 1000, // Consider data fresh for 2 minutes
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+  });
 
-  useEffect(() => {
-    fetchItineraries();
-  }, []);
+  // Fetch bucket list IDs separately
+  const { data: bucketListIds = new Set<string>(), isLoading: isLoadingBucket } = useQuery({
+    queryKey: ['bucket-list-ids'],
+    queryFn: async () => {
+      const result = await getBucketListIds();
+      return result.success ? new Set(result.data) : new Set<string>();
+    },
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+  });
+
+  const isLoading = isLoadingItineraries || isLoadingBucket;
 
   const handleTogglePrivacy = async (id: string, currentPrivacy: boolean) => {
     const result = await updateItineraryPrivacy(id, !currentPrivacy);
@@ -53,8 +61,8 @@ export default function MyPlansPage() {
         }
       );
       
-      // Refresh both the list and the public gallery
-      fetchItineraries();
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ['my-itineraries'] });
       queryClient.invalidateQueries({ queryKey: ['public-itineraries'] });
       queryClient.invalidateQueries({ queryKey: ['all-tags'] });
     } else {
@@ -72,7 +80,8 @@ export default function MyPlansPage() {
           ? '✅ Itinerary marked as completed!' 
           : '↩️ Itinerary reactivated'
       );
-      fetchItineraries(); // Refresh list
+      // Invalidate to refresh
+      queryClient.invalidateQueries({ queryKey: ['my-itineraries'] });
     } else {
       toast.error('Failed to update status');
     }
@@ -87,11 +96,12 @@ export default function MyPlansPage() {
     
     if (result.success) {
       toast.success('Itinerary deleted successfully');
-      fetchItineraries(); // Refresh list
       
-      // Also refresh the public gallery in case it was public
+      // Invalidate all related queries
+      queryClient.invalidateQueries({ queryKey: ['my-itineraries'] });
       queryClient.invalidateQueries({ queryKey: ['public-itineraries'] });
       queryClient.invalidateQueries({ queryKey: ['all-tags'] });
+      queryClient.invalidateQueries({ queryKey: ['bucket-list-ids'] });
     } else {
       toast.error('Failed to delete itinerary');
     }
@@ -150,6 +160,7 @@ export default function MyPlansPage() {
                 key={itinerary.id}
                 itinerary={itinerary}
                 showActions={true}
+                isInBucketList={bucketListIds.has(itinerary.id)}
                 onTogglePrivacy={handleTogglePrivacy}
                 onToggleStatus={handleToggleStatus}
                 onDelete={handleDelete}
