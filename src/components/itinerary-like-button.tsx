@@ -57,7 +57,7 @@ export function ItineraryLikeButton({ itineraryId, initialLikes }: ItineraryLike
         setHasLiked(false);
         toast.error('Failed to like itinerary');
       }
-    } catch (error) {
+    } catch {
       // Revert optimistic update
       setCurrentLikes(prev => prev - 1);
       setHasLiked(false);

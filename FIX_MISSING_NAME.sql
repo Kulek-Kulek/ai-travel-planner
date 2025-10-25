@@ -13,3 +13,4 @@ WHERE id = auth.uid();
 SELECT id, email, full_name FROM profiles WHERE id = auth.uid();
 
 
+
