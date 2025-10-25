@@ -67,7 +67,7 @@ export async function NavHeader() {
                 {user ? (
                   <>
                     <span className="text-sm text-gray-600 max-w-[200px] truncate">
-                      {user.email}
+                      {user.email || 'User'}
                     </span>
                     <SignOutButton />
                   </>
