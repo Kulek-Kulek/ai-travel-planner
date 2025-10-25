@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import Image from 'next/image';
+import { useState } from 'react';
 import type { Itinerary } from '@/lib/actions/itinerary-actions';
+import { likeItinerary } from '@/lib/actions/itinerary-actions';
 import { Button } from './ui/button';
 import {
   DropdownMenu,
@@ -9,6 +11,23 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
+import { toast } from 'sonner';
+import { 
+  Calendar,
+  Users, 
+  Accessibility, 
+  Lock, 
+  Globe, 
+  CheckCircle2, 
+  ThumbsUp, 
+  Share2, 
+  Heart, 
+  Trash2, 
+  Eye, 
+  Pencil, 
+  MoreVertical,
+  RotateCcw
+} from 'lucide-react';
 
 interface ItineraryCardProps {
   itinerary: Itinerary;
@@ -42,8 +61,67 @@ export function ItineraryCard({
     status, 
     user_id,
     creator_name,
-    image_url
+    image_url,
+    likes
   } = itinerary;
+  
+  const [currentLikes, setCurrentLikes] = useState(likes || 0);
+  const [isLiking, setIsLiking] = useState(false);
+  const [hasLiked, setHasLiked] = useState(() => {
+    // Check localStorage to see if user has already liked this itinerary
+    if (typeof window !== 'undefined') {
+      const liked = localStorage.getItem(`liked_${id}`);
+      return liked === 'true';
+    }
+    return false;
+  });
+  const [justLiked, setJustLiked] = useState(false);
+  
+  const handleLike = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (hasLiked) {
+      toast.info('You already liked this itinerary!');
+      return;
+    }
+    
+    if (isLiking) return;
+    
+    setIsLiking(true);
+    setJustLiked(true);
+    
+    // Remove animation after it completes (500ms)
+    setTimeout(() => setJustLiked(false), 500);
+    
+    // Optimistic update
+    setCurrentLikes(prev => prev + 1);
+    setHasLiked(true);
+    
+    try {
+      const result = await likeItinerary(id);
+      
+      if (result.success) {
+        // Update with actual value from server
+        setCurrentLikes(result.data);
+        // Save to localStorage
+        localStorage.setItem(`liked_${id}`, 'true');
+        toast.success('Thanks for your thumbs up! 👍');
+      } else {
+        // Revert optimistic update
+        setCurrentLikes(prev => prev - 1);
+        setHasLiked(false);
+        toast.error('Failed to like itinerary');
+      }
+    } catch {
+      // Revert optimistic update
+      setCurrentLikes(prev => prev - 1);
+      setHasLiked(false);
+      toast.error('Something went wrong');
+    } finally {
+      setIsLiking(false);
+    }
+  };
   
   // Get first few places as preview
   const previewPlaces = ai_plan.days
@@ -76,7 +154,7 @@ export function ItineraryCard({
           </h3>
           {/* Admin viewing indicator */}
           {showActions && !user_id && (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium shrink-0">
+            <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium shrink-0">
               Anonymous
             </span>
           )}
@@ -84,21 +162,21 @@ export function ItineraryCard({
         <div className="space-y-1 mb-2">
           {/* Date range if available */}
           {start_date && end_date && (
-            <div className="flex items-center gap-1 text-sm text-gray-600">
-              <span>📅</span>
+            <div className="flex items-center gap-1.5 text-sm text-gray-600">
+              <Calendar className="w-4 h-4" />
               <span>{new Date(start_date).toLocaleDateString('en-GB')} - {new Date(end_date).toLocaleDateString('en-GB')}</span>
             </div>
           )}
           {!start_date && (
-            <div className="flex items-center gap-1 text-sm text-gray-600">
-              <span>📅</span>
+            <div className="flex items-center gap-1.5 text-sm text-gray-600">
+              <Calendar className="w-4 h-4" />
               <span>{days} {days === 1 ? 'day' : 'days'}</span>
             </div>
           )}
           
           {/* Travelers info */}
-          <div className="flex items-center gap-1 text-sm text-gray-600">
-            <span>👥</span>
+          <div className="flex items-center gap-1.5 text-sm text-gray-600">
+            <Users className="w-4 h-4" />
             <span>
               {travelers} adult{travelers > 1 ? 's' : ''}
               {children && children > 0 && (
@@ -110,8 +188,8 @@ export function ItineraryCard({
           
           {/* Accessibility indicator */}
           {has_accessibility_needs && (
-            <div className="flex items-center gap-1 text-sm text-blue-600">
-              <span>♿</span>
+            <div className="flex items-center gap-1.5 text-sm text-blue-600">
+              <Accessibility className="w-4 h-4" />
               <span>Accessible</span>
             </div>
           )}
@@ -121,17 +199,17 @@ export function ItineraryCard({
         {showActions && (
           <div className="flex items-center gap-2">
             <span
-              className={`inline-block px-2 py-1 text-xs rounded-full ${
+              className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full ${
                 is_private
                   ? 'bg-gray-200 text-gray-700'
                   : 'bg-green-100 text-green-800'
               }`}
             >
-              {is_private ? '🔒 Private' : '🌍 Public'}
+              {is_private ? <><Lock className="w-3 h-3" /> Private</> : <><Globe className="w-3 h-3" /> Public</>}
             </span>
             {status === 'completed' && (
-              <span className="inline-block px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
-                ✅ Completed
+              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
+                <CheckCircle2 className="w-3 h-3" /> Completed
               </span>
             )}
           </div>
@@ -168,21 +246,66 @@ export function ItineraryCard({
       
       {/* Footer - different for gallery vs my plans */}
       {!showActions ? (
-        <div className="pt-3 border-t border-gray-100">
-          <div className="flex justify-between items-center">
-            <div className="flex flex-col gap-0.5">
+        <div className="pt-3 border-t border-gray-100 space-y-2">
+          {/* Creator and date info */}
+          <div className="flex justify-between items-center gap-2">
+            <div className="flex flex-col gap-0.5 flex-1 min-w-0">
               <span className="text-xs text-gray-500">
                 {new Date(created_at).toLocaleDateString()}
               </span>
               {creator_name && (
-                <span className="text-xs text-gray-600">
+                <span className="text-xs text-gray-600 truncate">
                   <span className="text-gray-400">by</span> <span className="font-medium text-indigo-600">{creator_name}</span>
                 </span>
               )}
             </div>
             <span className="text-sm text-blue-600 font-medium hover:underline">
-              View Details →
+              View →
             </span>
+          </div>
+          
+          {/* Action buttons row */}
+          <div className="flex items-center gap-2 pt-3">
+            {/* Like button */}
+            <button
+              onClick={handleLike}
+              disabled={isLiking || hasLiked}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all ${
+                hasLiked
+                  ? 'bg-blue-100 text-blue-700 cursor-default'
+                  : 'bg-gray-100 text-gray-700 hover:bg-blue-50 hover:text-blue-600 active:scale-95'
+              } ${isLiking ? 'opacity-50' : ''}`}
+              title={hasLiked ? 'You liked this!' : 'Give this itinerary a thumbs up'}
+            >
+              <span className="text-xs font-semibold min-w-[16px] text-center">{currentLikes}</span>
+              <ThumbsUp className={`w-4 h-4 ${justLiked ? 'animate-bounce' : ''}`} />
+            </button>
+            
+            {/* Share button - placeholder */}
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toast.info('Share feature coming soon!');
+              }}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-green-50 hover:text-green-600 transition-all active:scale-95"
+              title="Share with friends (coming soon)"
+            >
+              <Share2 className="w-4 h-4" />
+            </button>
+            
+            {/* Bucket list button - placeholder */}
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toast.info('Bucket list feature coming soon!');
+              }}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-red-50 hover:text-red-600 transition-all active:scale-95"
+              title="Add to bucket list (coming soon)"
+            >
+              <Heart className="w-4 h-4" />
+            </button>
           </div>
         </div>
       ) : (
@@ -196,13 +319,13 @@ export function ItineraryCard({
             {/* Primary actions row */}
             <div className="flex gap-2">
               <Link href={`/itinerary/${id}`} className="flex-1">
-                <Button variant="outline" size="sm" className="w-full">
-                  👁️ View
+                <Button variant="outline" size="sm" className="w-full gap-1.5">
+                  <Eye className="w-4 h-4" /> View
                 </Button>
               </Link>
               <Link href={`/itinerary/${id}/edit`} className="flex-1">
-                <Button variant="outline" size="sm" className="w-full">
-                  ✏️ Edit & Regenerate
+                <Button variant="outline" size="sm" className="w-full gap-1.5">
+                  <Pencil className="w-4 h-4" /> Edit & Regenerate
                 </Button>
               </Link>
               
@@ -210,7 +333,7 @@ export function ItineraryCard({
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" className="px-3">
-                    <span className="text-lg">⋮</span>
+                    <MoreVertical className="w-4 h-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
@@ -224,12 +347,12 @@ export function ItineraryCard({
                     >
                       {is_private ? (
                         <>
-                          <span className="mr-2">🌍</span>
+                          <Globe className="w-4 h-4 mr-2" />
                           Make Public
                         </>
                       ) : (
                         <>
-                          <span className="mr-2">🔒</span>
+                          <Lock className="w-4 h-4 mr-2" />
                           Make Private
                         </>
                       )}
@@ -246,12 +369,12 @@ export function ItineraryCard({
                     >
                       {status === 'completed' ? (
                         <>
-                          <span className="mr-2">↩️</span>
+                          <RotateCcw className="w-4 h-4 mr-2" />
                           Reactivate
                         </>
                       ) : (
                         <>
-                          <span className="mr-2">✅</span>
+                          <CheckCircle2 className="w-4 h-4 mr-2" />
                           Mark as Done
                         </>
                       )}
@@ -268,7 +391,7 @@ export function ItineraryCard({
                         }}
                         className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
                       >
-                        <span className="mr-2">🗑️</span>
+                        <Trash2 className="w-4 h-4 mr-2" />
                         Delete Itinerary
                       </DropdownMenuItem>
                     </>

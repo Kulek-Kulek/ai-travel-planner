@@ -12,3 +12,5 @@ WHERE id = auth.uid();
 -- Verify it worked
 SELECT id, email, full_name FROM profiles WHERE id = auth.uid();
 
+
+
