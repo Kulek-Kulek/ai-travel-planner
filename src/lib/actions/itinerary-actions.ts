@@ -93,26 +93,44 @@ export async function getPublicItineraries(
       };
     }
     
-    // For each itinerary with a user_id, fetch the creator's name
-    const itinerariesWithNames = await Promise.all(
-      (data || []).map(async (itinerary: Itinerary) => {
-        if (!itinerary.user_id) {
-          return { ...itinerary, creator_name: null };
-        }
-        
-        // Fetch profile for this user
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('full_name')
-          .eq('id', itinerary.user_id)
-          .single();
-        
-        return {
-          ...itinerary,
-          creator_name: profile?.full_name || null,
-        };
-      })
-    );
+    if (!data || data.length === 0) {
+      return {
+        success: true,
+        data: {
+          itineraries: [],
+          total: count || 0,
+        },
+      };
+    }
+    
+    // Get unique user IDs (excluding null for anonymous itineraries)
+    const userIds = [...new Set(
+      data
+        .map((i: Itinerary) => i.user_id)
+        .filter((id): id is string => id !== null)
+    )];
+    
+    // Fetch all profiles in one batch query
+    let profilesMap: Record<string, string> = {};
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', userIds);
+      
+      if (profiles) {
+        profilesMap = profiles.reduce((acc, profile) => {
+          acc[profile.id] = profile.full_name;
+          return acc;
+        }, {} as Record<string, string>);
+      }
+    }
+    
+    // Map creator names to itineraries
+    const itinerariesWithNames = data.map((itinerary: Itinerary) => ({
+      ...itinerary,
+      creator_name: itinerary.user_id ? profilesMap[itinerary.user_id] || null : null,
+    }));
     
     return {
       success: true,
@@ -522,6 +540,248 @@ export async function loadDraftItinerary(
   } catch (error) {
     console.error("Error in loadDraftItinerary:", error);
     return null;
+  }
+}
+
+/**
+ * Add an itinerary to the user's bucket list
+ * Requires authentication
+ */
+export async function addToBucketList(itineraryId: string): Promise<ActionResult<void>> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      return { 
+        success: false, 
+        error: 'You must be logged in to save to your bucket list' 
+      };
+    }
+    
+    // Check if itinerary exists and is accessible (public or owned by user)
+    const { data: itinerary, error: itineraryError } = await supabase
+      .from('itineraries')
+      .select('id, is_private, user_id')
+      .eq('id', itineraryId)
+      .single();
+    
+    if (itineraryError || !itinerary) {
+      return { success: false, error: 'Itinerary not found' };
+    }
+    
+    // Check if already in bucket list
+    const { data: existing } = await supabase
+      .from('bucket_list')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('itinerary_id', itineraryId)
+      .single();
+    
+    if (existing) {
+      return { success: false, error: 'Already in your bucket list' };
+    }
+    
+    // Add to bucket list
+    const { error } = await supabase
+      .from('bucket_list')
+      .insert({
+        user_id: user.id,
+        itinerary_id: itineraryId,
+      });
+    
+    if (error) {
+      console.error('Error adding to bucket list:', error);
+      return { success: false, error: 'Failed to add to bucket list' };
+    }
+    
+    return { success: true, data: undefined };
+  } catch (error) {
+    console.error('Error in addToBucketList:', error);
+    return { success: false, error: 'An unexpected error occurred' };
+  }
+}
+
+/**
+ * Remove an itinerary from the user's bucket list
+ * Requires authentication
+ */
+export async function removeFromBucketList(itineraryId: string): Promise<ActionResult<void>> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      return { success: false, error: 'Not authenticated' };
+    }
+    
+    const { error } = await supabase
+      .from('bucket_list')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('itinerary_id', itineraryId);
+    
+    if (error) {
+      console.error('Error removing from bucket list:', error);
+      return { success: false, error: 'Failed to remove from bucket list' };
+    }
+    
+    return { success: true, data: undefined };
+  } catch (error) {
+    console.error('Error in removeFromBucketList:', error);
+    return { success: false, error: 'An unexpected error occurred' };
+  }
+}
+
+/**
+ * Check if an itinerary is in the user's bucket list
+ * Requires authentication
+ */
+export async function isInBucketList(itineraryId: string): Promise<ActionResult<boolean>> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      return { success: true, data: false };
+    }
+    
+    const { data, error } = await supabase
+      .from('bucket_list')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('itinerary_id', itineraryId)
+      .single();
+    
+    if (error && error.code !== 'PGRST116') { // PGRST116 is "not found" error
+      console.error('Error checking bucket list:', error);
+      return { success: false, error: 'Failed to check bucket list' };
+    }
+    
+    return { success: true, data: !!data };
+  } catch (error) {
+    console.error('Error in isInBucketList:', error);
+    return { success: false, error: 'An unexpected error occurred' };
+  }
+}
+
+/**
+ * Get just the IDs of itineraries in the user's bucket list
+ * Lightweight version for checking bucket list status
+ * Requires authentication
+ */
+export async function getBucketListIds(): Promise<ActionResult<string[]>> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      return { success: true, data: [] };
+    }
+    
+    const { data: bucketItems, error } = await supabase
+      .from('bucket_list')
+      .select('itinerary_id')
+      .eq('user_id', user.id);
+    
+    if (error) {
+      console.error('Error fetching bucket list IDs:', error);
+      return { success: false, error: 'Failed to fetch bucket list' };
+    }
+    
+    const ids = (bucketItems || []).map(item => item.itinerary_id);
+    return { success: true, data: ids };
+  } catch (error) {
+    console.error('Error in getBucketListIds:', error);
+    return { success: false, error: 'An unexpected error occurred' };
+  }
+}
+
+/**
+ * Get all itineraries in the user's bucket list
+ * Requires authentication
+ */
+export async function getBucketList(): Promise<ActionResult<Itinerary[]>> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      return { success: false, error: 'Not authenticated' };
+    }
+    
+    // Get bucket list items with itinerary details
+    const { data: bucketItems, error } = await supabase
+      .from('bucket_list')
+      .select('itinerary_id, added_at')
+      .eq('user_id', user.id)
+      .order('added_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching bucket list:', error);
+      return { success: false, error: 'Failed to fetch bucket list' };
+    }
+    
+    if (!bucketItems || bucketItems.length === 0) {
+      return { success: true, data: [] };
+    }
+    
+    // Fetch full itinerary details
+    const itineraryIds = bucketItems.map(item => item.itinerary_id);
+    const { data: itineraries, error: itinerariesError } = await supabase
+      .from('itineraries')
+      .select('*')
+      .in('id', itineraryIds);
+    
+    if (itinerariesError) {
+      console.error('Error fetching itineraries:', itinerariesError);
+      return { success: false, error: 'Failed to fetch itineraries' };
+    }
+    
+    if (!itineraries || itineraries.length === 0) {
+      return { success: true, data: [] };
+    }
+    
+    // Get unique user IDs (excluding null for anonymous itineraries)
+    const userIds = [...new Set(
+      itineraries
+        .map((i: Itinerary) => i.user_id)
+        .filter((id): id is string => id !== null)
+    )];
+    
+    // Fetch all profiles in one query
+    let profilesMap: Record<string, string> = {};
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', userIds);
+      
+      if (profiles) {
+        profilesMap = profiles.reduce((acc, profile) => {
+          acc[profile.id] = profile.full_name;
+          return acc;
+        }, {} as Record<string, string>);
+      }
+    }
+    
+    // Add creator names to itineraries
+    const itinerariesWithNames = itineraries.map((itinerary: Itinerary) => ({
+      ...itinerary,
+      creator_name: itinerary.user_id ? profilesMap[itinerary.user_id] || null : null,
+    }));
+    
+    // Sort by bucket list added_at date
+    const sortedItineraries = itinerariesWithNames.sort((a, b) => {
+      const aDate = bucketItems.find(item => item.itinerary_id === a.id)?.added_at || '';
+      const bDate = bucketItems.find(item => item.itinerary_id === b.id)?.added_at || '';
+      return bDate.localeCompare(aDate);
+    });
+    
+    return { success: true, data: sortedItineraries };
+  } catch (error) {
+    console.error('Error in getBucketList:', error);
+    return { success: false, error: 'An unexpected error occurred' };
   }
 }
 

@@ -44,6 +44,12 @@ export async function NavHeader() {
                       My Plans
                     </Link>
                     <Link
+                      href="/bucket-list"
+                      className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                    >
+                      Bucket List
+                    </Link>
+                    <Link
                       href="/profile"
                       className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium transition-colors"
                     >
