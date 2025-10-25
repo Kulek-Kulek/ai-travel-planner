@@ -206,3 +206,4 @@ import { YourIcon } from 'lucide-react';
 - Icon migration: `ICON_MIGRATION_PROGRESS.md`
 - UI improvements: `UI_IMPROVEMENTS_SUMMARY.md`
 
+
