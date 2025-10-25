@@ -46,6 +46,7 @@ export type Itinerary = {
   image_url?: string | null;
   image_photographer?: string | null;
   image_photographer_url?: string | null;
+  likes: number; // Number of thumb-ups this itinerary has received
   created_at: string;
 };
 
@@ -390,6 +391,46 @@ export async function deleteItinerary(id: string): Promise<ActionResult<void>> {
     return { success: true, data: undefined };
   } catch (error) {
     console.error('Error in deleteItinerary:', error);
+    return { success: false, error: 'An unexpected error occurred' };
+  }
+}
+
+/**
+ * Increment the likes count for an itinerary
+ * Can be called by anyone (authenticated or anonymous)
+ */
+export async function likeItinerary(id: string): Promise<ActionResult<number>> {
+  try {
+    const supabase = await createClient();
+    
+    // Get current likes count
+    const { data: currentData, error: fetchError } = await supabase
+      .from('itineraries')
+      .select('likes')
+      .eq('id', id)
+      .single();
+    
+    if (fetchError) {
+      console.error('Error fetching itinerary:', fetchError);
+      return { success: false, error: 'Itinerary not found' };
+    }
+    
+    const newLikes = (currentData.likes || 0) + 1;
+    
+    // Increment likes
+    const { error: updateError } = await supabase
+      .from('itineraries')
+      .update({ likes: newLikes })
+      .eq('id', id);
+    
+    if (updateError) {
+      console.error('Error updating likes:', updateError);
+      return { success: false, error: 'Failed to update likes' };
+    }
+    
+    return { success: true, data: newLikes };
+  } catch (error) {
+    console.error('Error in likeItinerary:', error);
     return { success: false, error: 'An unexpected error occurred' };
   }
 }
