@@ -116,38 +116,27 @@ export default function Home() {
 
   // Load itinerary from URL param or sessionStorage if present
   useEffect(() => {
-    console.log("🔍 DEBUG: Home page mounted, checking for itineraryId");
-    
     const params = new URLSearchParams(window.location.search);
     let itineraryId = params.get("itineraryId");
-    console.log("🔍 DEBUG: itineraryId from URL:", itineraryId);
     
     // If not in URL, check sessionStorage for a recently created draft
     if (!itineraryId) {
-      console.log("🔍 DEBUG: Not in URL, checking sessionStorage...");
       const stored = sessionStorage.getItem('draftItineraryId');
       if (stored) {
         itineraryId = stored;
-        console.log("🔍 DEBUG: ✅ Found draftItineraryId in sessionStorage:", itineraryId);
       }
     }
-    
-    console.log("🔍 DEBUG: Final itineraryId to use:", itineraryId);
     
     if (itineraryId) {
       const loadItinerary = async () => {
         try {
-          console.log("🔍 DEBUG: Loading itinerary with ID:", itineraryId);
           const response = await fetch(`/api/itineraries/${itineraryId}`);
-          console.log("🔍 DEBUG: API response status:", response.status);
           
           if (response.ok) {
             const data = await response.json();
-            console.log("🔍 DEBUG: API response success:", data.success);
             
             if (data.success && data.data) {
               const itinerary = data.data;
-              console.log("🔍 DEBUG: ✅ Setting result with itinerary:", itinerary.destination);
               setResult({
                 destination: itinerary.destination,
                 days: itinerary.days,
@@ -160,16 +149,13 @@ export default function Home() {
                 model: "anthropic/claude-3-haiku" as const,
               });
               setHasSubmitted(true);
-              console.log("🔍 DEBUG: ✅ Result set successfully!");
               
               // If this is a draft, check if user is now authenticated and claim it
               if (itinerary.status === 'draft') {
                 getUser().then((user) => {
                   if (user) {
-                    console.log("🔍 DEBUG: Claiming draft itinerary for authenticated user");
                     claimDraftItinerary(itineraryId!).then((result) => {
                       if (result.success) {
-                        console.log("🔍 DEBUG: ✅ Draft claimed successfully");
                         toast.success("Itinerary saved to your account!", {
                           description: "Your travel plan is now permanently saved",
                         });
@@ -198,8 +184,6 @@ export default function Home() {
         }
       };
       loadItinerary();
-    } else {
-      console.log("🔍 DEBUG: ❌ No itineraryId found in URL or sessionStorage");
     }
   }, [queryClient]);
 
@@ -393,7 +377,6 @@ export default function Home() {
     // Store it in sessionStorage so it persists through navigation
     const itineraryId = result.aiPlan.id;
     sessionStorage.setItem('itineraryId', itineraryId);
-    console.log("🔍 DEBUG: Redirecting to " + authPage + " with itineraryId:", itineraryId);
     window.location.href = `/${authPage}?itineraryId=${itineraryId}`;
   };
 
@@ -744,7 +727,7 @@ export default function Home() {
         </div>
 
         {/* Public Itineraries Gallery */}
-        <div id="public-itineraries" ref={galleryRef} className="mt-24">
+        <div id="public-itineraries" ref={galleryRef} className="mt-16">
           <ItineraryGallery isAdmin={isAdmin} />
         </div>
       </main>

@@ -42,8 +42,6 @@ export async function backfillItineraryImages(): Promise<ActionResult<{
     let updated = 0;
     let failed = 0;
     
-    console.log(`Processing ${itineraries.length} itineraries...`);
-    
     // Process each itinerary
     for (const itinerary of itineraries) {
       try {
@@ -68,7 +66,6 @@ export async function backfillItineraryImages(): Promise<ActionResult<{
             console.error(`Failed to update itinerary ${itinerary.id}:`, updateError);
             failed++;
           } else {
-            console.log(`✓ Updated ${itinerary.destination} (${itinerary.id})`);
             updated++;
           }
         } else {
@@ -84,11 +81,6 @@ export async function backfillItineraryImages(): Promise<ActionResult<{
         failed++;
       }
     }
-    
-    console.log(`\nBackfill complete:`);
-    console.log(`- Processed: ${itineraries.length}`);
-    console.log(`- Updated: ${updated}`);
-    console.log(`- Failed: ${failed}`);
     
     return {
       success: true,

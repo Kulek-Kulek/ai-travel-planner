@@ -111,6 +111,42 @@ export async function signIn(formData: FormData) {
   redirect('/');
 }
 
+export async function signInWithGoogle(itineraryId?: string) {
+  const supabase = await createClient();
+  
+  const origin = 
+    process.env.NEXT_PUBLIC_APP_URL || 
+    process.env.NEXT_PUBLIC_VERCEL_URL 
+      ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+      : 'http://localhost:3000';
+  
+  // Build redirect URL with itineraryId if present
+  const redirectTo = itineraryId 
+    ? `${origin}/api/auth/callback?itineraryId=${itineraryId}`
+    : `${origin}/api/auth/callback`;
+  
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo,
+      queryParams: {
+        access_type: 'offline',
+        prompt: 'consent',
+      },
+    },
+  });
+
+  if (error) {
+    return {
+      error: { general: [error.message] },
+    };
+  }
+
+  if (data.url) {
+    redirect(data.url);
+  }
+}
+
 export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();

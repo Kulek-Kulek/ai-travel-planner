@@ -24,7 +24,6 @@ export default function FormComparisonPage() {
   const [submittedData, setSubmittedData] = useState<ItineraryFormData | null>(null);
 
   const handleSubmit = (data: ItineraryFormData) => {
-    console.log("Form submitted:", data);
     setSubmittedData(data);
     
     // Show success message

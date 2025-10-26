@@ -4,6 +4,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ItineraryActions } from '@/components/itinerary-actions';
 import { ItineraryLikeButton } from '@/components/itinerary-like-button';
+import { ItineraryShareButton } from '@/components/itinerary-share-button';
+import { DownloadPDFButton } from '@/components/download-pdf-button';
 import { createClient } from '@/lib/supabase/server';
 import { 
   ArrowLeft, 
@@ -14,7 +16,8 @@ import {
   CalendarDays, 
   FileText, 
   Tag, 
-  Clock 
+  Clock ,
+  ListCheck
 } from 'lucide-react';
 
 export default async function ItineraryPage({
@@ -74,6 +77,14 @@ export default async function ItineraryPage({
               <ClipboardList className="w-4 h-4" /> My Plans
             </Link>
           )}
+          {isOwner && (
+            <Link
+              href="/bucket-list"
+              className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800"
+            >
+              <ListCheck className="w-4 h-4" /> Bucket List
+            </Link>
+          )}
         </div>
 
         {/* Destination Image */}
@@ -106,11 +117,19 @@ export default async function ItineraryPage({
 
         {/* Header Card */}
         <div className="bg-white rounded-lg shadow-lg p-6 md:p-8 mb-6">
-          <div className="flex items-start justify-between gap-4 mb-4">
+          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-4">
             <h1 className="text-3xl md:text-4xl font-bold text-gray-900 flex-1">
               {ai_plan.city || destination}
             </h1>
-            <ItineraryLikeButton itineraryId={id} initialLikes={likes} />
+            <div className="flex flex-wrap gap-2 shrink-0">
+              <ItineraryLikeButton itineraryId={id} initialLikes={likes} />
+              <ItineraryShareButton 
+                itineraryId={id} 
+                title={ai_plan.city || destination}
+                description={`A ${days}-day travel itinerary for ${ai_plan.city || destination}`}
+              />
+              <DownloadPDFButton itinerary={itinerary} />
+            </div>
           </div>
           
           <div className="flex flex-wrap items-center gap-4 text-gray-600 mb-4">
@@ -132,10 +151,10 @@ export default async function ItineraryPage({
               <Users className="w-5 h-5" />
               <span>
                 {travelers} adult{travelers > 1 ? 's' : ''}
-                {children && children > 0 && (
+                {children && children > 0 ? (
                   <>, {children} {children === 1 ? 'child' : 'children'}
                   {child_ages && child_ages.length > 0 && ` (ages: ${child_ages.join(', ')})`}</>
-                )}
+                ) : null}
               </span>
             </span>
             
