@@ -46,7 +46,7 @@ export async function signUp(formData: FormData) {
   const { email, password, name } = validatedFields.data;
 
   // Sign up user
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
@@ -64,12 +64,20 @@ export async function signUp(formData: FormData) {
 
   revalidatePath('/', 'layout');
   
-  // Preserve itineraryId in redirect if present
+  // Check if email confirmation is required
+  // If the session is null, it means email confirmation is enabled
   const itineraryId = formData.get('itineraryId');
-  if (itineraryId) {
-    redirect(`/?itineraryId=${itineraryId}`);
+  
+  if (data.session === null) {
+    // Email confirmation required - redirect to confirmation page
+    const confirmUrl = `/confirm-email?email=${encodeURIComponent(email)}${itineraryId ? `&itineraryId=${itineraryId}` : ''}`;
+    redirect(confirmUrl);
   }
-  redirect('/');
+  
+  // User is logged in immediately (email confirmation disabled)
+  // Redirect to plan selection page for new users
+  const planSelectionUrl = `/choose-plan${itineraryId ? `?itineraryId=${itineraryId}` : ''}`;
+  redirect(planSelectionUrl);
 }
 
 export async function signIn(formData: FormData) {

@@ -5,14 +5,13 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ItineraryFormAIEnhanced } from "@/components/itinerary-form-ai-enhanced";
 import { ItineraryGallery } from "@/components/itinerary-gallery";
 import { Masthead } from "@/components/masthead";
+import { UpgradeModal } from "@/components/upgrade-modal";
 import { generateItinerary } from "@/lib/actions/ai-actions";
 import { claimDraftItinerary } from "@/lib/actions/itinerary-actions";
 import { getUserRole } from "@/lib/auth/admin";
 import { getUser } from "@/lib/actions/auth-actions";
-import { getUserSubscription, recordPlanGeneration } from "@/lib/actions/subscription-actions";
 import { toast } from "sonner";
 import type { OpenRouterModel } from "@/lib/openrouter/models";
-import type { SubscriptionTier, ModelKey } from "@/lib/config/pricing-models";
 import { Button } from "@/components/ui/button";
 
 type FormData = {
@@ -26,7 +25,6 @@ type FormData = {
   hasAccessibilityNeeds?: boolean;
   notes?: string;
   model: OpenRouterModel;
-  pricingModel?: string; // Pricing model key from pricing system
 };
 
 type ResultData = FormData & {
@@ -49,10 +47,9 @@ export default function Home() {
   const [result, setResult] = useState<ResultData | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [userTier, setUserTier] = useState<SubscriptionTier>('free');
-  const [userCredits, setUserCredits] = useState(0);
   const [loadingMessage, setLoadingMessage] = useState("");
   const [progress, setProgress] = useState(0);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [progressDirection, setProgressDirection] = useState<1 | -1>(1);
   const [currentStep, setCurrentStep] = useState(0);
   const [userCancelled, setUserCancelled] = useState(false);
@@ -66,6 +63,7 @@ export default function Home() {
   const authBannerRef = useRef<HTMLDivElement>(null);
   const cancelledRef = useRef(false);
   const dayButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const claimedIdsRef = useRef<Set<string>>(new Set()); // Track claimed itineraries to prevent duplicates
 
   useEffect(() => {
     // Check if user is admin
@@ -74,7 +72,7 @@ export default function Home() {
     });
   }, []);
 
-  // Check authentication status on mount and load subscription
+  // Check authentication status on mount
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -82,15 +80,8 @@ export default function Home() {
         const isAuth = !!user;
         setIsAuthenticated(isAuth);
         
-        // Load subscription data if authenticated
+        // If user is now authenticated, clear the "created plan while logged out" flags
         if (isAuth) {
-          const subscription = await getUserSubscription();
-          if (subscription) {
-            setUserTier(subscription.tier);
-            setUserCredits(subscription.creditsBalance || 0);
-          }
-          
-          // Clear the "created plan while logged out" flags
           sessionStorage.removeItem('createdPlanWhileLoggedOut');
           sessionStorage.removeItem('draftItineraryId');
           setHasCreatedPlanWhileLoggedOut(false);
@@ -140,6 +131,14 @@ export default function Home() {
     }
     
     if (itineraryId) {
+      // Check if already processing this ID to prevent duplicate claims
+      if (claimedIdsRef.current.has(itineraryId)) {
+        return;
+      }
+      
+      // Mark as processing immediately before any async operations
+      claimedIdsRef.current.add(itineraryId);
+      
       const loadItinerary = async () => {
         try {
           const response = await fetch(`/api/itineraries/${itineraryId}`);
@@ -168,13 +167,38 @@ export default function Home() {
                   if (user) {
                     claimDraftItinerary(itineraryId!).then((result) => {
                       if (result.success) {
+                        
+                        // Clean up sessionStorage after successful claim
+                        sessionStorage.removeItem('createdPlanWhileLoggedOut');
+                        sessionStorage.removeItem('draftItineraryId');
+                        sessionStorage.removeItem('itineraryId');
+                        
+                        // Clear result to re-enable form
+                        setResult(null);
+                        setHasSubmitted(false);
+                        
                         toast.success("Itinerary saved to your account!", {
                           description: "Your travel plan is now permanently saved",
+                          action: {
+                            label: "View My Plans",
+                            onClick: () => window.location.href = "/my-plans",
+                          },
                         });
+                        
                         // Refresh gallery to show the newly published itinerary
                         queryClient.invalidateQueries({ queryKey: ["public-itineraries"] });
+                        queryClient.invalidateQueries({ queryKey: ["my-itineraries"] });
+                        
+                        // Scroll to gallery
+                        setTimeout(() => {
+                          if (galleryRef.current) {
+                            galleryRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+                          }
+                        }, 300);
                       } else {
-                        console.error("🔍 DEBUG: ❌ Failed to claim draft:", result.error);
+                        toast.error('Failed to save itinerary', {
+                          description: result.error,
+                        });
                       }
                     });
                   }
@@ -183,16 +207,10 @@ export default function Home() {
               
               // Clean up URL but keep draftItineraryId in sessionStorage
               window.history.replaceState({}, document.title, window.location.pathname);
-            } else {
-              console.error("🔍 DEBUG: ❌ API response not successful:", data);
             }
-          } else {
-            console.error("🔍 DEBUG: ❌ API response not OK, status:", response.status);
-            const errorData = await response.json();
-            console.error("🔍 DEBUG: API error:", errorData);
           }
         } catch (error) {
-          console.error("❌ Failed to load itinerary:", error);
+          console.error("Failed to load itinerary:", error);
         }
       };
       loadItinerary();
@@ -202,26 +220,13 @@ export default function Home() {
   // Use TanStack Query mutation for generating itinerary
   const mutation = useMutation({
     mutationFn: generateItinerary,
-    onSuccess: async (response, variables) => {
+    onSuccess: (response, variables) => {
       if (cancelledRef.current) {
         // Ignore success if the user cancelled while loading
         cancelledRef.current = false;
         return;
       }
       if (response.success) {
-        // Record the generation for billing/analytics (if pricingModel is provided)
-        const pricingModel = (variables as ResultData & { pricingModel?: string }).pricingModel;
-        if (pricingModel && response.data.id) {
-          await recordPlanGeneration(
-            response.data.id,
-            pricingModel as ModelKey,
-            'create'
-          ).catch((error) => {
-            console.error('Failed to record generation:', error);
-            // Don't block the user flow if recording fails
-          });
-        }
-
         // Show success toast
         toast.success("Itinerary generated!", {
           description: `${variables.days}-day trip to ${response.data.city}`,
@@ -268,9 +273,22 @@ export default function Home() {
         // NO auto-redirect - let user see preview first
         // They can click the banner buttons to sign in if needed
       } else {
-        toast.error("Failed to generate itinerary", {
-          description: response.error,
-        });
+        // Check if this is a tier limit error
+        const errorMessage = response.error || "";
+        const isTierLimitError = 
+          errorMessage.toLowerCase().includes("limit reached") ||
+          errorMessage.toLowerCase().includes("tier limit") ||
+          errorMessage.toLowerCase().includes("upgrade");
+        
+        if (isTierLimitError) {
+          // Show upgrade modal instead of toast for limit errors
+          setShowUpgradeModal(true);
+        } else {
+          // Show regular error toast for other errors
+          toast.error("Failed to generate itinerary", {
+            description: response.error,
+          });
+        }
       }
     },
     onError: (error) => {
@@ -435,10 +453,9 @@ export default function Home() {
               <ItineraryFormAIEnhanced
                 onSubmit={handleSubmit}
                 isLoading={mutation.isPending}
+                modelOverride="anthropic/claude-3.5-haiku"
                 isAuthenticated={isAuthenticated}
-                hasResult={!!result}
-                userTier={userTier}
-                userCredits={userCredits}
+                hasResult={!!result || hasCreatedPlanWhileLoggedOut}
               />
             </div>
           </div>
@@ -678,11 +695,17 @@ export default function Home() {
                                 return (
                                   <div
                                     key={placeIndex}
-                                    className={`mt-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm ${shouldBlur ? 'blur-[0.5px] select-none pointer-events-none' : ''}`}
+                                    className={`mt-3 rounded-xl border-l-4 border-blue-500 bg-white p-4 shadow-sm ${shouldBlur ? 'blur-[0.5px] select-none pointer-events-none' : ''}`}
                                   >
-                                    <p className="font-medium text-slate-900">{place.name}</p>
-                                    <p className="text-sm text-slate-500 mt-1">{place.desc}</p>
-                                    <p className="text-xs text-slate-400 mt-2">⏱️ {place.time}</p>
+                                    <div className="flex items-start gap-3">
+                                      <div className="flex-shrink-0 bg-blue-600 text-white rounded-md px-2 py-1 text-xs font-bold whitespace-nowrap">
+                                        {place.time}
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="font-semibold text-slate-900">{place.name}</p>
+                                        <p className="text-sm text-slate-600 mt-1">{place.desc}</p>
+                                      </div>
+                                    </div>
                                   </div>
                                 );
                               })}
@@ -753,10 +776,16 @@ export default function Home() {
         </div>
 
         {/* Public Itineraries Gallery */}
-        <div id="public-itineraries" ref={galleryRef} className="mt-16">
+        <div id="public-itineraries" ref={galleryRef} className="mt-24">
           <ItineraryGallery isAdmin={isAdmin} />
         </div>
       </main>
+
+      {/* Upgrade Modal */}
+      <UpgradeModal 
+        open={showUpgradeModal} 
+        onOpenChange={setShowUpgradeModal}
+      />
     </div>
   );
 }
