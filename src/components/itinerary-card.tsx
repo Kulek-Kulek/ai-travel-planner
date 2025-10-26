@@ -15,6 +15,7 @@ import {
 } from './ui/dropdown-menu';
 import { toast } from 'sonner';
 import { shareItinerary } from '@/lib/utils/share';
+import { generateBookingLink } from '@/lib/utils/booking-affiliate';
 import { 
   Calendar,
   Users, 
@@ -29,7 +30,8 @@ import {
   Eye, 
   Pencil, 
   MoreVertical,
-  RotateCcw
+  RotateCcw,
+  Hotel
 } from 'lucide-react';
 
 interface ItineraryCardProps {
@@ -274,6 +276,27 @@ export function ItineraryCard({
     }
   };
   
+  const handleFindHotels = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    try {
+      const bookingUrl = generateBookingLink({
+        destination: ai_plan.city || destination,
+        checkIn: start_date ? new Date(start_date) : undefined,
+        checkOut: end_date ? new Date(end_date) : undefined,
+        adults: travelers,
+        children: children || 0,
+        childAges: child_ages || [],
+      });
+      
+      window.open(bookingUrl, '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      console.error('Error generating booking link:', error);
+      toast.error('Failed to open booking search');
+    }
+  };
+  
   // Get first few places as preview
   const previewPlaces = ai_plan.days
     .slice(0, 2)
@@ -397,7 +420,21 @@ export function ItineraryCard({
       
       {/* Footer - different for gallery vs my plans */}
       {!showActions ? (
-        <div className="pt-3 border-t border-gray-100 space-y-2">
+        <div className="pt-3 border-t border-gray-100 space-y-3">
+          {/* Find Hotels CTA - PROMINENT! Always shown for maximum revenue */}
+          <button
+            onClick={handleFindHotels}
+            className="w-full group relative overflow-hidden rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-4 py-3 transition-all duration-200 hover:shadow-lg active:scale-[0.98]"
+          >
+            <div className="flex items-center justify-center gap-2 text-white">
+              <Hotel className="w-5 h-5 group-hover:scale-110 transition-transform" />
+              <span className="font-semibold text-sm">
+                {start_date && end_date ? 'Find Hotels for This Trip' : `Find Hotels in ${ai_plan.city || destination}`}
+              </span>
+            </div>
+            <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity" />
+          </button>
+          
           {/* Creator and date info */}
           <div className="flex justify-between items-center gap-2">
             <div className="flex flex-col gap-0.5 flex-1 min-w-0">
@@ -425,8 +462,8 @@ export function ItineraryCard({
             )}
           </div>
           
-          {/* Action buttons row */}
-          <div className="flex items-center gap-4 pt-3">
+          {/* Action buttons row - Like, Share, Bucket */}
+          <div className="flex items-center gap-4 pt-1">
             {/* Like button */}
             <button
               onClick={handleLike}

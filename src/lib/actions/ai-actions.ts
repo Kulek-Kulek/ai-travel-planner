@@ -9,6 +9,11 @@ import {
   OPENROUTER_BUDGET_FIRST_ORDER,
   type OpenRouterModel,
 } from "@/lib/openrouter/models";
+import { 
+  canGeneratePlan, 
+  recordPlanGeneration 
+} from "@/lib/actions/subscription-actions";
+import { type ModelKey } from "@/lib/config/pricing-models";
 import { z } from "zod";
 
 // Input schema
@@ -60,6 +65,25 @@ type SavedItinerary = z.infer<typeof aiResponseSchema> & {
   tags: string[];
 };
 
+// Helper function to map OpenRouter model ID to ModelKey for pricing
+function mapOpenRouterModelToKey(openRouterModel: string): ModelKey {
+  // Map OpenRouter model IDs to our pricing model keys
+  if (openRouterModel.includes('gemini-2.5-flash') || openRouterModel.includes('gemini-1.5-flash')) {
+    return 'gemini-flash';
+  }
+  if (openRouterModel.includes('gpt-4o-mini')) {
+    return 'gpt-4o-mini';
+  }
+  if (openRouterModel.includes('claude-3-haiku')) {
+    return 'claude-haiku';
+  }
+  if (openRouterModel.includes('gpt-5') || openRouterModel.includes('gpt-4o')) {
+    return 'gpt-4o';
+  }
+  // Default to gemini-flash for unknown models
+  return 'gemini-flash';
+}
+
 export async function generateItinerary(
   input: z.infer<typeof generateItinerarySchema>,
 ): Promise<ActionResult<SavedItinerary>> {
@@ -67,7 +91,27 @@ export async function generateItinerary(
     // 1. Validate input
     const validated = generateItinerarySchema.parse(input);
 
-    // 2. Check if API key is configured
+    // 2. Check if user is authenticated and can generate
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    // Get the model key for usage tracking
+    const modelKey = mapOpenRouterModelToKey(validated.model);
+
+    // Only check limits for authenticated users
+    if (user?.id) {
+      const canGenerate = await canGeneratePlan(modelKey);
+      if (!canGenerate.allowed) {
+        return {
+          success: false,
+          error: canGenerate.reason || 'Cannot generate plan at this time',
+        };
+      }
+    }
+
+    // 3. Check if API key is configured
     if (!process.env.OPENROUTER_API_KEY) {
       console.error("OPENROUTER_API_KEY is not configured");
       return {
@@ -236,11 +280,7 @@ export async function generateItinerary(
     ]);
 
     // 7. Save to database
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
+    // Note: supabase and user are already fetched at the beginning
     // For non-authenticated users, save as draft (won't show in public gallery)
     // For authenticated users, save as published (will show in gallery)
     const isAnonymous = !user?.id;
@@ -263,6 +303,7 @@ export async function generateItinerary(
       image_photographer: photo?.photographer || null,
       image_photographer_url: photo?.photographerUrl || null,
       status: isAnonymous ? "draft" : "published", // Drafts for anonymous users
+      ai_model_used: modelKey, // Track which model was used
     };
 
     const { data: savedItinerary, error: dbError } = await supabase
@@ -307,6 +348,21 @@ export async function generateItinerary(
         error:
           "Generated itinerary but failed to save. Please try again or contact support.",
       };
+    }
+
+    // 8. Record plan generation for authenticated users (tracks usage and credits)
+    if (user?.id) {
+      const recordResult = await recordPlanGeneration(
+        savedItinerary.id,
+        modelKey,
+        'create'
+      );
+      
+      if (!recordResult.success) {
+        console.error('Failed to record plan generation:', recordResult.error);
+        // Don't fail the whole operation, but log the error
+        // The itinerary is already created, just the tracking failed
+      }
     }
 
     return {
@@ -406,11 +462,18 @@ Number of travelers: ${travelersDesc}${dateInstructions}
 ${params.notes ? `Additional notes: ${params.notes}` : ""}
 
 IMPORTANT: Detect the language used in the user's notes and respond in that SAME language. If no notes provided or notes are in English, respond in English. Match the user's language for all text content (place names, descriptions, etc.).
-${params.children && params.children > 0 ? `\nIMPORTANT: This trip includes children (ages ${params.childAges?.join(", ") || "unspecified"}). Include child-friendly activities, appropriate timing, and family-suitable venues.` : ""}
+${params.children && params.children > 0 ? `\nIMPORTANT: This trip includes children (ages ${params.childAges?.join(", ") || "unspecified"}). Include child-friendly activities, appropriate timing, and family-suitable venues. Schedule breaks and avoid overpacking the day.` : ""}
 ${params.hasAccessibilityNeeds ? `\nIMPORTANT: This trip requires accessibility accommodations. ONLY include venues with wheelchair access, elevators, accessible restrooms, and mobility-friendly facilities. Avoid places with many stairs, narrow passages, or difficult terrain. Prioritize accessible transportation options.` : ""}
 
-Create a detailed day-by-day travel plan including attractions, food suggestions, and estimated visit times. 
-Each day should include multiple places to visit with timing recommendations.
+Create a detailed day-by-day travel plan with SPECIFIC SCHEDULED TIMES for each activity. 
+Build a realistic daily schedule that:
+- Starts around 8:00-9:00 AM
+- Includes specific time slots for each attraction/activity (e.g., "9:00 AM - 11:00 AM")
+- Accounts for meal times (breakfast, lunch, dinner)
+- Includes realistic travel time between locations
+- Ends around 8:00-10:00 PM
+- Leaves breathing room between activities (don't over-schedule)
+${params.children && params.children > 0 ? "- With children: include afternoon breaks, shorter activities, and ends earlier" : ""}
 
 Return ONLY a JSON object (no markdown, no extra text) with this EXACT structure:
 {
@@ -422,17 +485,25 @@ Return ONLY a JSON object (no markdown, no extra text) with this EXACT structure
         {
           "name": "Place name",
           "desc": "Brief description of what to do here (in user's language)",
-          "time": "Estimated visit time (e.g., '2 hours' or '2 godziny' - match user's language)"
+          "time": "Scheduled time slot (e.g., '9:00 AM - 11:00 AM' or '9:00 - 11:00' - match user's language and locale)"
         }
       ]
     }
   ]
 }
 
+CRITICAL - Time Format Requirements:
+- Use SPECIFIC TIME RANGES for each place (e.g., "9:00 AM - 11:00 AM", "12:00 PM - 1:30 PM")
+- Create a sequential schedule throughout the day
+- Each place should follow logically after the previous one (no time overlaps!)
+- Include meals as places (e.g., "Lunch at Local Bistro: 1:00 PM - 2:00 PM")
+- Times should be realistic for the activity (museums: 1-2 hours, meals: 1-1.5 hours, landmarks: 30min-2 hours)
+- Match the time format to user's language (24-hour for most European languages, AM/PM for English)
+
 Important:
 - Include ${params.days} days in the "days" array
-- Each day should have 3-5 interesting places/activities
-- Consider meal times and breaks
+- Each day should have 4-6 places/activities (including meals)
+- Create a LOGICAL FLOW through the day - nearby places grouped together
 - Mix different types of activities (sightseeing, dining, culture, relaxation)
 - Be specific with place names and descriptions
 - Make it realistic and practical for ${params.travelers} traveler(s)

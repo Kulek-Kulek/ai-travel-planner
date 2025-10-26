@@ -6,6 +6,7 @@ import { ItineraryActions } from '@/components/itinerary-actions';
 import { ItineraryLikeButton } from '@/components/itinerary-like-button';
 import { ItineraryShareButton } from '@/components/itinerary-share-button';
 import { DownloadPDFButton } from '@/components/download-pdf-button';
+import { BookingAccommodationCard } from '@/components/booking-accommodation-card';
 import { createClient } from '@/lib/supabase/server';
 import { 
   ArrowLeft, 
@@ -198,6 +199,19 @@ export default async function ItineraryPage({
           )}
         </div>
 
+        {/* Booking Accommodation Card - Only show if dates are available */}
+        {start_date && end_date && (
+          <BookingAccommodationCard
+            destination={ai_plan.city || destination}
+            checkIn={new Date(start_date)}
+            checkOut={new Date(end_date)}
+            adults={travelers}
+            childrenCount={children || 0}
+            childAges={child_ages}
+            className="mb-6"
+          />
+        )}
+
         {/* Itinerary Days */}
         <div className="space-y-6">
           {ai_plan.days.map((day, dayIndex) => (
@@ -213,18 +227,27 @@ export default async function ItineraryPage({
                 {day.places.map((place, placeIndex) => (
                   <div
                     key={placeIndex}
-                    className="bg-gray-50 rounded-lg p-5 hover:bg-gray-100 transition-colors"
+                    className="bg-gray-50 rounded-lg p-5 hover:bg-gray-100 transition-colors border-l-4 border-blue-500"
                   >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1">
+                    <div className="flex items-start gap-4">
+                      {/* Time Badge */}
+                      <div className="flex-shrink-0">
+                        <div className="bg-blue-600 text-white rounded-lg px-3 py-2 text-center min-w-[120px]">
+                          <div className="flex items-center justify-center gap-1 mb-1">
+                            <Clock className="w-4 h-4" />
+                          </div>
+                          <div className="text-sm font-bold leading-tight whitespace-nowrap">
+                            {place.time}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Place Details */}
+                      <div className="flex-1 min-w-0">
                         <h3 className="text-lg font-semibold text-gray-900 mb-2">
                           {placeIndex + 1}. {place.name}
                         </h3>
-                        <p className="text-gray-700 mb-3">{place.desc}</p>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <Clock className="w-4 h-4" />
-                          <span className="font-medium">{place.time}</span>
-                        </div>
+                        <p className="text-gray-700">{place.desc}</p>
                       </div>
                     </div>
                   </div>

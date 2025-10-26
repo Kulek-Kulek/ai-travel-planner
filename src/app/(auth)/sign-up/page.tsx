@@ -52,6 +52,11 @@ export default function SignUpPage() {
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Create Account</h1>
           <p className="text-gray-600 mt-2">Sign up to save your itineraries</p>
+          <div className="mt-4 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-xs text-blue-800">
+            You&apos;ll need to confirm your email address to complete sign-up
+            </p>
+          </div>
         </div>
 
         {/* Google Sign-Up Button */}
@@ -94,6 +99,11 @@ export default function SignUpPage() {
         </div>
 
         <form action={handleSubmit} className="space-y-6">
+          {/* Hidden itineraryId field */}
+          {draftId && (
+            <input type="hidden" name="itineraryId" value={draftId} />
+          )}
+          
           {/* Name */}
           <div className="space-y-2">
             <Label htmlFor="name">Name</Label>

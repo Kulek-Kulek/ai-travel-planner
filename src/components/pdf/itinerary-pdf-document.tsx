@@ -1,12 +1,27 @@
 import React from 'react';
-import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
+import { Document, Page, Text, View, StyleSheet, Image, Font } from '@react-pdf/renderer';
+
+// Register Unicode-compatible fonts (supports Polish and other special characters)
+Font.register({
+  family: 'Roboto',
+  fonts: [
+    {
+      src: 'https://fonts.gstatic.com/s/roboto/v30/KFOmCnqEu92Fr1Me5WZLCzYlKw.ttf',
+      fontWeight: 'normal',
+    },
+    {
+      src: 'https://fonts.gstatic.com/s/roboto/v30/KFOlCnqEu92Fr1MmWUlvAx05IsDqlA.ttf',
+      fontWeight: 'bold',
+    },
+  ],
+});
 
 // Define styles for the PDF
 const styles = StyleSheet.create({
   page: {
     padding: 40,
     fontSize: 10,
-    fontFamily: 'Helvetica',
+    fontFamily: 'Roboto',
     backgroundColor: '#ffffff',
   },
   header: {
