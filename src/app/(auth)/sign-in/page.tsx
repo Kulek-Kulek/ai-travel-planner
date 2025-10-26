@@ -94,6 +94,11 @@ export default function SignInPage() {
         </div>
 
         <form action={handleSubmit} className="space-y-6">
+          {/* Hidden itineraryId field */}
+          {draftId && (
+            <input type="hidden" name="itineraryId" value={draftId} />
+          )}
+          
           {/* Email */}
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
