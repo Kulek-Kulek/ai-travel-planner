@@ -9,8 +9,10 @@ import { generateItinerary } from "@/lib/actions/ai-actions";
 import { claimDraftItinerary } from "@/lib/actions/itinerary-actions";
 import { getUserRole } from "@/lib/auth/admin";
 import { getUser } from "@/lib/actions/auth-actions";
+import { getUserSubscription, recordPlanGeneration } from "@/lib/actions/subscription-actions";
 import { toast } from "sonner";
 import type { OpenRouterModel } from "@/lib/openrouter/models";
+import type { SubscriptionTier, ModelKey } from "@/lib/config/pricing-models";
 import { Button } from "@/components/ui/button";
 
 type FormData = {
@@ -24,6 +26,7 @@ type FormData = {
   hasAccessibilityNeeds?: boolean;
   notes?: string;
   model: OpenRouterModel;
+  pricingModel?: string; // Pricing model key from pricing system
 };
 
 type ResultData = FormData & {
@@ -46,6 +49,8 @@ export default function Home() {
   const [result, setResult] = useState<ResultData | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userTier, setUserTier] = useState<SubscriptionTier>('free');
+  const [userCredits, setUserCredits] = useState(0);
   const [loadingMessage, setLoadingMessage] = useState("");
   const [progress, setProgress] = useState(0);
   const [progressDirection, setProgressDirection] = useState<1 | -1>(1);
@@ -69,7 +74,7 @@ export default function Home() {
     });
   }, []);
 
-  // Check authentication status on mount
+  // Check authentication status on mount and load subscription
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -77,8 +82,15 @@ export default function Home() {
         const isAuth = !!user;
         setIsAuthenticated(isAuth);
         
-        // If user is now authenticated, clear the "created plan while logged out" flags
+        // Load subscription data if authenticated
         if (isAuth) {
+          const subscription = await getUserSubscription();
+          if (subscription) {
+            setUserTier(subscription.tier);
+            setUserCredits(subscription.creditsBalance || 0);
+          }
+          
+          // Clear the "created plan while logged out" flags
           sessionStorage.removeItem('createdPlanWhileLoggedOut');
           sessionStorage.removeItem('draftItineraryId');
           setHasCreatedPlanWhileLoggedOut(false);
@@ -190,13 +202,26 @@ export default function Home() {
   // Use TanStack Query mutation for generating itinerary
   const mutation = useMutation({
     mutationFn: generateItinerary,
-    onSuccess: (response, variables) => {
+    onSuccess: async (response, variables) => {
       if (cancelledRef.current) {
         // Ignore success if the user cancelled while loading
         cancelledRef.current = false;
         return;
       }
       if (response.success) {
+        // Record the generation for billing/analytics (if pricingModel is provided)
+        const pricingModel = (variables as ResultData & { pricingModel?: string }).pricingModel;
+        if (pricingModel && response.data.id) {
+          await recordPlanGeneration(
+            response.data.id,
+            pricingModel as ModelKey,
+            'create'
+          ).catch((error) => {
+            console.error('Failed to record generation:', error);
+            // Don't block the user flow if recording fails
+          });
+        }
+
         // Show success toast
         toast.success("Itinerary generated!", {
           description: `${variables.days}-day trip to ${response.data.city}`,
@@ -410,9 +435,10 @@ export default function Home() {
               <ItineraryFormAIEnhanced
                 onSubmit={handleSubmit}
                 isLoading={mutation.isPending}
-                modelOverride="anthropic/claude-3.5-haiku"
                 isAuthenticated={isAuthenticated}
-                hasResult={!!result || hasCreatedPlanWhileLoggedOut}
+                hasResult={!!result}
+                userTier={userTier}
+                userCredits={userCredits}
               />
             </div>
           </div>
