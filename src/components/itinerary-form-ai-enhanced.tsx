@@ -15,7 +15,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 import { format, differenceInDays, isBefore, startOfDay } from "date-fns";
-import { Calendar as CalendarIcon, CheckCircle2, AlertCircle, Sparkles } from "lucide-react";
+import Link from "next/link";
+import { Calendar as CalendarIcon, CheckCircle2, AlertCircle, Sparkles, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -44,10 +45,14 @@ import {
 } from "@/components/ui/form";
 import { cn } from "@/lib/utils";
 import {
-  DEFAULT_OPENROUTER_MODEL,
   OPENROUTER_MODEL_OPTIONS,
   OPENROUTER_MODEL_VALUES,
 } from "@/lib/openrouter/models";
+import {
+  AI_MODELS,
+  type SubscriptionTier,
+  formatCurrency,
+} from "@/lib/config/pricing-models";
 import { extractTravelInfoWithAI } from "@/lib/actions/extract-travel-info";
 import { type ExtractedTravelInfo } from "@/lib/types/extract-travel-info-types";
 import { calculateExtractionConfidence } from "@/lib/utils/extract-travel-info-utils";
@@ -108,6 +113,8 @@ interface ItineraryFormProps {
   modelOverride?: string; // Allow overriding the default model based on user tier
   isAuthenticated?: boolean; // Whether the user is logged in
   hasResult?: boolean; // Whether a plan was already generated
+  userTier?: SubscriptionTier; // User's subscription tier for model access control
+  userCredits?: number; // PAYG credits balance
 }
 
 export const ItineraryFormAIEnhanced = ({
@@ -116,6 +123,8 @@ export const ItineraryFormAIEnhanced = ({
   modelOverride,
   isAuthenticated = false,
   hasResult = false,
+  userTier = 'free',
+  // userCredits is available but not currently used in this component
 }: ItineraryFormProps) => {
   const [childAgesInput, setChildAgesInput] = useState<string[]>([]);
   const [startDateOpen, setStartDateOpen] = useState(false);
@@ -135,7 +144,7 @@ export const ItineraryFormAIEnhanced = ({
       childAges: [],
       hasAccessibilityNeeds: false,
       notes: "",
-      model: DEFAULT_OPENROUTER_MODEL,
+      model: "google/gemini-1.5-flash", // Default to free tier model
     },
   });
 
@@ -764,32 +773,146 @@ export const ItineraryFormAIEnhanced = ({
             </p>
           </div>
 
-          <div className="max-w-sm">
-            <FormField
-              control={form.control}
-              name="model"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>AI provider</FormLabel>
-                  <FormControl>
-                    <Select value={field.value} onValueChange={field.onChange} disabled={isLoading}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {OPENROUTER_MODEL_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
+          <FormField
+            control={form.control}
+            name="model"
+            render={({ field }) => {
+              // Map OpenRouter model value to pricing model key for tier checking
+              const getPricingModelKey = (openRouterValue: string) => {
+                // Map openrouter values to pricing model keys
+                const mapping: Record<string, string> = {
+                  'google/gemini-1.5-flash': 'gemini-flash',
+                  'google/gemini-2.5-flash': 'gemini-flash', // Also map newer version to same tier
+                  'openai/gpt-4o-mini': 'gpt-4o-mini',
+                  'anthropic/claude-3-haiku': 'claude-haiku',
+                  'openai/gpt-5': 'gpt-4o', // Map GPT-5 to premium tier
+                };
+                return mapping[openRouterValue];
+              };
+
+              // Group models by availability
+              const availableModels = OPENROUTER_MODEL_OPTIONS.filter((option) => {
+                const pricingKey = getPricingModelKey(option.value);
+                // Skip models without pricing config
+                if (!pricingKey) return false;
+                // Check if this model exists in our pricing config
+                if (!AI_MODELS[pricingKey as keyof typeof AI_MODELS]) return false;
+                const pricingModel = AI_MODELS[pricingKey as keyof typeof AI_MODELS];
+                return pricingModel.freeAccess || userTier !== 'free';
+              });
+
+              const lockedModels = OPENROUTER_MODEL_OPTIONS.filter((option) => {
+                const pricingKey = getPricingModelKey(option.value);
+                // Skip models without pricing config
+                if (!pricingKey) return false;
+                if (!AI_MODELS[pricingKey as keyof typeof AI_MODELS]) return false;
+                const pricingModel = AI_MODELS[pricingKey as keyof typeof AI_MODELS];
+                return !pricingModel.freeAccess && userTier === 'free';
+              });
+
+              return (
+                <>
+                  <FormItem className="max-w-sm">
+                    <FormLabel>AI Model</FormLabel>
+                    <FormControl>
+                      <Select value={field.value} onValueChange={field.onChange} disabled={isLoading}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {/* Available Models */}
+                          {availableModels.length > 0 && (
+                            <>
+                              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                                Available
+                              </div>
+                              {availableModels.map((option) => {
+                                const pricingKey = getPricingModelKey(option.value);
+                                const pricingModel = AI_MODELS[pricingKey as keyof typeof AI_MODELS];
+                                return (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    <div className="flex items-center justify-between w-full gap-3">
+                                      <span>{option.label}</span>
+                                      <div className="flex items-center gap-2">
+                                        {pricingModel && (
+                                          <span className="text-xs px-2 py-0.5 bg-muted rounded">
+                                            {pricingModel.badge}
+                                          </span>
+                                        )}
+                                        {userTier === 'payg' && pricingModel && (
+                                          <span className="text-xs text-muted-foreground">
+                                            {formatCurrency(pricingModel.cost)}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </SelectItem>
+                                );
+                              })}
+                            </>
+                          )}
+
+                          {/* Locked Models */}
+                          {lockedModels.length > 0 && (
+                            <>
+                              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-t mt-2 pt-2">
+                                🔒 Premium Models
+                              </div>
+                              {lockedModels.map((option) => {
+                                const pricingKey = getPricingModelKey(option.value);
+                                const pricingModel = AI_MODELS[pricingKey as keyof typeof AI_MODELS];
+                                return (
+                                  <SelectItem key={option.value} value={option.value} disabled>
+                                    <div className="flex items-center justify-between w-full gap-2">
+                                      <div className="flex items-center gap-2">
+                                        <Lock className="size-3.5 text-muted-foreground" />
+                                        <span className="font-medium">{option.label}</span>
+                                      </div>
+                                      {pricingModel && (
+                                        <span className="text-xs px-2 py-0.5 bg-muted rounded">
+                                          {pricingModel.badge}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </SelectItem>
+                                );
+                              })}
+                            </>
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                  
+                  {/* Upgrade prompt for locked models - Full width outside the select */}
+                  {lockedModels.length > 0 && userTier === 'free' && (
+                    <div className="mt-4 p-4 border border-blue-200 bg-blue-50/50 rounded-lg">
+                      <div className="flex items-start gap-2">
+                        <Lock className="size-4 text-blue-600 shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-blue-900 mb-1">
+                            Unlock Premium AI Models
+                          </p>
+                          <p className="text-xs text-blue-700 mb-2">
+                            Access <strong>Claude Haiku</strong> and <strong>GPT-4o</strong> with 
+                            Pay-as-you-go ({formatCurrency(0.3)}-{formatCurrency(0.5)} per plan) 
+                            or Pro plan ({formatCurrency(9.99)}/month).
+                          </p>
+                          <Link
+                            href="/pricing"
+                            className="inline-block text-sm font-semibold text-blue-600 hover:text-blue-700 underline underline-offset-2"
+                          >
+                            View Pricing Plans →
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            }}
+          />
         </section>
 
         <Button 

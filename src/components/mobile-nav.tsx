@@ -13,7 +13,8 @@ import {
   LogIn,
   UserPlus,
   LogOut,
-  ListCheck
+  ListCheck,
+  Sparkles
 } from 'lucide-react';
 import { signInWithGoogle } from '@/lib/actions/auth-actions';
 
@@ -106,6 +107,16 @@ export function MobileNav({ user, isAdmin }: MobileNavProps) {
               >
                 <Home className="w-5 h-5" />
                 <span className="font-medium">Home</span>
+              </Link>
+
+              {/* Pricing Link - Always Visible */}
+              <Link
+                href="/pricing"
+                onClick={closeMenu}
+                className="flex items-center gap-3 px-4 py-3 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-blue-200 bg-blue-50/50"
+              >
+                <Sparkles className="w-5 h-5" />
+                <span className="font-semibold">Pricing Plans</span>
               </Link>
 
               {user && (

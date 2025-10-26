@@ -4,7 +4,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import Link from 'next/link';
 import { HideOnScroll } from '@/components/hide-on-scroll';
 import { MobileNav } from '@/components/mobile-nav';
-import { Plane, Shield } from 'lucide-react';
+import { Plane, Shield, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 async function SignOutButton() {
@@ -36,37 +36,52 @@ export async function NavHeader() {
                 </Link>
                 
                 {/* Desktop Navigation */}
-                {user && (
-                  <nav className="hidden lg:flex space-x-1">
-                    <Link
-                      href="/my-plans"
-                      className={cn(buttonVariants({ variant: "ghost" }))}
-                    >
-                      My Plans
-                    </Link>
-                    <Link
-                      href="/bucket-list"
-                      className={cn(buttonVariants({ variant: "ghost" }))}
-                    >
-                      Bucket List
-                    </Link>
-                    <Link
-                      href="/profile"
-                      className={cn(buttonVariants({ variant: "ghost" }))}
-                    >
-                      Profile
-                    </Link>
-                    {userIsAdmin && (
-                      <Link
-                        href="/admin/itineraries"
-                        className={cn(buttonVariants({ variant: "ghost" }), "text-red-600 hover:text-red-700 hover:bg-red-50 gap-1.5")}
-                      >
-                        <Shield className="w-4 h-4" />
-                        Admin
-                      </Link>
+                <nav className="hidden lg:flex items-center space-x-1">
+                  {/* Pricing Link - Always Visible */}
+                  <Link
+                    href="/pricing"
+                    className={cn(
+                      buttonVariants({ variant: "ghost" }), 
+                      "text-blue-600 hover:text-blue-700 hover:bg-blue-50 gap-1.5 font-semibold"
                     )}
-                  </nav>
-                )}
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    Pricing
+                  </Link>
+                  
+                  {/* User-specific Navigation */}
+                  {user && (
+                    <>
+                      <Link
+                        href="/my-plans"
+                        className={cn(buttonVariants({ variant: "ghost" }))}
+                      >
+                        My Plans
+                      </Link>
+                      <Link
+                        href="/bucket-list"
+                        className={cn(buttonVariants({ variant: "ghost" }))}
+                      >
+                        Bucket List
+                      </Link>
+                      <Link
+                        href="/profile"
+                        className={cn(buttonVariants({ variant: "ghost" }))}
+                      >
+                        Profile
+                      </Link>
+                      {userIsAdmin && (
+                        <Link
+                          href="/admin/itineraries"
+                          className={cn(buttonVariants({ variant: "ghost" }), "text-red-600 hover:text-red-700 hover:bg-red-50 gap-1.5")}
+                        >
+                          <Shield className="w-4 h-4" />
+                          Admin
+                        </Link>
+                      )}
+                    </>
+                  )}
+                </nav>
               </div>
 
               {/* Desktop Auth Buttons */}
