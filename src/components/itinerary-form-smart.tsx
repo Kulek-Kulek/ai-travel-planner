@@ -293,7 +293,7 @@ export const ItineraryForm = ({
     // Check if text is in English (for language hint)
     const isEnglish = isEnglishText(watchNotes);
     if (!isEnglish && watchNotes.length > 20) {
-      console.log('Non-English text detected - extraction may be limited');
+      // Non-English text detected - extraction may be limited
     }
 
     // Auto-fill fields if they're empty and we extracted something
@@ -900,7 +900,6 @@ export const ItineraryForm = ({
         <Button type="submit" className="w-full" disabled={isLoading} size="lg">
           {isLoading ? (
             <>
-              <span className="mr-2 animate-spin">⏳</span>
               Generating Your Itinerary...
             </>
           ) : (

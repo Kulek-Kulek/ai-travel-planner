@@ -208,15 +208,30 @@ export async function generateItinerary(
             validatedResponse,
           );
 
+    // Fetch existing tags from database for consistency
+    const supabaseForTags = await createClient();
+    const { data: existingTagsData } = await supabaseForTags
+      .from('itineraries')
+      .select('tags')
+      .eq('is_private', false);
+    
+    const allExistingTags = existingTagsData
+      ? Array.from(new Set(existingTagsData.flatMap(item => item.tags || [])))
+          .filter(tag => tag && tag.length > 0)
+          .sort()
+      : [];
+
     const [photo, tags] = await Promise.all([
       photoPromise,
       generateTags({
         destination: validated.destination,
         days: validated.days,
         travelers: validated.travelers,
+        children: validated.children,
         notes: validated.notes,
         aiPlan: validatedResponse,
         model: validated.model,
+        existingTags: allExistingTags,
       }),
     ]);
 
@@ -249,9 +264,6 @@ export async function generateItinerary(
       image_photographer_url: photo?.photographerUrl || null,
       status: isAnonymous ? "draft" : "published", // Drafts for anonymous users
     };
-
-    console.log("🔍 DEBUG: Inserting itinerary with data:", JSON.stringify(insertData, null, 2));
-    console.log("🔍 DEBUG: Status value type:", typeof insertData.status, "Value:", insertData.status);
 
     const { data: savedItinerary, error: dbError } = await supabase
       .from("itineraries")
@@ -429,40 +441,124 @@ ${params.notes ? `- Take into account: ${params.notes}` : ""}`;
 }
 
 /**
+ * Helper function to determine duration tag based on number of days
+ * Returns standardized duration tags for consistent filtering
+ */
+function getDurationTag(days: number): string {
+  if (days === 1) return "1 day";
+  if (days >= 2 && days <= 3) return "2-3 days";
+  if (days >= 4 && days <= 6) return "4-6 days";
+  if (days === 7) return "7 days";
+  if (days >= 8 && days <= 10) return "8-10 days";
+  if (days >= 11 && days <= 13) return "11-13 days";
+  if (days === 14) return "14 days";
+  return "14+ days"; // 15+ days
+}
+
+/**
+ * Helper function to determine group size tag based on travelers and children
+ * Returns standardized group size tags for consistent filtering
+ */
+function getGroupSizeTag(travelers: number, children?: number): string {
+  const totalPeople = travelers + (children || 0);
+  
+  // Family takes precedence if there are children
+  if (children && children > 0) {
+    return "family";
+  }
+  
+  // Otherwise, determine by total count
+  if (totalPeople === 1) return "solo";
+  if (totalPeople === 2) return "2 people";
+  return "group"; // 3 or more people
+}
+
+/**
  * Generate relevant tags for filtering and categorization
  * Uses AI to intelligently tag itineraries based on content
+ * 
+ * Returns tags in 3 categories:
+ * 1. Duration tag (automatic based on days)
+ * 2. Group size tag (automatic based on travelers + children)
+ * 3. Nature/interest tags (AI-generated based on activities)
  */
 async function generateTags(params: {
   destination: string;
   days: number;
   travelers: number;
+  children?: number;
   notes?: string;
   aiPlan: z.infer<typeof aiResponseSchema>;
   model: OpenRouterModel;
+  existingTags?: string[];
 }): Promise<string[]> {
   try {
-    const prompt = `You are a travel categorization expert. Analyze this travel itinerary and generate relevant tags for filtering and search.
+    const existingTagsList = params.existingTags && params.existingTags.length > 0
+      ? `\n\nEXISTING TAGS IN DATABASE:\n${params.existingTags.slice(0, 100).join(", ")}\n\nIMPORTANT: PRIORITIZE using tags from the existing tags list above when they match the itinerary. Only create NEW tags if none of the existing tags fit well.`
+      : '';
 
-Destination: ${params.destination}
+    const prompt = `You are a travel categorization expert. Analyze this travel itinerary and generate NATURE/INTEREST tags that describe the type and characteristics of this trip.
+
+IMPORTANT: DO NOT generate tags for:
+❌ Duration (like "weekend", "3-5 days", "week-long") - this is handled automatically
+❌ Group size (like "solo", "couple", "family", "group") - this is handled automatically
+❌ Destination names (like cities, countries, regions) - destination is searchable separately
+
+ONLY generate tags for the NATURE and INTERESTS of the trip based on:
+- Activities and places visited
+- Type of experience (romantic, adventure, cultural, relaxation, etc.)
+- Main interests (food, history, art, nature, museums, architecture, etc.)
+- Budget level if clear (budget, mid-range, luxury)
+- Special characteristics (family-friendly, accessible, off-the-beaten-path, etc.)
+
 Duration: ${params.days} days
-Travelers: ${params.travelers}
+Travelers: ${params.travelers}${params.children ? ` (including ${params.children} children)` : ""}
 ${params.notes ? `Notes: ${params.notes}` : ""}
 
-Itinerary summary: ${params.aiPlan.days.map((d) => d.places.map((p) => p.name).join(", ")).join("; ")}
+Itinerary places: ${params.aiPlan.days.map((d) => d.places.map((p) => p.name).join(", ")).join("; ")}
+${existingTagsList}
 
-Generate 5-10 relevant tags that would help users find this itinerary. Include tags for:
-1. Location (city, country, region, continent)
-2. Duration category (e.g., "weekend", "3-5 days", "week-long", "1-2 days")
-3. Trip type (e.g., "city break", "beach holiday", "adventure", "cultural", "romantic", "family-friendly")
-4. Group size (e.g., "solo", "couple", "family", "group")
-5. Main interests based on activities (e.g., "food", "history", "art", "nature", "shopping", "nightlife", "museums")
-6. Season/weather if relevant (e.g., "summer", "winter activities")
-7. Budget level if detectable (e.g., "budget", "mid-range", "luxury")
+Generate 6-10 tags describing the NATURE of this trip. Categories to consider:
 
-Return ONLY a JSON array of strings (tags should be lowercase, concise, in English):
+1. TRIP TYPE (pick 1-3):
+   romantic, adventure, cultural, relaxation, beach, city-break, road-trip, backpacking, luxury, budget-friendly, wellness, spiritual, educational, eco-tourism
+
+2. INTERESTS & ACTIVITIES (pick 3-6):
+   food, cuisine, restaurants, cooking, wine, coffee
+   history, historical-sites, archaeology, ancient-ruins
+   art, museums, galleries, modern-art, street-art
+   nature, hiking, mountains, wildlife, national-parks, outdoors
+   architecture, churches, castles, palaces, monuments
+   photography, scenic-views, landscapes
+   shopping, markets, local-crafts, fashion
+   nightlife, bars, clubs, entertainment
+   music, concerts, festivals, local-culture
+   sports, skiing, surfing, diving, cycling
+   wellness, spa, yoga, meditation
+   technology, innovation, science
+
+3. SPECIAL CHARACTERISTICS (pick 0-2):
+   family-friendly, kid-activities, accessible, pet-friendly, sustainable, eco-conscious, off-the-beaten-path, hidden-gems, local-experience, authentic, budget, mid-range, luxury
+
+TAG SELECTION STRATEGY:
+✅ PRIORITIZE reusing existing tags from the database when they match
+✅ Use exact same spelling as existing tags (if "city-break" exists, use "city-break" not "city break")
+✅ Only create new tags when existing ones don't accurately describe this trip
+✅ Focus on tags that describe the EXPERIENCE, not logistics
+
+FORMAT RULES:
+- All lowercase
+- Use hyphens for multi-word tags (e.g., "city-break", "family-friendly")
+- Keep tags concise (1-3 words)
+- NO destination names
+- NO duration indicators (no "weekend", "5-day", etc.)
+- NO group size indicators (no "solo", "couple", "family")
+
+Return ONLY a JSON array of strings:
 ["tag1", "tag2", "tag3", ...]
 
-Example: ["rome", "italy", "europe", "3-5 days", "city break", "couple", "history", "art", "food", "cultural"]`;
+✅ GOOD: ["romantic", "city-break", "art", "museums", "food", "architecture", "mid-range"]
+❌ BAD: ["paris", "5-days", "couple", "france", "weekend-trip"]`;
 
     const tagModels = [
       params.model,
@@ -508,12 +604,21 @@ Example: ["rome", "italy", "europe", "3-5 days", "city break", "couple", "histor
       return generateFallbackTags(params);
     }
 
-    // Clean and validate tags
-    return tags
+    // Clean and validate AI-generated nature tags
+    const cleanedTags = tags
       .filter((tag): tag is string => typeof tag === "string")
       .map((tag) => tag.toLowerCase().trim())
-      .filter((tag) => tag.length > 0 && tag.length < 50)
-      .slice(0, 15); // Max 15 tags
+      .filter((tag) => tag.length > 0 && tag.length < 50);
+    
+    // Remove destination-related tags and deduplicate
+    const natureTags = deduplicateAndFilterTags(cleanedTags, params.destination);
+    
+    // Automatically add duration and group size tags
+    const durationTag = getDurationTag(params.days);
+    const groupSizeTag = getGroupSizeTag(params.travelers, params.children);
+    
+    // Combine all tags: [duration, groupSize, ...natureTags]
+    return [durationTag, groupSizeTag, ...natureTags];
   } catch (error) {
     console.error("Tag generation error:", error);
     return generateFallbackTags(params);
@@ -522,54 +627,105 @@ Example: ["rome", "italy", "europe", "3-5 days", "city break", "couple", "histor
 
 /**
  * Fallback tag generation when AI fails
+ * Returns automatic duration/group tags plus rule-based nature tags
  */
 function generateFallbackTags(params: {
   destination: string;
   days: number;
   travelers: number;
+  children?: number;
   notes?: string;
   model?: OpenRouterModel;
 }): string[] {
   const tags: string[] = [];
 
-  // Add destination
-  tags.push(params.destination.toLowerCase());
+  // Add automatic duration and group size tags
+  tags.push(getDurationTag(params.days));
+  tags.push(getGroupSizeTag(params.travelers, params.children));
 
-  // Add duration category
-  if (params.days <= 2) tags.push("weekend", "1-2 days");
-  else if (params.days <= 5) tags.push("3-5 days");
-  else if (params.days <= 7) tags.push("week-long");
-  else tags.push("extended trip");
-
-  // Add traveler type
-  if (params.travelers === 1) tags.push("solo");
-  else if (params.travelers === 2) tags.push("couple");
-  else if (params.travelers <= 4) tags.push("small group");
-  else tags.push("group");
-
-  // Extract keywords from notes
+  // Extract nature/interest tags from notes
   if (params.notes) {
-    const keywords = [
-      "family",
-      "kids",
-      "children",
-      "adventure",
-      "romantic",
-      "food",
-      "culture",
-      "beach",
-      "history",
-      "art",
-      "nature",
-      "luxury",
-      "budget",
-    ];
-    keywords.forEach((keyword) => {
-      if (params.notes!.toLowerCase().includes(keyword)) {
-        tags.push(keyword);
-      }
-    });
+    const lowerNotes = params.notes.toLowerCase();
+    
+    // Family-related
+    if (lowerNotes.includes("family") || lowerNotes.includes("kids") || lowerNotes.includes("children")) {
+      tags.push("family-friendly");
+    }
+    
+    // Trip type
+    if (lowerNotes.includes("adventure")) tags.push("adventure");
+    if (lowerNotes.includes("romantic") || lowerNotes.includes("honeymoon")) tags.push("romantic");
+    if (lowerNotes.includes("beach") || lowerNotes.includes("coast")) tags.push("beach");
+    if (lowerNotes.includes("culture") || lowerNotes.includes("cultural")) tags.push("cultural");
+    if (lowerNotes.includes("city")) tags.push("city-break");
+    
+    // Interests
+    if (lowerNotes.includes("food") || lowerNotes.includes("restaurant") || lowerNotes.includes("culinary")) tags.push("food");
+    if (lowerNotes.includes("history") || lowerNotes.includes("historical")) tags.push("history");
+    if (lowerNotes.includes("art") || lowerNotes.includes("museum")) tags.push("art");
+    if (lowerNotes.includes("nature") || lowerNotes.includes("hiking") || lowerNotes.includes("outdoor")) tags.push("nature");
+    if (lowerNotes.includes("photography") || lowerNotes.includes("photo")) tags.push("photography");
+    if (lowerNotes.includes("shopping")) tags.push("shopping");
+    if (lowerNotes.includes("nightlife") || lowerNotes.includes("party")) tags.push("nightlife");
+    
+    // Budget
+    if (lowerNotes.includes("luxury") || lowerNotes.includes("upscale")) tags.push("luxury");
+    else if (lowerNotes.includes("budget") || lowerNotes.includes("cheap") || lowerNotes.includes("affordable")) tags.push("budget");
+    else tags.push("mid-range");
   }
 
-  return tags;
+  // Default trip type if nothing detected (skip if already has duration and group tags)
+  const natureTags = tags.slice(2); // Skip duration and group tags
+  if (natureTags.length === 0) {
+    tags.push("cultural");
+  }
+
+  return tags.slice(0, 12); // Max 12 tags (2 fixed + up to 10 nature)
+}
+
+/**
+ * Deduplicate tags and remove destination-related tags
+ */
+function deduplicateAndFilterTags(tags: string[], destination: string): string[] {
+  const destinationLower = destination.toLowerCase();
+  const destinationWords = destinationLower.split(/[\s,]+/);
+  
+  // List of common location-related words to filter out
+  const locationWords = new Set([
+    'city', 'town', 'village', 'island', 'country', 'region', 
+    'district', 'province', 'state', 'county', 'area'
+  ]);
+  
+  // Remove destination-related tags
+  const filtered = tags.filter(tag => {
+    const tagLower = tag.toLowerCase();
+    
+    // Skip if tag matches destination or contains destination words
+    if (tagLower === destinationLower) return false;
+    if (destinationWords.some(word => word.length > 2 && tagLower.includes(word))) return false;
+    if (tagLower.includes(destinationLower)) return false;
+    
+    // Skip pure location indicators without context
+    if (locationWords.has(tagLower)) return false;
+    
+    return true;
+  });
+  
+  // Deduplicate similar tags (e.g., "10 days" and "10-day-trip")
+  const normalized = new Map<string, string>();
+  
+  for (const tag of filtered) {
+    // Normalize for comparison: remove hyphens, spaces, common suffixes
+    const normalizedKey = tag
+      .replace(/[-\s]/g, '')
+      .replace(/trip|travel|vacation|holiday/g, '')
+      .toLowerCase();
+    
+    // Keep the shorter/cleaner version
+    if (!normalized.has(normalizedKey) || tag.length < normalized.get(normalizedKey)!.length) {
+      normalized.set(normalizedKey, tag);
+    }
+  }
+  
+  return Array.from(normalized.values()).slice(0, 12); // Max 12 unique tags
 }

@@ -180,14 +180,12 @@ export const ItineraryFormAIEnhanced = ({
         }
         if (extracted.children && !form.getValues("children")) {
           form.setValue("children", extracted.children, { shouldValidate: false });
-          console.log("Setting children to:", extracted.children);
         }
         
         // Pre-fill child ages if extracted
         if (extracted.childAges && extracted.childAges.length > 0 && !form.getValues("childAges")?.length) {
           form.setValue("childAges", extracted.childAges, { shouldValidate: false });
           setChildAgesInput(extracted.childAges.map(age => age.toString()));
-          console.log("Setting childAges to:", extracted.childAges);
         }
         
         if (extracted.hasAccessibilityNeeds) {
@@ -200,7 +198,6 @@ export const ItineraryFormAIEnhanced = ({
             const startDate = new Date(extracted.startDate);
             if (!isNaN(startDate.getTime())) {
               form.setValue("startDate", startDate, { shouldValidate: false });
-              console.log("Setting startDate to:", startDate);
             }
           } catch (error) {
             console.error("Failed to parse startDate:", extracted.startDate, error);
@@ -211,7 +208,6 @@ export const ItineraryFormAIEnhanced = ({
             const endDate = new Date(extracted.endDate);
             if (!isNaN(endDate.getTime())) {
               form.setValue("endDate", endDate, { shouldValidate: false });
-              console.log("Setting endDate to:", endDate);
             }
           } catch (error) {
             console.error("Failed to parse endDate:", extracted.endDate, error);
@@ -804,7 +800,6 @@ export const ItineraryFormAIEnhanced = ({
         >
           {isLoading ? (
             <>
-              <span className="mr-2 animate-spin">⏳</span>
               Generating Your Itinerary...
             </>
           ) : isExtracting ? (

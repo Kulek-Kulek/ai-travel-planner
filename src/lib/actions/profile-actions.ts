@@ -48,8 +48,6 @@ export async function getProfile(): Promise<ActionResult<{ name: string; email: 
     
     // If profile doesn't exist, create it
     if (error && error.code === 'PGRST116') {
-      console.log('Profile not found, creating new profile for user:', user.id);
-      
       const { error: insertError } = await supabase
         .from('profiles')
         .insert({
