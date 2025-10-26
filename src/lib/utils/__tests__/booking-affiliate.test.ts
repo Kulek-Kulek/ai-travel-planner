@@ -85,10 +85,11 @@ describe('booking-affiliate', () => {
       expect(links).toHaveProperty('resorts');
       
       expect(links.all).toContain('booking.com');
-      expect(links.hotels).toContain('ht_id=204');
-      expect(links.apartments).toContain('ht_id=201');
-      expect(links.hostels).toContain('ht_id=203');
-      expect(links.resorts).toContain('ht_id=206');
+      // Check for URL-encoded property type filters
+      expect(links.hotels).toContain('ht_id%3D204'); // URL-encoded ht_id=204
+      expect(links.apartments).toContain('ht_id%3D201'); // URL-encoded ht_id=201
+      expect(links.hostels).toContain('ht_id%3D203'); // URL-encoded ht_id=203
+      expect(links.resorts).toContain('ht_id%3D206'); // URL-encoded ht_id=206
     });
   });
 
