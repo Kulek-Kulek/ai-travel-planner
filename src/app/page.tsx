@@ -12,7 +12,7 @@ import { getUser } from "@/lib/actions/auth-actions";
 import { getUserSubscription, recordPlanGeneration } from "@/lib/actions/subscription-actions";
 import { toast } from "sonner";
 import type { OpenRouterModel } from "@/lib/openrouter/models";
-import type { SubscriptionTier } from "@/lib/config/pricing-models";
+import type { SubscriptionTier, ModelKey } from "@/lib/config/pricing-models";
 import { Button } from "@/components/ui/button";
 
 type FormData = {
@@ -214,7 +214,7 @@ export default function Home() {
         if (pricingModel && response.data.id) {
           await recordPlanGeneration(
             response.data.id,
-            pricingModel,
+            pricingModel as ModelKey,
             'create'
           ).catch((error) => {
             console.error('Failed to record generation:', error);
