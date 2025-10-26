@@ -186,27 +186,67 @@ export async function claimDraftItinerary(itineraryId: string): Promise<ActionRe
     const { data: { user } } = await supabase.auth.getUser();
     
     if (!user) {
+      console.error('🔍 claimDraftItinerary: User not authenticated');
       return {
         success: false,
         error: 'You must be logged in to claim this itinerary',
       };
     }
     
+    // First, let's check what the current status is
+    const { data: existingItinerary, error: fetchError } = await supabase
+      .from('itineraries')
+      .select('id, status, user_id, is_private')
+      .eq('id', itineraryId)
+      .single();
+    
+    if (fetchError) {
+      console.error('claimDraftItinerary: Error fetching itinerary:', fetchError);
+      return {
+        success: false,
+        error: 'Failed to find itinerary',
+      };
+    }
+    
+    // If already published and already belongs to this user, just return success
+    if (existingItinerary.status === 'published' && existingItinerary.user_id === user.id) {
+      return { success: true, data: undefined };
+    }
+    
+    // If already published but belongs to someone else, can't claim
+    if (existingItinerary.status === 'published' && existingItinerary.user_id && existingItinerary.user_id !== user.id) {
+      console.error('claimDraftItinerary: Itinerary already belongs to another user');
+      return {
+        success: false,
+        error: 'This itinerary already belongs to another user',
+      };
+    }
+    
     // Update the itinerary to published and assign to user
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('itineraries')
       .update({
         user_id: user.id,
         status: 'published',
+        is_private: false, // Explicitly set to public
       })
       .eq('id', itineraryId)
-      .eq('status', 'draft'); // Only update if it's still a draft
+      .eq('status', 'draft') // Only update if it's still a draft
+      .select(); // Return the updated row
     
     if (error) {
-      console.error('Error claiming draft itinerary:', error);
+      console.error('claimDraftItinerary: Database error:', error);
       return {
         success: false,
         error: 'Failed to save itinerary',
+      };
+    }
+    
+    if (!data || data.length === 0) {
+      console.warn('claimDraftItinerary: No rows updated. Itinerary might not be a draft or does not exist.');
+      return {
+        success: false,
+        error: 'Itinerary could not be claimed. It may have already been saved.',
       };
     }
     
