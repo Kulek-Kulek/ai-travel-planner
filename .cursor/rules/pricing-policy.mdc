@@ -1,0 +1,185 @@
+# Pricing Policy Implementation Rules
+
+## Critical Rules
+
+### 1. Cost Protection (PREVENT BANKRUPTCY)
+- **NEVER** allow unlimited expensive AI models without limits
+- **ALWAYS** enforce rate limits on all tiers
+- **ALWAYS** track AI costs in database
+- **ALERT** admin when user costs exceed revenue
+
+### 2. Free Tier Constraints
+```typescript
+FREE_TIER = {
+  max_plans: 2, // lifetime
+  max_regenerations_per_plan: 1, // lifetime
+  allowed_models: ['gemini-flash', 'gpt-4o-mini'],
+  locked_after_creation: ['destination', 'dates', 'travelers'],
+  features: ['like', 'share', 'download', 'bucket_list']
+}
+```
+
+### 3. Pay-as-you-go Rules
+```typescript
+PAYG_TIER = {
+  topup_amounts: [2, 5, 10, 20], // euros
+  credits_never_expire: true,
+  show_cost_before_generation: true, // REQUIRED
+  pricing: {
+    'gemini-flash': 0.15,
+    'gpt-4o-mini': 0.20,
+    'claude-haiku': 0.30,
+    'gpt-4o': 0.50
+  }
+}
+```
+
+### 4. Pro Tier Limits (CRITICAL)
+```typescript
+PRO_TIER = {
+  price: 9.99,
+  monthly_limits: {
+    economy_models: 100, // gemini-flash, gpt-4o-mini
+    premium_models: 20,  // claude-haiku, gpt-4o
+    rollover_max: 40     // unused premium plans
+  },
+  after_limits: {
+    economy: 'unlimited',
+    premium: 'payg_rate' // charge €0.20 per additional
+  },
+  rate_limit: {
+    per_hour: 20 // max 20 generations/hour even for pro
+  }
+}
+```
+
+### 5. Model Selection UI Rules
+- **FREE users:** Show 2 unlocked models, others with 🔒 and upgrade prompt
+- **PAYG users:** Show price next to each model BEFORE selection
+- **PRO users:** Show remaining monthly allowance per model tier
+- **ALWAYS:** Display current balance/credits/remaining plans
+
+### 6. Edit Mode Rules
+```typescript
+EDIT_RULES = {
+  free_tier: {
+    edits_per_plan: 1, // lifetime per plan
+    locked_fields: ['destination', 'dates', 'travelers'],
+    show_ui: 'disabled_with_lock_icon'
+  },
+  paid_tiers: {
+    edits_per_plan: 'unlimited',
+    locked_fields: ['destination', 'dates', 'travelers'],
+    regeneration_cost: 'same_as_creation'
+  }
+}
+```
+
+### 7. Upgrade Prompts
+When free user hits limit (3rd plan attempt):
+```typescript
+UPGRADE_MODAL = {
+  title: "You've used your 2 free plans! 🎉",
+  options: [
+    { type: 'payg', cta: 'Add Credits', highlight: false },
+    { type: 'pro', cta: 'Go Pro - €9.99/mo', highlight: true },
+  ],
+  allow_dismiss: false, // Must choose to continue
+}
+```
+
+### 8. Database Requirements
+```sql
+-- Required tables/columns
+profiles:
+  - subscription_tier: 'free' | 'payg' | 'pro'
+  - credits_balance: DECIMAL(10,2) -- for PAYG
+  - monthly_economy_used: INTEGER -- for PRO
+  - monthly_premium_used: INTEGER -- for PRO
+  - premium_rollover: INTEGER -- for PRO
+  - billing_cycle_start: TIMESTAMPTZ -- for PRO
+  - plans_created_count: INTEGER -- track free tier usage
+
+itineraries:
+  - ai_model_used: TEXT
+  - generation_cost: DECIMAL(10,4)
+  - edit_count: INTEGER
+
+ai_usage_logs:
+  - user_id, plan_id, model, estimated_cost, actual_cost, created_at
+```
+
+### 9. Safety Triggers
+```typescript
+// Implement these checks BEFORE generation
+if (tier === 'pro' && economyUsed >= 100 && premiumUsed >= 20) {
+  if (selectedModel in PREMIUM_MODELS) {
+    return { 
+      error: 'Monthly premium limit reached. Use economy model or add credits.' 
+    };
+  }
+}
+
+if (tier === 'payg' && credits < modelCost) {
+  return { 
+    error: 'Insufficient credits. Please top up.' 
+  };
+}
+
+if (tier === 'free' && plansCreated >= 2) {
+  return { 
+    error: 'Free plan limit reached. Please upgrade.' 
+  };
+}
+```
+
+### 10. Model Configuration
+```typescript
+// lib/config/pricing-models.ts
+export const AI_MODELS = {
+  'gemini-flash': {
+    name: 'Gemini Flash',
+    provider: 'google/gemini-flash-1.5',
+    cost: 0.15,
+    tier: 'economy',
+    free_tier: true,
+    badge: 'Fast'
+  },
+  'gpt-4o-mini': {
+    name: 'GPT-4o Mini',
+    provider: 'openai/gpt-4o-mini',
+    cost: 0.20,
+    tier: 'economy',
+    free_tier: true,
+    badge: 'Balanced'
+  },
+  'claude-haiku': {
+    name: 'Claude Haiku',
+    provider: 'anthropic/claude-3.5-haiku',
+    cost: 0.30,
+    tier: 'premium',
+    free_tier: false,
+    badge: 'Better'
+  },
+  'gpt-4o': {
+    name: 'GPT-4o',
+    provider: 'openai/gpt-4o',
+    cost: 0.50,
+    tier: 'premium',
+    free_tier: false,
+    badge: 'Best'
+  }
+} as const;
+```
+
+## Implementation Checklist
+When implementing pricing features:
+- [ ] Enforce tier limits BEFORE API calls
+- [ ] Show cost/limits to user BEFORE generation
+- [ ] Log all AI usage with costs
+- [ ] Implement rate limiting
+- [ ] Add admin alerts for high usage
+- [ ] Test bankruptcy scenarios
+- [ ] Add usage dashboard for users
+- [ ] Implement credit/limit reset cron jobs
+
