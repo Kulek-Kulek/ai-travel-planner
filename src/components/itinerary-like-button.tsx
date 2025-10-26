@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
-import { likeItinerary } from '@/lib/actions/itinerary-actions';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { likeItinerary, addToBucketList, removeFromBucketList, isInBucketList } from '@/lib/actions/itinerary-actions';
 import { Button } from './ui/button';
+import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
-import { ThumbsUp, Share2, Heart } from 'lucide-react';
+import { ThumbsUp, Heart } from 'lucide-react';
 
 interface ItineraryLikeButtonProps {
   itineraryId: string;
@@ -12,17 +14,34 @@ interface ItineraryLikeButtonProps {
 }
 
 export function ItineraryLikeButton({ itineraryId, initialLikes }: ItineraryLikeButtonProps) {
+  const router = useRouter();
   const [currentLikes, setCurrentLikes] = useState(initialLikes || 0);
   const [isLiking, setIsLiking] = useState(false);
-  const [hasLiked, setHasLiked] = useState(() => {
-    // Check localStorage to see if user has already liked this itinerary
-    if (typeof window !== 'undefined') {
-      const liked = localStorage.getItem(`liked_${itineraryId}`);
-      return liked === 'true';
-    }
-    return false;
-  });
+  const [hasLiked, setHasLiked] = useState(false); // Start with false to avoid hydration mismatch
   const [justLiked, setJustLiked] = useState(false);
+  const [inBucketList, setInBucketList] = useState(false);
+  const [isCheckingBucketList, setIsCheckingBucketList] = useState(true);
+  const [isAddingToBucket, setIsAddingToBucket] = useState(false);
+  
+  // Check localStorage after mount to avoid hydration mismatch
+  useEffect(() => {
+    const liked = localStorage.getItem(`liked_${itineraryId}`);
+    setHasLiked(liked === 'true');
+  }, [itineraryId]);
+  
+  // Check if itinerary is in bucket list on mount
+  useEffect(() => {
+    async function checkBucketListStatus() {
+      setIsCheckingBucketList(true);
+      const result = await isInBucketList(itineraryId);
+      if (result.success) {
+        setInBucketList(result.data);
+      }
+      setIsCheckingBucketList(false);
+    }
+    
+    checkBucketListStatus();
+  }, [itineraryId]);
 
   const handleLike = async () => {
     if (hasLiked) {
@@ -66,6 +85,61 @@ export function ItineraryLikeButton({ itineraryId, initialLikes }: ItineraryLike
       setIsLiking(false);
     }
   };
+  
+  const handleAddToBucketList = async () => {
+    if (isAddingToBucket) return;
+    
+    // Check if user is authenticated
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      // User not authenticated - store intent and redirect to sign-in
+      sessionStorage.setItem('pendingBucketListAdd', itineraryId);
+      toast.info('Please sign in to save to your bucket list');
+      router.push(`/sign-in?redirectTo=/itinerary/${itineraryId}`);
+      return;
+    }
+    
+    setIsAddingToBucket(true);
+    
+    try {
+      const result = await addToBucketList(itineraryId);
+      
+      if (result.success) {
+        setInBucketList(true);
+        toast.success('Added to your bucket list! ❤️');
+      } else {
+        if (result.error === 'Already in your bucket list') {
+          setInBucketList(true);
+          toast.info('This itinerary is already in your bucket list!');
+        } else {
+          toast.error(result.error || 'Failed to add to bucket list');
+        }
+      }
+    } catch (error) {
+      console.error('Error adding to bucket list:', error);
+      toast.error('Something went wrong');
+    } finally {
+      setIsAddingToBucket(false);
+    }
+  };
+  
+  const handleRemoveFromBucketList = async () => {
+    try {
+      const result = await removeFromBucketList(itineraryId);
+      
+      if (result.success) {
+        setInBucketList(false);
+        toast.success('Removed from bucket list');
+      } else {
+        toast.error(result.error || 'Failed to remove from bucket list');
+      }
+    } catch (error) {
+      console.error('Error removing from bucket list:', error);
+      toast.error('Something went wrong');
+    }
+  };
 
   return (
     <div className="flex items-center gap-2">
@@ -86,26 +160,20 @@ export function ItineraryLikeButton({ itineraryId, initialLikes }: ItineraryLike
         <ThumbsUp className={`w-5 h-5 ${justLiked ? 'animate-bounce' : ''}`} />
       </Button>
       
-      {/* Share button - placeholder */}
+      {/* Bucket list button */}
       <Button
-        onClick={() => toast.info('Share feature coming soon!')}
-        variant="outline"
+        onClick={inBucketList ? handleRemoveFromBucketList : handleAddToBucketList}
+        disabled={isAddingToBucket || isCheckingBucketList}
+        variant={inBucketList ? 'default' : 'outline'}
         size="lg"
-        className="hover:bg-green-50 hover:text-green-600 hover:border-green-600 transition-all active:scale-95"
-        title="Share with friends (coming soon)"
+        className={`flex items-center gap-2 ${
+          inBucketList
+            ? 'bg-blue-600 hover:bg-blue-700 text-white cursor-default'
+            : 'hover:bg-blue-50 hover:text-blue-600 hover:border-blue-600'
+        } ${(isAddingToBucket || isCheckingBucketList) ? 'opacity-50' : ''} transition-all active:scale-95`}
+        title={inBucketList ? 'Remove from bucket list' : 'Add to bucket list'}
       >
-        <Share2 className="w-5 h-5" />
-      </Button>
-      
-      {/* Bucket list button - placeholder */}
-      <Button
-        onClick={() => toast.info('Bucket list feature coming soon!')}
-        variant="outline"
-        size="lg"
-        className="hover:bg-red-50 hover:text-red-600 hover:border-red-600 transition-all active:scale-95"
-        title="Add to bucket list (coming soon)"
-      >
-        <Heart className="w-5 h-5" />
+        <Heart className={`w-5 h-5 ${inBucketList ? 'fill-current' : ''}`} />
       </Button>
     </div>
   );

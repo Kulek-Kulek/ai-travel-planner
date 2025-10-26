@@ -626,7 +626,6 @@ export const ItineraryForm = ({
         <Button type="submit" className="w-full" disabled={isLoading} size="lg">
           {isLoading ? (
             <>
-              <span className="mr-2 animate-spin">⏳</span>
               Generating Your Itinerary...
             </>
           ) : (
