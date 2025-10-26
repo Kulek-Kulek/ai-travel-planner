@@ -1,10 +1,11 @@
 import { getUser, signOut } from '@/lib/actions/auth-actions';
 import { isAdmin } from '@/lib/auth/admin';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import Link from 'next/link';
 import { HideOnScroll } from '@/components/hide-on-scroll';
 import { MobileNav } from '@/components/mobile-nav';
 import { Plane, Shield } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 async function SignOutButton() {
   return (
@@ -36,29 +37,29 @@ export async function NavHeader() {
                 
                 {/* Desktop Navigation */}
                 {user && (
-                  <nav className="hidden lg:flex space-x-4">
+                  <nav className="hidden lg:flex space-x-1">
                     <Link
                       href="/my-plans"
-                      className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                      className={cn(buttonVariants({ variant: "ghost" }))}
                     >
                       My Plans
                     </Link>
                     <Link
                       href="/bucket-list"
-                      className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                      className={cn(buttonVariants({ variant: "ghost" }))}
                     >
                       Bucket List
                     </Link>
                     <Link
                       href="/profile"
-                      className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                      className={cn(buttonVariants({ variant: "ghost" }))}
                     >
                       Profile
                     </Link>
                     {userIsAdmin && (
                       <Link
                         href="/admin/itineraries"
-                        className="flex items-center gap-1.5 text-red-600 hover:text-red-800 px-3 py-2 rounded-md text-sm font-medium font-semibold transition-colors"
+                        className={cn(buttonVariants({ variant: "ghost" }), "text-red-600 hover:text-red-700 hover:bg-red-50 gap-1.5")}
                       >
                         <Shield className="w-4 h-4" />
                         Admin

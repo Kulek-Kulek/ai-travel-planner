@@ -164,7 +164,6 @@ export default function BackfillImagesPage() {
             >
               {isClearing ? (
                 <>
-                  <span className="animate-spin mr-2">⏳</span>
                   Clearing...
                 </>
               ) : (
@@ -185,7 +184,6 @@ export default function BackfillImagesPage() {
           >
             {isProcessing ? (
               <>
-                <span className="animate-spin mr-2">⏳</span>
                 Processing...
               </>
             ) : count === 0 ? (

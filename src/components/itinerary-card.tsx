@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
 import { toast } from 'sonner';
+import { shareItinerary } from '@/lib/utils/share';
 import { 
   Calendar,
   Users, 
@@ -88,6 +89,7 @@ export function ItineraryCard({
   const [inBucketList, setInBucketList] = useState(isInBucketListProp ?? false);
   const [isCheckingBucketList, setIsCheckingBucketList] = useState(isInBucketListProp === undefined);
   const [isAddingToBucket, setIsAddingToBucket] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
   
   // Check if itinerary is in bucket list on mount - only if not provided via props
   useEffect(() => {
@@ -228,6 +230,50 @@ export function ItineraryCard({
     }
   };
   
+  const handleViewClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    router.push(`/itinerary/${id}`);
+  };
+  
+  const handleShare = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (isSharing) return;
+    
+    setIsSharing(true);
+    
+    try {
+      // Create a nice description
+      const placesList = previewPlaces.slice(0, 3).join(', ');
+      const description = placesList 
+        ? `A ${days}-day itinerary for ${ai_plan.city || destination} including ${placesList} and more!`
+        : `Check out this ${days}-day travel itinerary for ${ai_plan.city || destination}!`;
+      
+      const result = await shareItinerary({
+        id,
+        title: ai_plan.city || destination,
+        description,
+      });
+      
+      if (result.success) {
+        if (result.method === 'native') {
+          // Native share was successful (don't show toast, as native dialog handled it)
+        } else if (result.method === 'clipboard') {
+          toast.success('Link copied to clipboard! 📋');
+        }
+      } else {
+        toast.error('Failed to share. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error sharing:', error);
+      toast.error('Something went wrong');
+    } finally {
+      setIsSharing(false);
+    }
+  };
+  
   // Get first few places as preview
   const previewPlaces = ai_plan.days
     .slice(0, 2)
@@ -235,7 +281,7 @@ export function ItineraryCard({
     .slice(0, 4);
   
   const cardContent = (
-    <div className="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 overflow-hidden h-full border border-gray-200 hover:border-blue-400">
+    <div className="bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow duration-300 overflow-hidden h-full border border-gray-200 hover:border-blue-400 pointer-events-auto">
       {/* Image Header */}
       {image_url && (
         <div className="relative w-full h-48 bg-gray-200">
@@ -284,10 +330,10 @@ export function ItineraryCard({
             <Users className="w-4 h-4" />
             <span>
               {travelers} adult{travelers > 1 ? 's' : ''}
-              {children && children > 0 && (
+              {children && children > 0 ? (
                 <>, {children} {children === 1 ? 'child' : 'children'} 
                 {child_ages && child_ages.length > 0 && ` (ages: ${child_ages.join(', ')})`}</>
-              )}
+              ) : null}
             </span>
           </div>
           
@@ -364,9 +410,19 @@ export function ItineraryCard({
                 </span>
               )}
             </div>
-            <span className="text-sm text-blue-600 font-medium hover:underline">
-              View →
-            </span>
+            {showBucketListActions ? (
+              <Link 
+                href={`/itinerary/${id}`}
+                className="text-sm text-blue-600 font-medium hover:underline cursor-pointer"
+                onClick={(e) => e.stopPropagation()}
+              >
+                View →
+              </Link>
+            ) : (
+              <span className="text-sm text-blue-600 font-medium hover:underline">
+                View →
+              </span>
+            )}
           </div>
           
           {/* Action buttons row */}
@@ -383,20 +439,19 @@ export function ItineraryCard({
               title={hasLiked ? 'You liked this!' : 'Give this itinerary a thumbs up'}
             >
               <span className="text-sm font-semibold min-w-[16px] text-center">{currentLikes}</span>
-              <ThumbsUp className={`w-5 h-5 ${justLiked ? 'animate-bounce' : ''} ${hasLiked ? 'fill-current' : ''}`} />
+              <ThumbsUp className={`w-4 h-4 ${justLiked ? 'animate-bounce' : ''} ${hasLiked ? 'fill-current' : ''}`} />
             </button>
             
-            {/* Share button - placeholder */}
+            {/* Share button */}
             <button
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                toast.info('Share feature coming soon!');
-              }}
-              className="text-gray-500 hover:text-green-600 transition-all active:scale-95"
-              title="Share with friends (coming soon)"
+              onClick={handleShare}
+              disabled={isSharing}
+              className={`text-gray-500 hover:text-blue-600 transition-all active:scale-95 ${
+                isSharing ? 'opacity-50' : ''
+              }`}
+              title="Share this itinerary"
             >
-              <Share2 className="w-5 h-5" />
+              <Share2 className="w-4 h-4" />
             </button>
             
             {/* Bucket list button */}
@@ -405,12 +460,12 @@ export function ItineraryCard({
               disabled={isAddingToBucket || isCheckingBucketList}
               className={`transition-all ${
                 inBucketList
-                  ? 'text-red-600 hover:text-red-700 active:scale-95'
-                  : 'text-gray-500 hover:text-red-600 active:scale-95'
+                  ? 'text-blue-600 cursor-default'
+                  : 'text-gray-500 hover:text-blue-600 active:scale-95'
               } ${(isAddingToBucket || isCheckingBucketList) ? 'opacity-50' : ''}`}
               title={inBucketList ? 'Remove from bucket list' : 'Add to bucket list'}
             >
-              <Heart className={`w-5 h-5 ${inBucketList ? 'fill-current' : ''}`} />
+              <Heart className={`w-4 h-4 ${inBucketList ? 'fill-current' : ''}`} />
             </button>
           </div>
         </div>
@@ -433,15 +488,17 @@ export function ItineraryCard({
             
             {/* Action buttons for bucket list */}
             <div className="flex gap-2 pt-2">
-              <Link href={`/itinerary/${id}`} className="flex-1">
-                <Button variant="outline" size="sm" className="w-full gap-1.5">
-                  <Eye className="w-4 h-4" /> View
-                </Button>
-              </Link>
+              <button
+                type="button"
+                onClick={handleViewClick}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+              >
+                <Eye className="w-4 h-4" /> View
+              </button>
               <button 
                 type="button"
                 onClick={handleRemoveFromBucketList}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-300 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-300 transition-colors cursor-pointer"
               >
                 <Heart className="w-4 h-4 fill-current" /> Remove
               </button>

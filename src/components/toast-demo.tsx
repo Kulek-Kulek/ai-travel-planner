@@ -72,7 +72,7 @@ export const ToastDemo = () => {
           variant="outline"
           size="sm"
         >
-          ⏳ Loading
+           Loading
         </Button>
 
         <Button

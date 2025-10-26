@@ -109,11 +109,6 @@ Return JSON in this exact format:
     // Validate with Zod schema
     const validated = extractionSchema.parse(parsed);
     
-    console.log("=== AI EXTRACTION SUCCESS ===");
-    console.log("Model:", model);
-    console.log("Extracted:", JSON.stringify(validated, null, 2));
-    console.log("============================");
-    
     return validated;
   } catch (error) {
     console.error("=== AI EXTRACTION ERROR ===");

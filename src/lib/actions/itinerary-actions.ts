@@ -55,17 +55,18 @@ type ActionResult<T> =
   | { success: false; error: string };
 
 /**
- * Fetch public itineraries with optional tag filtering
+ * Fetch public itineraries with optional tag and destination filtering
  */
 export async function getPublicItineraries(
   options: {
     tags?: string[];
+    destination?: string;
     limit?: number;
     offset?: number;
   } = {}
 ): Promise<ActionResult<{ itineraries: Itinerary[]; total: number }>> {
   try {
-    const { tags = [], limit = 20, offset = 0 } = options;
+    const { tags = [], destination, limit = 20, offset = 0 } = options;
     const supabase = await createClient();
     
     // Fetch itineraries first, then join with profiles separately
@@ -79,6 +80,11 @@ export async function getPublicItineraries(
     // Filter by tags if provided
     if (tags.length > 0) {
       query = query.contains('tags', tags);
+    }
+    
+    // Filter by destination if provided (case-insensitive partial match)
+    if (destination && destination.trim() !== '') {
+      query = query.ilike('destination', `%${destination.trim()}%`);
     }
     
     query = query.range(offset, offset + limit - 1);
@@ -113,16 +119,29 @@ export async function getPublicItineraries(
     // Fetch all profiles in one batch query
     let profilesMap: Record<string, string> = {};
     if (userIds.length > 0) {
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, full_name')
-        .in('id', userIds);
-      
-      if (profiles) {
-        profilesMap = profiles.reduce((acc, profile) => {
-          acc[profile.id] = profile.full_name;
-          return acc;
-        }, {} as Record<string, string>);
+      try {
+        const { data: profiles, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .in('id', userIds);
+        
+        if (!profileError && profiles) {
+          profilesMap = profiles.reduce((acc, profile) => {
+            // Use full_name if available, otherwise use first part of email, or 'Anonymous'
+            if (profile.full_name && profile.full_name.trim()) {
+              acc[profile.id] = profile.full_name;
+            } else if (profile.email) {
+              // Extract first part of email before @ as fallback
+              acc[profile.id] = profile.email.split('@')[0];
+            } else {
+              acc[profile.id] = 'Anonymous';
+            }
+            return acc;
+          }, {} as Record<string, string>);
+        }
+      } catch (profileErr) {
+        // If profile fetch fails, just continue without names
+        console.warn('Failed to fetch profiles:', profileErr);
       }
     }
     
@@ -132,6 +151,14 @@ export async function getPublicItineraries(
       creator_name: itinerary.user_id ? profilesMap[itinerary.user_id] || null : null,
     }));
     
+    // Test serialization before returning
+    try {
+      JSON.stringify({ itineraries: itinerariesWithNames, total: count || 0 });
+    } catch (serializeError) {
+      console.error('❌ Serialization failed:', serializeError);
+      throw new Error('Failed to serialize response data');
+    }
+    
     return {
       success: true,
       data: {
@@ -140,10 +167,11 @@ export async function getPublicItineraries(
       },
     };
   } catch (error) {
-    console.error('Error in getPublicItineraries:', error);
+    console.error('❌ Error in getPublicItineraries:', error);
+    console.error('Error details:', JSON.stringify(error, null, 2));
     return { 
       success: false, 
-      error: 'An unexpected error occurred' 
+      error: error instanceof Error ? error.message : 'An unexpected error occurred' 
     };
   }
 }
