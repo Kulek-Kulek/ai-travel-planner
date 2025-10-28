@@ -13,9 +13,7 @@ import {
   canGeneratePlan, 
   recordPlanGeneration 
 } from "@/lib/actions/subscription-actions";
-import { getUserTravelProfile } from "@/lib/actions/profile-ai-actions";
 import { type ModelKey } from "@/lib/config/pricing-models";
-import { type TravelProfile } from "@/types/travel-profile";
 import { z } from "zod";
 
 // Input schema
@@ -70,20 +68,21 @@ type SavedItinerary = z.infer<typeof aiResponseSchema> & {
 // Helper function to map OpenRouter model ID to ModelKey for pricing
 function mapOpenRouterModelToKey(openRouterModel: string): ModelKey {
   // Map OpenRouter model IDs to our pricing model keys
-  if (openRouterModel.includes('gemini-2.5-flash') || openRouterModel.includes('gemini-1.5-flash')) {
-    return 'gemini-flash';
-  }
-  if (openRouterModel.includes('gpt-4o-mini')) {
-    return 'gpt-4o-mini';
-  }
-  if (openRouterModel.includes('claude-3-haiku')) {
-    return 'claude-haiku';
-  }
-  if (openRouterModel.includes('gpt-5') || openRouterModel.includes('gpt-4o')) {
-    return 'gpt-4o';
-  }
-  // Default to gemini-flash for unknown models
-  return 'gemini-flash';
+  const mapping: Record<string, ModelKey> = {
+    'google/gemini-flash-1.5-8b': 'gemini-flash',
+    'openai/gpt-4o-mini': 'gpt-4o-mini',
+    'deepseek/deepseek-chat': 'deepseek-chat',
+    'anthropic/claude-3-haiku': 'claude-haiku',
+    'google/gemini-2.0-flash-exp:free': 'gemini-pro',
+    'google/gemini-2.0-flash-thinking-exp:free': 'gemini-2.0-thinking',
+    'openai/gpt-4o': 'gpt-4o',
+    'anthropic/claude-3-sonnet': 'claude-sonnet',
+    'anthropic/claude-3.5-sonnet': 'claude-3.5-sonnet',
+    'anthropic/claude-3-opus': 'claude-opus',
+  };
+  
+  // Return mapped key or default to gemini-flash
+  return mapping[openRouterModel] || 'gemini-flash';
 }
 
 export async function generateItinerary(
@@ -123,74 +122,118 @@ export async function generateItinerary(
       };
     }
 
-    // 3.5. Fetch user's travel profile (if authenticated)
-    let travelProfile: TravelProfile | null = null;
-    if (user?.id) {
-      console.log('🔍 Fetching user travel profile...');
-      const profileResult = await getUserTravelProfile();
-      if (profileResult.success && profileResult.data) {
-        travelProfile = profileResult.data;
-        console.log(`✅ Profile found: ${travelProfile.archetype}`);
-      } else {
-        console.log('ℹ️ No travel profile found - generating generic itinerary');
+    // 3. Build prompt
+    const prompt = buildPrompt(validated);
+
+    // 4. Call AI to generate itinerary with budget-first fallback routing
+    const primaryAndFallbacks = [
+      validated.model,
+      ...OPENROUTER_BUDGET_FIRST_ORDER.filter((m) => m !== validated.model),
+    ];
+
+    let completion;
+    let usedModel: string | null = null;
+    let lastError: unknown = null;
+    for (const modelId of primaryAndFallbacks) {
+      try {
+        completion = await openrouter.chat.completions.create({
+          model: modelId,
+          messages: [{ role: "user", content: prompt }],
+          response_format: { type: "json_object" },
+          temperature: 0.7,
+          max_tokens: 8000,
+        });
+        if (completion) {
+          usedModel = modelId;
+          break;
+        }
+      } catch (err) {
+        lastError = err;
+        continue;
       }
     }
-
-    // 4. AGENTIC ITINERARY GENERATION (3-pass approach)
-    console.log(`🤖 Starting agentic generation with ${validated.model}...`);
-    
-    // Pass 1: Generate itinerary with chain-of-thought reasoning
-    console.log('📝 Pass 1: Generating itinerary...');
-    const initialItinerary = await generateItineraryWithModel(
-      validated.model,
-      validated,
-      travelProfile
-    );
-    
-    if (!initialItinerary) {
+    if (!completion) {
+      console.error("All model fallbacks failed", lastError);
       return {
         success: false,
-        error: "Failed to generate itinerary. Please try again.",
+        error: "AI service unavailable. Please try again later.",
       };
     }
 
-    // Pass 2: Validate quality (using same model)
-    console.log('🔍 Pass 2: Validating quality...');
-    const qualityCheck = await validateItineraryQuality(
-      initialItinerary,
-      validated,
-      travelProfile,
-      validated.model
-    );
-
-    let validatedResponse = initialItinerary;
-    let refinementAttempted = false;
-
-    // Pass 3: Refine if needed (using same model)
-    if (qualityCheck.score < 85 || qualityCheck.needsRefinement) {
-      console.log(`⚠️ Quality score: ${qualityCheck.score}/100`);
-      console.log(`🎨 Pass 3: Refining with ${validated.model}...`);
-      
-      const refinedItinerary = await refineItineraryWithModel(
-        validated.model,
-        initialItinerary,
-        validated,
-        travelProfile,
-        qualityCheck
-      );
-      
-      if (refinedItinerary) {
-        validatedResponse = refinedItinerary;
-        refinementAttempted = true;
-        console.log('✅ Refinement successful');
-      } else {
-        console.log('⚠️ Refinement failed, using initial itinerary');
+    // 5. Parse and validate AI response; if empty/invalid, try the next fallback model automatically
+    let validatedResponse: z.infer<typeof aiResponseSchema> | null = null;
+    if (completion?.choices?.[0]?.message?.content) {
+      const rawContent = completion.choices[0].message.content;
+      try {
+        const parsed = JSON.parse(rawContent);
+        validatedResponse = aiResponseSchema.parse(parsed);
+      } catch {
+        // Try extracting JSON from response
+        const start = rawContent.indexOf("{");
+        const end = rawContent.lastIndexOf("}");
+        if (start !== -1 && end !== -1 && end > start) {
+          const possibleJson = rawContent.slice(start, end + 1);
+          try {
+            const parsed = JSON.parse(possibleJson);
+            validatedResponse = aiResponseSchema.parse(parsed);
+          } catch {
+            // JSON extraction failed, will try fallback models
+          }
+        }
       }
-    } else {
-      console.log(`✅ Quality score: ${qualityCheck.score}/100 - Approved!`);
     }
 
-    const usedModel = validated.model;
+    if (!validatedResponse) {
+      // current model failed to yield valid output; try remaining models
+      for (const modelId of primaryAndFallbacks) {
+        if (modelId === usedModel) continue;
+        try {
+          const attempt = await openrouter.chat.completions.create({
+            model: modelId,
+            messages: [{ role: "user", content: prompt }],
+            response_format: { type: "json_object" },
+            temperature: 0.7,
+            max_tokens: 8000,
+          });
+          const txt = attempt.choices?.[0]?.message?.content;
+          if (!txt) continue;
+          let parsed: unknown;
+          try {
+            parsed = JSON.parse(txt);
+          } catch {
+            const s = txt.indexOf("{");
+            const e = txt.lastIndexOf("}");
+            if (s !== -1 && e !== -1 && e > s) {
+              const maybe = txt.slice(s, e + 1);
+              try {
+                parsed = JSON.parse(maybe);
+              } catch {
+                continue;
+              }
+            } else {
+              continue;
+            }
+          }
+          try {
+            validatedResponse = aiResponseSchema.parse(parsed);
+            usedModel = modelId;
+            break;
+          } catch {
+            continue;
+          }
+        } catch {
+          continue;
+        }
+      }
+    }
+
+    if (!validatedResponse) {
+      return {
+        success: false,
+        error:
+          "AI output was empty or invalid. Please try another model (e.g., Gemini Flash 2.5 or GPT-4o mini).",
+      };
+    }
 
     // 6. Fetch destination photo and generate tags in parallel
     // Now we pass the AI plan to the photo fetcher so it can search for specific places mentioned
@@ -369,10 +412,7 @@ export async function generateItinerary(
   }
 }
 
-function buildPrompt(
-  params: z.infer<typeof generateItinerarySchema>,
-  profile: TravelProfile | null = null
-): string {
+function buildPrompt(params: z.infer<typeof generateItinerarySchema>): string {
   // Build traveler description
   let travelersDesc = `${params.travelers} adult${params.travelers > 1 ? "s" : ""}`;
   if (params.children && params.children > 0) {
@@ -380,48 +420,6 @@ function buildPrompt(
     if (params.childAges && params.childAges.length > 0) {
       travelersDesc += ` (ages: ${params.childAges.join(", ")})`;
     }
-  }
-
-  // Build profile personalization section
-  let profileSection = "";
-  if (profile) {
-    profileSection = `\n## 🎯 PERSONALIZATION - Travel Profile
-This traveler has completed a detailed travel personality quiz. Use this profile to personalize recommendations:
-
-**Travel Archetype:** ${profile.archetype}
-${profile.profile_summary}
-
-**Key Preferences to Honor:**
-${profile.activity_preferences && profile.activity_preferences.length > 0 ? `
-Activities they love:
-${profile.activity_preferences.map(pref => `  • ${pref}`).join('\n')}
-` : ''}
-${profile.dining_preferences && profile.dining_preferences.length > 0 ? `
-Dining style:
-${profile.dining_preferences.map(pref => `  • ${pref}`).join('\n')}
-` : ''}
-${profile.accommodation_preferences && profile.accommodation_preferences.length > 0 ? `
-Accommodation preferences:
-${profile.accommodation_preferences.map(pref => `  • ${pref}`).join('\n')}
-` : ''}
-${profile.social_preferences && profile.social_preferences.length > 0 ? `
-Social style:
-${profile.social_preferences.map(pref => `  • ${pref}`).join('\n')}
-` : ''}
-**Travel pace:** ${profile.pace}
-**Budget band:** ${profile.budget_band}
-${profile.dietary_needs && profile.dietary_needs.length > 0 ? `**Dietary needs:** ${profile.dietary_needs.join(', ')}` : ''}
-
-**CRITICAL PERSONALIZATION INSTRUCTIONS:**
-- Match activity recommendations to their specific preferences (not generic)
-- Respect their dining style and food adventure level
-- Align daily pace with their preference (${profile.pace})
-- Choose venues that fit their budget band (${profile.budget_band})
-- Include their preferred activity types throughout the itinerary
-- Add brief "Why we picked this" notes for 2-3 key activities that match their profile
-${profile.travel_strengths && profile.travel_strengths.length > 0 ? `- Leverage their travel strengths: ${profile.travel_strengths.join(', ')}` : ''}
-
-`;
   }
 
   // Build date-specific instructions
@@ -463,7 +461,7 @@ ${profile.travel_strengths && profile.travel_strengths.length > 0 ? `- Leverage 
 
 Number of travelers: ${travelersDesc}${dateInstructions}
 ${params.notes ? `Additional notes: ${params.notes}` : ""}
-${profileSection}
+
 IMPORTANT: Detect the language used in the user's notes and respond in that SAME language. If no notes provided or notes are in English, respond in English. Match the user's language for all text content (place names, descriptions, etc.).
 ${params.children && params.children > 0 ? `\nIMPORTANT: This trip includes children (ages ${params.childAges?.join(", ") || "unspecified"}). Include child-friendly activities, appropriate timing, and family-suitable venues. Schedule breaks and avoid overpacking the day.` : ""}
 ${params.hasAccessibilityNeeds ? `\nIMPORTANT: This trip requires accessibility accommodations. ONLY include venues with wheelchair access, elevators, accessible restrooms, and mobility-friendly facilities. Avoid places with many stairs, narrow passages, or difficult terrain. Prioritize accessible transportation options.` : ""}
@@ -511,8 +509,7 @@ Important:
 - Be specific with place names and descriptions
 - Make it realistic and practical for ${params.travelers} traveler(s)
 - ALL descriptions, times, and text must be in the SAME language as the user's notes
-${params.notes ? `- Take into account: ${params.notes}` : ""}
-${profile ? `\n🌟 PERSONALIZATION REMINDER: This itinerary MUST reflect the traveler's profile (${profile.archetype}). Every day should feel custom-made for their preferences. Don't create a generic itinerary - make it specifically for THEM.` : ""}`;
+${params.notes ? `- Take into account: ${params.notes}` : ""}`;
 }
 
 /**
@@ -803,244 +800,4 @@ function deduplicateAndFilterTags(tags: string[], destination: string): string[]
   }
   
   return Array.from(normalized.values()).slice(0, 12); // Max 12 unique tags
-}
-
-/**
- * AGENTIC HELPER FUNCTIONS FOR ITINERARY GENERATION
- */
-
-/**
- * Generate itinerary with specified model (with fallback routing)
- */
-async function generateItineraryWithModel(
-  model: string,
-  params: z.infer<typeof generateItinerarySchema>,
-  profile: TravelProfile | null
-): Promise<z.infer<typeof aiResponseSchema> | null> {
-  try {
-    const prompt = buildAgenticItineraryPrompt(params, profile);
-    
-    const primaryAndFallbacks = [
-      model,
-      ...OPENROUTER_BUDGET_FIRST_ORDER.filter((m) => m !== model),
-    ];
-
-    for (const modelId of primaryAndFallbacks) {
-      try {
-        const completion = await openrouter.chat.completions.create({
-          model: modelId,
-          messages: [{ role: "user", content: prompt }],
-          response_format: { type: "json_object" },
-          temperature: 0.7,
-          max_tokens: 8000,
-        });
-
-        if (completion?.choices?.[0]?.message?.content) {
-          const rawContent = completion.choices[0].message.content;
-          const parsed = JSON.parse(rawContent);
-          return aiResponseSchema.parse(parsed);
-        }
-      } catch (err) {
-        console.error(`Model ${modelId} failed:`, err);
-        continue;
-      }
-    }
-    
-    return null;
-  } catch (error) {
-    console.error('Itinerary generation error:', error);
-    return null;
-  }
-}
-
-/**
- * Build agentic prompt with chain-of-thought reasoning
- */
-function buildAgenticItineraryPrompt(
-  params: z.infer<typeof generateItinerarySchema>,
-  profile: TravelProfile | null
-): string {
-  const basePrompt = buildPrompt(params, profile);
-  
-  // Enhanced with chain-of-thought reasoning
-  const agenticPrefix = `## YOUR ROLE
-You are an expert travel planner with 15+ years of experience creating personalized itineraries. Your strength is balancing traveler preferences with practical logistics.
-
-## YOUR SYSTEMATIC APPROACH:
-
-### STEP 1: ANALYZE THE REQUEST
-- Destination: ${params.destination}
-- Duration: ${params.days} days
-- Travelers: ${params.travelers} adults${params.children ? ` + ${params.children} children` : ''}
-- Special needs: ${params.hasAccessibilityNeeds ? 'Yes - accessibility required' : 'None'}
-${profile ? `- Travel style: ${profile.archetype} (${profile.pace} pace, ${profile.budget_band} budget)` : '- Travel style: Not specified'}
-
-### STEP 2: IDENTIFY KEY PRIORITIES
-${profile ? `Based on their travel profile (${profile.archetype}), prioritize:
-${profile.activity_preferences ? profile.activity_preferences.slice(0, 3).map(p => `  • ${p}`).join('\n') : '  • Balanced mix of activities'}
-` : '  • Create a well-rounded experience\n  • Balance different activity types'}
-
-### STEP 3: DESIGN DAILY FLOW
-- Morning activities (8-12): Higher energy, popular attractions
-- Afternoon (12-6): Mix of activities, meals, exploration
-- Evening (6-10): Dining, relaxation, or nightlife
-- Ensure realistic timing and geographic clustering
-
-### STEP 4: VALIDATE & REFINE
-- Check: Are all times realistic?
-- Check: Is the daily pace appropriate?
-- Check: Does it match their profile preferences?
-- Check: Are meal times and travel time accounted for?
-
-`;
-
-  return agenticPrefix + basePrompt;
-}
-
-/**
- * Validate itinerary quality with self-reflection
- */
-async function validateItineraryQuality(
-  itinerary: z.infer<typeof aiResponseSchema>,
-  params: z.infer<typeof generateItinerarySchema>,
-  profile: TravelProfile | null,
-  model: string
-): Promise<{ score: number; needsRefinement: boolean; issues: string[] }> {
-  try {
-    const validationPrompt = `You are a quality assurance expert reviewing a travel itinerary.
-
-## ITINERARY TO REVIEW:
-${JSON.stringify(itinerary, null, 2)}
-
-## ORIGINAL REQUEST:
-- Destination: ${params.destination}
-- Days: ${params.days}
-- Travelers: ${params.travelers} adults${params.children ? ` + ${params.children} children` : ''}
-${profile ? `- Travel Profile: ${profile.archetype} (prefers: ${profile.activity_preferences?.slice(0, 2).join(', ')})` : ''}
-
-## EVALUATION CRITERIA (0-100 scale):
-
-1. **Feasibility (30 points)**: Are times realistic and routes logical?
-   - Check timing for each activity (not too rushed, not too loose)
-   - Check geographic flow (nearby places grouped, no excessive backtracking)
-   - Check daily start/end times (reasonable for travelers)
-   - Check meal timing and inclusion
-
-2. **Personalization (25 points)**: ${profile ? `Does it match the ${profile.archetype} profile?` : 'Is it well-tailored to the request?'}
-   ${profile ? `- Check alignment with: ${profile.activity_preferences?.slice(0, 2).join(', ')}
-   - Check pace matches: ${profile.pace}
-   - Check budget alignment: ${profile.budget_band}` : '- Check variety and balance of activities'}
-
-3. **Balance (25 points)**: Good mix and pacing?
-   - Variety of activity types (culture, food, nature, relaxation)
-   - Appropriate daily pace (not exhausting, not boring)
-   - Breaks and breathing room between activities
-   ${params.children ? '- Child-friendly timing and activities' : ''}
-
-4. **Detail Quality (20 points)**: Clear and helpful descriptions?
-   - Specific place names (not generic)
-   - Helpful descriptions (what to do, why it's special)
-   - Complete time slots for all activities
-   - Practical and actionable information
-
-## CRITICAL ISSUES TO FLAG:
-- Impossible timing (too much in too little time)
-- Geographic chaos (jumping across city repeatedly)
-- Missing meals or unrealistic meal times
-- Generic or vague place names
-- Poor profile alignment (if profile provided)
-- Overpacked or underpacked days
-
-Return JSON:
-{
-  "score": 85,
-  "needsRefinement": false,
-  "issues": ["list specific issues, or empty array"],
-  "strengths": ["what works well"],
-  "reasoning": "Brief explanation"
-}`;
-
-    const completion = await openrouter.chat.completions.create({
-      model: model, // Use same model for consistency
-      messages: [{ role: "user", content: validationPrompt }],
-      response_format: { type: "json_object" },
-      temperature: 0.3, // Lower temp for evaluation
-      max_tokens: 1500,
-    });
-
-    const content = completion.choices[0]?.message?.content;
-    if (!content) {
-      return { score: 90, needsRefinement: false, issues: [] };
-    }
-
-    const result = JSON.parse(content);
-    console.log(`📊 Quality Report: ${result.reasoning}`);
-    
-    return {
-      score: result.score || 90,
-      needsRefinement: (result.score || 90) < 85,
-      issues: result.issues || [],
-    };
-
-  } catch (error) {
-    console.error('Validation error:', error);
-    return { score: 90, needsRefinement: false, issues: [] };
-  }
-}
-
-/**
- * Refine itinerary using same model
- */
-async function refineItineraryWithModel(
-  model: string,
-  itinerary: z.infer<typeof aiResponseSchema>,
-  params: z.infer<typeof generateItinerarySchema>,
-  profile: TravelProfile | null,
-  qualityCheck: { score: number; issues: string[] }
-): Promise<z.infer<typeof aiResponseSchema> | null> {
-  try {
-    const refinementPrompt = `You are refining a travel itinerary that needs improvement.
-
-## ORIGINAL ITINERARY:
-${JSON.stringify(itinerary, null, 2)}
-
-## IDENTIFIED ISSUES:
-${qualityCheck.issues.map((issue, i) => `${i + 1}. ${issue}`).join('\n')}
-
-## REQUEST DETAILS:
-- Destination: ${params.destination}
-- Days: ${params.days}
-- Travelers: ${params.travelers}${params.children ? ` + ${params.children} children` : ''}
-${profile ? `- Travel Profile: ${profile.archetype}` : ''}
-
-## YOUR TASK:
-Create an IMPROVED version that:
-1. Fixes all identified issues
-2. Maintains what works well
-3. Ensures realistic timing and flow
-4. ${profile ? `Better matches the ${profile.archetype} profile` : 'Creates better balance'}
-5. Provides specific, actionable details
-
-Return the improved itinerary in the SAME JSON format as the original.`;
-
-    const completion = await openrouter.chat.completions.create({
-      model: model,
-      messages: [{ role: "user", content: refinementPrompt }],
-      response_format: { type: "json_object" },
-      temperature: 0.7,
-      max_tokens: 8000,
-    });
-
-    const content = completion.choices[0]?.message?.content;
-    if (!content) {
-      return null;
-    }
-
-    const parsed = JSON.parse(content);
-    return aiResponseSchema.parse(parsed);
-
-  } catch (error) {
-    console.error('Refinement error:', error);
-    return null;
-  }
 }
