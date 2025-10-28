@@ -15,11 +15,17 @@ export default function TestTravelQuizPage() {
   const handleQuizComplete = async (responses: QuizResponse) => {
     setIsGenerating(true);
     
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // Call the actual AI profile generation
+    const { generateTravelProfile } = await import("@/lib/actions/profile-ai-actions");
+    const result = await generateTravelProfile(responses);
     
-    setQuizResults(responses);
-    setQuizComplete(true);
+    if (result.success) {
+      setQuizResults(responses);
+      setQuizComplete(true);
+    } else {
+      alert(`Error: ${result.error}`);
+    }
+    
     setIsGenerating(false);
   };
 
