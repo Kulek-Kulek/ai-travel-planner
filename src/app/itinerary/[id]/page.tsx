@@ -9,8 +9,8 @@ import { DownloadPDFButton } from '@/components/download-pdf-button';
 import { BookingAccommodationCard } from '@/components/booking-accommodation-card';
 import { ItineraryMap } from '@/components/itinerary-map';
 import { GoogleMapsButton } from '@/components/google-maps-button';
-import { createClient } from '@/lib/supabase/server';
 import { isGoogleMapsEnabled } from '@/lib/config/google-maps';
+import { createClient } from '@/lib/supabase/server';
 import { 
   ArrowLeft, 
   ClipboardList, 
@@ -20,7 +20,7 @@ import {
   CalendarDays, 
   FileText, 
   Tag, 
-  Clock ,
+  Clock,
   ListCheck,
   Map
 } from 'lucide-react';
