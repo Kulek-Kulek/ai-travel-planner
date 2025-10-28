@@ -452,6 +452,7 @@ export function ItineraryCard({
                 href={`/itinerary/${id}`}
                 className="text-sm text-blue-600 font-medium hover:underline cursor-pointer"
                 onClick={(e) => e.stopPropagation()}
+                scroll={true}
               >
                 View →
               </Link>
@@ -644,7 +645,7 @@ export function ItineraryCard({
   // Don't wrap if showing bucket list actions or my plans actions
   if (!showActions && !showBucketListActions) {
     return (
-      <Link href={`/itinerary/${id}`} prefetch>
+      <Link href={`/itinerary/${id}`} prefetch scroll={true}>
         {cardContent}
       </Link>
     );
