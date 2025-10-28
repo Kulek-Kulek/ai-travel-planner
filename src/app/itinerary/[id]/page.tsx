@@ -7,7 +7,10 @@ import { ItineraryLikeButton } from '@/components/itinerary-like-button';
 import { ItineraryShareButton } from '@/components/itinerary-share-button';
 import { DownloadPDFButton } from '@/components/download-pdf-button';
 import { BookingAccommodationCard } from '@/components/booking-accommodation-card';
+import { ItineraryMap } from '@/components/itinerary-map';
+import { GoogleMapsButton } from '@/components/google-maps-button';
 import { createClient } from '@/lib/supabase/server';
+import { isGoogleMapsEnabled } from '@/lib/config/google-maps';
 import { 
   ArrowLeft, 
   ClipboardList, 
@@ -18,7 +21,8 @@ import {
   FileText, 
   Tag, 
   Clock ,
-  ListCheck
+  ListCheck,
+  Map
 } from 'lucide-react';
 
 export default async function ItineraryPage({
@@ -212,6 +216,30 @@ export default async function ItineraryPage({
           />
         )}
 
+        {/* Interactive Map Section */}
+        {isGoogleMapsEnabled() && (
+          <div className="bg-white rounded-lg shadow-lg p-6 md:p-8 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                <Map className="w-6 h-6 text-blue-600" />
+                Map View
+              </h2>
+              <GoogleMapsButton
+                places={ai_plan.days.flatMap(day => day.places)}
+                destination={ai_plan.city || destination}
+              />
+            </div>
+            <ItineraryMap
+              days={ai_plan.days}
+              city={ai_plan.city || destination}
+              className="mb-4"
+            />
+            <p className="text-sm text-gray-600 mt-2">
+              Click markers to see location names. Use the button above to open directions in Google Maps.
+            </p>
+          </div>
+        )}
+
         {/* Itinerary Days */}
         <div className="space-y-6">
           {ai_plan.days.map((day, dayIndex) => (
@@ -229,10 +257,10 @@ export default async function ItineraryPage({
                     key={placeIndex}
                     className="bg-gray-50 rounded-lg p-5 hover:bg-gray-100 transition-colors border-l-4 border-blue-500"
                   >
-                    <div className="flex items-start gap-4">
+                    <div className="flex flex-col md:flex-row items-start gap-4">
                       {/* Time Badge */}
-                      <div className="flex-shrink-0">
-                        <div className="bg-blue-600 text-white rounded-lg px-3 py-2 text-center min-w-[120px]">
+                      <div className="w-full md:w-auto flex-shrink-0">
+                        <div className="bg-blue-600 text-white rounded-lg px-3 py-2 text-center md:min-w-[120px]">
                           <div className="flex items-center justify-center gap-1 mb-1">
                             <Clock className="w-4 h-4" />
                           </div>

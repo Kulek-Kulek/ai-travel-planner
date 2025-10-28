@@ -22,3 +22,6 @@ CREATE POLICY "Users can update own itineraries and claim drafts"
 COMMENT ON POLICY "Users can update own itineraries and claim drafts" ON itineraries IS 
   'Allows authenticated users to update their own itineraries and claim draft itineraries created by anonymous users';
 
+
+
+

@@ -30,7 +30,7 @@ export default function PricingPage() {
       </section>
 
       {/* Pricing Cards */}
-      <section className="container mx-auto px-4 pb-24">
+      <section className="container mx-auto pb-24">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {/* FREE TIER */}
           <PricingCard
