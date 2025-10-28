@@ -33,20 +33,22 @@ export function TravelPersonalityDisplay({ profile }: TravelPersonalityDisplayPr
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 py-12">
       <div className="max-w-5xl mx-auto px-4 space-y-6">
         
-        {/* Header Card - Archetype */}
+        {/* Header Card */}
         <Card className="relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-blue-400/20 to-purple-400/20 rounded-full blur-3xl -z-0" />
           <div className="relative z-10 p-8">
-            <div className="flex items-start justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                  <Sparkles className="w-8 h-8 text-white" />
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                  <Sparkles className="w-10 h-10 text-white" />
                 </div>
                 <div>
-                  <div className="text-sm text-slate-600 mb-1">Your Travel Personality</div>
-                  <h1 className="text-3xl font-bold text-slate-900">
-                    {profile.archetype}
+                  <h1 className="text-4xl font-bold text-slate-900 mb-1">
+                    Your Travel Profile
                   </h1>
+                  <p className="text-slate-600">
+                    Personalized insights to power your perfect trips
+                  </p>
                 </div>
               </div>
               
@@ -62,13 +64,6 @@ export function TravelPersonalityDisplay({ profile }: TravelPersonalityDisplayPr
                   </Button>
                 </Link>
               </div>
-            </div>
-
-            {/* Profile Summary */}
-            <div className="prose prose-slate max-w-none">
-              <p className="text-lg text-slate-700 leading-relaxed">
-                {profile.profile_summary}
-              </p>
             </div>
           </div>
         </Card>
@@ -126,16 +121,20 @@ export function TravelPersonalityDisplay({ profile }: TravelPersonalityDisplayPr
           {profile.interests && profile.interests.length > 0 && (
             <Card className="p-6">
               <div className="flex items-center gap-2 mb-4">
-                <Heart className="w-5 h-5 text-rose-600" />
+                <Heart className="w-5 h-5 text-indigo-600" />
                 <h3 className="text-lg font-semibold text-slate-900">
                   Your Interests
                 </h3>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="space-y-2">
                 {profile.interests.map((interest, index) => (
-                  <Badge key={index} variant="secondary" className="text-sm">
-                    {interest}
-                  </Badge>
+                  <div
+                    key={index}
+                    className="text-sm text-slate-700 flex items-start gap-2"
+                  >
+                    <span className="text-indigo-600 mt-0.5">•</span>
+                    <span>{interest}</span>
+                  </div>
                 ))}
               </div>
             </Card>
@@ -168,7 +167,7 @@ export function TravelPersonalityDisplay({ profile }: TravelPersonalityDisplayPr
           {profile.dining_preferences && profile.dining_preferences.length > 0 && (
             <Card className="p-6">
               <div className="flex items-center gap-2 mb-4">
-                <Utensils className="w-5 h-5 text-orange-600" />
+                <Utensils className="w-5 h-5 text-teal-600" />
                 <h3 className="text-lg font-semibold text-slate-900">
                   Dining Style
                 </h3>
@@ -179,7 +178,7 @@ export function TravelPersonalityDisplay({ profile }: TravelPersonalityDisplayPr
                     key={index}
                     className="text-sm text-slate-700 flex items-start gap-2"
                   >
-                    <span className="text-orange-600 mt-0.5">•</span>
+                    <span className="text-teal-600 mt-0.5">•</span>
                     <span>{pref}</span>
                   </div>
                 ))}
@@ -241,34 +240,45 @@ export function TravelPersonalityDisplay({ profile }: TravelPersonalityDisplayPr
                 Travel Details
               </h3>
             </div>
-            <div className="space-y-3">
-              <div>
-                <div className="text-xs text-slate-500 mb-1">Style</div>
-                <Badge variant="outline">{profile.travel_style}</Badge>
+            <div className="space-y-2">
+              <div className="text-sm text-slate-700 flex items-start gap-2">
+                <span className="text-emerald-600 mt-0.5">•</span>
+                <span><span className="font-medium">Style:</span> {profile.travel_style}</span>
               </div>
-              <div>
-                <div className="text-xs text-slate-500 mb-1">Pace</div>
-                <Badge variant="outline">{profile.pace}</Badge>
+              <div className="text-sm text-slate-700 flex items-start gap-2">
+                <span className="text-emerald-600 mt-0.5">•</span>
+                <span><span className="font-medium">Pace:</span> {profile.pace}</span>
               </div>
-              <div>
-                <div className="text-xs text-slate-500 mb-1">Budget</div>
-                <Badge variant="outline">{profile.budget_band}</Badge>
+              <div className="text-sm text-slate-700 flex items-start gap-2">
+                <span className="text-emerald-600 mt-0.5">•</span>
+                <span><span className="font-medium">Budget:</span> {profile.budget_band}</span>
               </div>
-              {profile.dietary_needs && profile.dietary_needs.length > 0 && (
-                <div>
-                  <div className="text-xs text-slate-500 mb-1">Dietary</div>
-                  <div className="flex flex-wrap gap-1">
-                    {profile.dietary_needs.map((need, index) => (
-                      <Badge key={index} variant="outline" className="text-xs">
-                        {need}
-                      </Badge>
-                    ))}
-                  </div>
+              {profile.dietary_needs && profile.dietary_needs.length > 0 && profile.dietary_needs[0] !== 'none' && (
+                <div className="text-sm text-slate-700 flex items-start gap-2">
+                  <span className="text-emerald-600 mt-0.5">•</span>
+                  <span><span className="font-medium">Dietary:</span> {profile.dietary_needs.join(', ')}</span>
                 </div>
               )}
             </div>
           </Card>
         </div>
+
+        {/* Your Travel Personality - Moved to Bottom */}
+        <Card className="p-8 bg-gradient-to-br from-indigo-50 to-purple-50 border-indigo-200">
+          <div className="text-center mb-4">
+            <h2 className="text-2xl font-bold text-slate-900 mb-2">
+              Your Travel Personality
+            </h2>
+            <h3 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              {profile.archetype}
+            </h3>
+          </div>
+          <div className="prose prose-slate max-w-none">
+            <p className="text-lg text-slate-700 leading-relaxed text-center">
+              {profile.profile_summary}
+            </p>
+          </div>
+        </Card>
 
         {/* How This Helps */}
         <Card className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
