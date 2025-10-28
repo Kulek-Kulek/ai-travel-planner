@@ -272,3 +272,6 @@ const aiResponseSchema = z.object({
 
 **This is what users wanted - a real, actionable schedule they can follow!** 🎯⏰
 
+
+
+
