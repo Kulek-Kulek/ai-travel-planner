@@ -469,11 +469,6 @@ export default function Home() {
               ref={previewRef}
               className="rounded-3xl border border-slate-200 bg-white/80 p-8 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.35)] backdrop-blur-xl"
             >
-              {/* Travel Personality Banner - shown for authenticated users without profile */}
-              {isAuthenticated && result && !mutation.isPending && (
-                <TravelPersonalityBanner />
-              )}
-
               {/* Auth Banner - shown when not authenticated and preview is ready */}
               {!isAuthenticated && result && !mutation.isPending && (
                 <div 
@@ -846,8 +841,13 @@ export default function Home() {
           )}
         </div>
 
+        {/* Travel Personality Banner - Before Gallery */}
+        <div className="mt-10 lg:mt-12">
+          <TravelPersonalityBanner />
+        </div>
+
         {/* Public Itineraries Gallery */}
-        <div id="public-itineraries" ref={galleryRef} className="mt-24">
+        <div id="public-itineraries" ref={galleryRef} className="mt-10">
           <ItineraryGallery isAdmin={isAdmin} />
         </div>
       </main>
