@@ -220,6 +220,17 @@ export default function Home() {
     }
   }, [queryClient]);
 
+  // Auto-scroll to gallery for authenticated users after plan is created
+  useEffect(() => {
+    if (isAuthenticated && result?.aiPlan?.id && galleryRef.current) {
+      // Scroll to gallery instead of showing preview
+      setTimeout(() => {
+        const galleryTop = galleryRef.current!.getBoundingClientRect().top + window.scrollY - 100;
+        window.scrollTo({ top: galleryTop, behavior: "smooth" });
+      }, 500);
+    }
+  }, [isAuthenticated, result]);
+
   // Use TanStack Query mutation for generating itinerary
   const mutation = useMutation({
     mutationFn: generateItinerary,
@@ -598,7 +609,7 @@ export default function Home() {
                 )}
 
 
-                {result && !mutation.isPending && (
+                {result && !mutation.isPending && !isAuthenticated && (
                   <div className="space-y-4">
                     <div className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-emerald-100/60 p-4">
                       <h3 className="mb-1 text-lg font-semibold text-emerald-900">

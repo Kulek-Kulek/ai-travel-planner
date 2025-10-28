@@ -5,7 +5,17 @@
 
 export type SubscriptionTier = 'free' | 'payg' | 'pro';
 export type ModelTier = 'economy' | 'premium';
-export type ModelKey = 'gemini-flash' | 'gpt-4o-mini' | 'claude-haiku' | 'gpt-4o';
+export type ModelKey = 
+  | 'gemini-flash' 
+  | 'gpt-4o-mini' 
+  | 'claude-haiku' 
+  | 'deepseek-chat'
+  | 'gemini-pro'
+  | 'gemini-2.0-thinking'
+  | 'gpt-4o' 
+  | 'claude-sonnet'
+  | 'claude-3.5-sonnet'
+  | 'claude-opus';
 
 export interface AIModel {
   key: ModelKey;
@@ -20,49 +30,118 @@ export interface AIModel {
 }
 
 export const AI_MODELS: Record<ModelKey, AIModel> = {
+  // Economy tier - Fast & Affordable
   'gemini-flash': {
     key: 'gemini-flash',
-    name: 'Gemini Flash',
-    provider: 'google/gemini-1.5-flash', // Updated to match actual OpenRouter model
-    cost: 0.15,
+    name: 'Gemini Flash 1.5 8B',
+    provider: 'google/gemini-flash-1.5-8b',
+    cost: 0.10,
     tier: 'economy',
     freeAccess: true,
     badge: 'Fast',
-    description: 'Fast and efficient, great for quick travel plans',
+    description: 'Ultra-fast and cost-effective, great for quick travel plans',
     speed: 'fast',
   },
   'gpt-4o-mini': {
     key: 'gpt-4o-mini',
     name: 'GPT-4o Mini',
     provider: 'openai/gpt-4o-mini',
-    cost: 0.20,
+    cost: 0.15,
     tier: 'economy',
     freeAccess: true,
     badge: 'Balanced',
-    description: 'Balanced quality and speed, reliable choice',
+    description: 'Fast and affordable with excellent quality',
+    speed: 'fast',
+  },
+  'deepseek-chat': {
+    key: 'deepseek-chat',
+    name: 'DeepSeek Chat',
+    provider: 'deepseek/deepseek-chat',
+    cost: 0.12,
+    tier: 'economy',
+    freeAccess: false,
+    badge: 'Budget',
+    description: 'Budget-friendly with solid analytical performance',
     speed: 'fast',
   },
   'claude-haiku': {
     key: 'claude-haiku',
-    name: 'Claude Haiku',
-    provider: 'anthropic/claude-3-haiku', // Updated to match actual OpenRouter model
-    cost: 0.30,
+    name: 'Claude 3 Haiku',
+    provider: 'anthropic/claude-3-haiku',
+    cost: 0.20,
+    tier: 'economy',
+    freeAccess: false,
+    badge: 'Efficient',
+    description: 'Lightning-fast and efficient, perfect for balanced itineraries',
+    speed: 'fast',
+  },
+  
+  // Premium tier - High Quality
+  'gemini-pro': {
+    key: 'gemini-pro',
+    name: 'Gemini 2.0 Flash',
+    provider: 'google/gemini-2.0-flash-exp:free',
+    cost: 0.35,
     tier: 'premium',
     freeAccess: false,
-    badge: 'Better',
-    description: 'Enhanced quality, detailed itineraries',
+    badge: 'Advanced',
+    description: 'Latest Gemini with enhanced reasoning and quality',
+    speed: 'medium',
+  },
+  'gemini-2.0-thinking': {
+    key: 'gemini-2.0-thinking',
+    name: 'Gemini 2.0 Flash Thinking',
+    provider: 'google/gemini-2.0-flash-thinking-exp:free',
+    cost: 0.40,
+    tier: 'premium',
+    freeAccess: false,
+    badge: 'Reasoning',
+    description: 'Advanced Gemini 2.0 with deep reasoning capabilities',
     speed: 'medium',
   },
   'gpt-4o': {
     key: 'gpt-4o',
     name: 'GPT-4o',
-    provider: 'openai/gpt-5', // Mapped to GPT-5 as the premium option
+    provider: 'openai/gpt-4o',
+    cost: 0.45,
+    tier: 'premium',
+    freeAccess: false,
+    badge: 'Premium',
+    description: 'Premium quality with advanced reasoning for complex trips',
+    speed: 'medium',
+  },
+  'claude-sonnet': {
+    key: 'claude-sonnet',
+    name: 'Claude 3 Sonnet',
+    provider: 'anthropic/claude-3-sonnet',
     cost: 0.50,
     tier: 'premium',
     freeAccess: false,
-    badge: 'Best',
-    description: 'Premium quality, most comprehensive plans',
+    badge: 'Excellent',
+    description: 'Balanced performance with excellent creative planning',
     speed: 'medium',
+  },
+  'claude-3.5-sonnet': {
+    key: 'claude-3.5-sonnet',
+    name: 'Claude 3.5 Sonnet',
+    provider: 'anthropic/claude-3.5-sonnet',
+    cost: 0.60,
+    tier: 'premium',
+    freeAccess: false,
+    badge: 'Superior',
+    description: 'Latest Anthropic model with exceptional reasoning and detail',
+    speed: 'medium',
+  },
+  'claude-opus': {
+    key: 'claude-opus',
+    name: 'Claude 3 Opus',
+    provider: 'anthropic/claude-3-opus',
+    cost: 0.80,
+    tier: 'premium',
+    freeAccess: false,
+    badge: 'Best',
+    description: 'Top-tier flagship model for the most sophisticated itineraries',
+    speed: 'slow',
   },
 } as const;
 
@@ -112,7 +191,18 @@ export const TIER_CONFIG: Record<SubscriptionTier, TierLimits> = {
     displayName: 'Pay as You Go',
     price: 0, // Variable pricing
     plansLimit: null,
-    allowedModels: ['gemini-flash', 'gpt-4o-mini', 'claude-haiku', 'gpt-4o'],
+    allowedModels: [
+      'gemini-flash', 
+      'gpt-4o-mini', 
+      'deepseek-chat',
+      'claude-haiku', 
+      'gemini-pro',
+      'gemini-2.0-thinking',
+      'gpt-4o',
+      'claude-sonnet',
+      'claude-3.5-sonnet',
+      'claude-opus'
+    ],
     economyLimit: null,
     premiumLimit: null,
     premiumRolloverMax: 0,
@@ -123,7 +213,7 @@ export const TIER_CONFIG: Record<SubscriptionTier, TierLimits> = {
     },
     features: [
       'Pay per itinerary',
-      'All AI models available',
+      'All 10 AI models available',
       'Credits never expire',
       'Unlimited edits',
       'All premium features',
@@ -134,7 +224,18 @@ export const TIER_CONFIG: Record<SubscriptionTier, TierLimits> = {
     displayName: 'Pro',
     price: 9.99,
     plansLimit: null,
-    allowedModels: ['gemini-flash', 'gpt-4o-mini', 'claude-haiku', 'gpt-4o'],
+    allowedModels: [
+      'gemini-flash', 
+      'gpt-4o-mini', 
+      'deepseek-chat',
+      'claude-haiku', 
+      'gemini-pro',
+      'gemini-2.0-thinking',
+      'gpt-4o',
+      'claude-sonnet',
+      'claude-3.5-sonnet',
+      'claude-opus'
+    ],
     economyLimit: 100,
     premiumLimit: 20,
     premiumRolloverMax: 40,
@@ -145,7 +246,7 @@ export const TIER_CONFIG: Record<SubscriptionTier, TierLimits> = {
     },
     features: [
       '100 economy + 20 premium plans/month',
-      'All AI models included',
+      'All 10 AI models included',
       'Unused premium plans roll over',
       'Priority generation',
       'Unlimited edits',
@@ -161,25 +262,23 @@ export const TOPUP_AMOUNTS = [2, 5, 10, 20] as const;
 export interface CreditPack {
   amount: number;
   estimatedPlans: {
-    min: number; // Using most expensive model
-    max: number; // Using cheapest model
+    min: number; // Using premium models
+    max: number; // Using economy models
   };
-  popular?: boolean;
 }
 
 export const CREDIT_PACKS: CreditPack[] = [
   {
     amount: 2,
-    estimatedPlans: { min: 4, max: 13 },
+    estimatedPlans: { min: 4, max: 20 },
   },
   {
     amount: 5,
-    estimatedPlans: { min: 10, max: 33 },
-    popular: true,
+    estimatedPlans: { min: 10, max: 50 },
   },
   {
     amount: 10,
-    estimatedPlans: { min: 20, max: 67 },
+    estimatedPlans: { min: 20, max: 100 },
   },
   {
     amount: 20,
@@ -217,85 +316,53 @@ export function isModelAvailable(
 }
 
 /**
- * Get model by key
+ * Get tier from subscription tier name
  */
-export function getModel(key: ModelKey): AIModel {
-  return AI_MODELS[key];
+export function getTierLimits(tier: SubscriptionTier): TierLimits {
+  return TIER_CONFIG[tier];
 }
 
 /**
- * Get model cost
- */
-export function getModelCost(key: ModelKey): number {
-  return AI_MODELS[key].cost;
-}
-
-/**
- * Calculate cost for multiple plans
- */
-export function calculateCost(model: ModelKey, planCount: number): number {
-  return AI_MODELS[model].cost * planCount;
-}
-
-/**
- * Estimate plans from credits
- */
-export function estimatePlansFromCredits(
-  credits: number,
-  model: ModelKey
-): number {
-  return Math.floor(credits / AI_MODELS[model].cost);
-}
-
-/**
- * Get default model for a tier
- */
-export function getDefaultModel(tier: SubscriptionTier): ModelKey {
-  const available = TIER_CONFIG[tier].allowedModels;
-  // Default to first economy model, or first available
-  return available.includes('gemini-flash') ? 'gemini-flash' : available[0];
-}
-
-/**
- * Format currency (euros)
+ * Format currency for display
  */
 export function formatCurrency(amount: number): string {
-  return `€${amount.toFixed(2)}`;
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 2,
+  }).format(amount);
 }
 
 /**
- * Get tier display info
+ * Calculate estimated plan count from credits
  */
-export function getTierDisplayInfo(tier: SubscriptionTier) {
-  const config = TIER_CONFIG[tier];
-  return {
-    name: config.displayName,
-    price: config.price,
-    priceFormatted: config.price === 0 ? 'Free' : `€${config.price}/mo`,
-    features: config.features,
-  };
+export function estimatePlanCount(
+  credits: number,
+  modelCost: number
+): number {
+  return Math.floor(credits / modelCost);
 }
 
 /**
- * Pro tier: Calculate available premium plans (including rollover)
+ * Get available premium plans (including rollover)
  */
 export function getAvailablePremiumPlans(
   monthlyUsed: number,
   rollover: number
-): number {
-  const baseAllowance = TIER_CONFIG.pro.premiumLimit!;
-  const total = baseAllowance + rollover;
-  return Math.max(0, total - monthlyUsed);
+): number | null {
+  const limit = TIER_CONFIG.pro.premiumLimit;
+  if (limit === null) return null;
+  
+  return Math.max(0, (limit + rollover) - monthlyUsed);
 }
 
 /**
- * Pro tier: Calculate available economy plans
+ * Get available economy plans
  */
 export function getAvailableEconomyPlans(monthlyUsed: number): number | null {
-  const limit = TIER_CONFIG.pro.economyLimit!;
-  if (monthlyUsed >= limit) {
-    return null; // Unlimited after limit
-  }
+  const limit = TIER_CONFIG.pro.economyLimit;
+  if (limit === null) return null;
+  
   return limit - monthlyUsed;
 }
 
@@ -346,34 +413,28 @@ export function validateModelSelection(
 
     case 'pro':
       if (modelInfo.tier === 'economy') {
-        // Economy: unlimited after 100
-        return { valid: true };
-      } else {
-        // Premium: check limits
-        const used = profile.monthlyPremiumUsed ?? 0;
-        const rollover = profile.premiumRollover ?? 0;
-        const available = getAvailablePremiumPlans(used, rollover);
-
-        if (available <= 0) {
-          // Check if they can use credits
-          if ((profile.creditsBalance ?? 0) >= 0.2) {
-            return {
-              valid: true,
-              cost: 0.2,
-              reason: 'Using credits (€0.20) - monthly premium limit reached',
-            };
-          }
+        const availableEconomy = getAvailableEconomyPlans(profile.monthlyEconomyUsed ?? 0);
+        if (availableEconomy !== null && availableEconomy <= 0) {
           return {
             valid: false,
-            reason:
-              'Monthly premium limit reached. Use economy model or add credits.',
+            reason: 'Monthly economy plan limit reached. Resets next month.',
           };
         }
-        return { valid: true };
+      } else {
+        const availablePremium = getAvailablePremiumPlans(
+          profile.monthlyPremiumUsed ?? 0,
+          profile.premiumRollover ?? 0
+        );
+        if (availablePremium !== null && availablePremium <= 0) {
+          return {
+            valid: false,
+            reason: 'Monthly premium plan limit reached. Resets next month.',
+          };
+        }
       }
+      return { valid: true };
 
     default:
       return { valid: false, reason: 'Invalid subscription tier' };
   }
 }
-
