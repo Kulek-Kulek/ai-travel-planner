@@ -16,7 +16,7 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { format, differenceInDays, isBefore, startOfDay } from "date-fns";
 import Link from "next/link";
-import { Calendar as CalendarIcon, CheckCircle2, AlertCircle, Sparkles, Lock } from "lucide-react";
+import { Calendar as CalendarIcon, CheckCircle2, AlertCircle, Sparkles, Lock, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -340,8 +340,9 @@ export const ItineraryFormAIEnhanced = ({
                   </div>
                 </FormControl>
                 {isFormDisabled && (
-                  <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 mt-2">
-                    ℹ️ Sign in to create more itineraries
+                  <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 mt-2 flex items-center gap-2">
+                    <Info className="w-4 h-4 flex-shrink-0" />
+                    <span>Sign in to create more itineraries</span>
                   </p>
                 )}
                 <FormMessage />
