@@ -144,7 +144,7 @@ export const ItineraryFormAIEnhanced = ({
       childAges: [],
       hasAccessibilityNeeds: false,
       notes: "",
-      model: "google/gemini-1.5-flash", // Default to free tier model
+      model: "google/gemini-flash-1.5-8b", // Default to free tier model
     },
   });
 
@@ -782,11 +782,16 @@ export const ItineraryFormAIEnhanced = ({
               const getPricingModelKey = (openRouterValue: string) => {
                 // Map openrouter values to pricing model keys
                 const mapping: Record<string, string> = {
-                  'google/gemini-1.5-flash': 'gemini-flash',
-                  'google/gemini-2.5-flash': 'gemini-flash', // Also map newer version to same tier
+                  'google/gemini-flash-1.5-8b': 'gemini-flash',
                   'openai/gpt-4o-mini': 'gpt-4o-mini',
+                  'deepseek/deepseek-chat': 'deepseek-chat',
                   'anthropic/claude-3-haiku': 'claude-haiku',
-                  'openai/gpt-5': 'gpt-4o', // Map GPT-5 to premium tier
+                  'google/gemini-2.0-flash-exp:free': 'gemini-pro',
+                  'google/gemini-2.0-flash-thinking-exp:free': 'gemini-2.0-thinking',
+                  'openai/gpt-4o': 'gpt-4o',
+                  'anthropic/claude-3-sonnet': 'claude-sonnet',
+                  'anthropic/claude-3.5-sonnet': 'claude-3.5-sonnet',
+                  'anthropic/claude-3-opus': 'claude-opus',
                 };
                 return mapping[openRouterValue];
               };
@@ -817,7 +822,7 @@ export const ItineraryFormAIEnhanced = ({
                     <FormLabel>AI Model</FormLabel>
                     <FormControl>
                       <Select value={field.value} onValueChange={field.onChange} disabled={isLoading}>
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className="w-full cursor-pointer">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -831,7 +836,7 @@ export const ItineraryFormAIEnhanced = ({
                                 const pricingKey = getPricingModelKey(option.value);
                                 const pricingModel = AI_MODELS[pricingKey as keyof typeof AI_MODELS];
                                 return (
-                                  <SelectItem key={option.value} value={option.value}>
+                                  <SelectItem key={option.value} value={option.value} className="cursor-pointer">
                                     <div className="flex items-center justify-between w-full gap-3">
                                       <span>{option.label}</span>
                                       <div className="flex items-center gap-2">
@@ -856,14 +861,15 @@ export const ItineraryFormAIEnhanced = ({
                           {/* Locked Models */}
                           {lockedModels.length > 0 && (
                             <>
-                              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-t mt-2 pt-2">
-                                🔒 Premium Models
+                              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-t mt-2 pt-2 flex items-center gap-2">
+                              <Lock className="size-3.5" />  
+                              <span>Premium Models</span>
                               </div>
                               {lockedModels.map((option) => {
                                 const pricingKey = getPricingModelKey(option.value);
                                 const pricingModel = AI_MODELS[pricingKey as keyof typeof AI_MODELS];
                                 return (
-                                  <SelectItem key={option.value} value={option.value} disabled>
+                                  <SelectItem key={option.value} value={option.value} disabled className="cursor-not-allowed">
                                     <div className="flex items-center justify-between w-full gap-2">
                                       <div className="flex items-center gap-2">
                                         <Lock className="size-3.5 text-muted-foreground" />
