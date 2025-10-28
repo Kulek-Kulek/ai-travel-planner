@@ -9,8 +9,8 @@ import { DownloadPDFButton } from '@/components/download-pdf-button';
 import { BookingAccommodationCard } from '@/components/booking-accommodation-card';
 import { ItineraryMap } from '@/components/itinerary-map';
 import { GoogleMapsButton } from '@/components/google-maps-button';
-import { createClient } from '@/lib/supabase/server';
 import { isGoogleMapsEnabled } from '@/lib/config/google-maps';
+import { createClient } from '@/lib/supabase/server';
 import { 
   ArrowLeft, 
   ClipboardList, 
@@ -20,7 +20,7 @@ import {
   CalendarDays, 
   FileText, 
   Tag, 
-  Clock ,
+  Clock,
   ListCheck,
   Map
 } from 'lucide-react';
@@ -258,7 +258,7 @@ export default async function ItineraryPage({
                     className="bg-gray-50 rounded-lg p-5 hover:bg-gray-100 transition-colors border-l-4 border-blue-500"
                   >
                     <div className="flex flex-col md:flex-row items-start gap-4">
-                      {/* Time Badge */}
+                      {/* Time Badge - Above on mobile, left on desktop */}
                       <div className="w-full md:w-auto flex-shrink-0">
                         <div className="bg-blue-600 text-white rounded-lg px-3 py-2 text-center md:min-w-[120px]">
                           <div className="flex items-center justify-center gap-1 mb-1">
