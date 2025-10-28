@@ -13,6 +13,7 @@ import { getUser } from "@/lib/actions/auth-actions";
 import { toast } from "sonner";
 import type { OpenRouterModel } from "@/lib/openrouter/models";
 import { Button } from "@/components/ui/button";
+import { Plane, Clock, Lock, CheckCircle2, LogIn, AlertTriangle, Check } from "lucide-react";
 
 type FormData = {
   destination: string;
@@ -165,25 +166,26 @@ export default function Home() {
               if (itinerary.status === 'draft') {
                 getUser().then((user) => {
                   if (user) {
-                    claimDraftItinerary(itineraryId!).then((result) => {
-                      if (result.success) {
-                        
-                        // Clean up sessionStorage after successful claim
-                        sessionStorage.removeItem('createdPlanWhileLoggedOut');
-                        sessionStorage.removeItem('draftItineraryId');
-                        sessionStorage.removeItem('itineraryId');
-                        
-                        // Clear result to re-enable form
-                        setResult(null);
-                        setHasSubmitted(false);
-                        
-                        toast.success("Itinerary saved to your account!", {
-                          description: "Your travel plan is now permanently saved",
-                          action: {
-                            label: "View My Plans",
-                            onClick: () => window.location.href = "/my-plans",
-                          },
-                        });
+                      claimDraftItinerary(itineraryId!).then((result) => {
+                        if (result.success) {
+                          
+                          // Clean up sessionStorage after successful claim
+                          sessionStorage.removeItem('createdPlanWhileLoggedOut');
+                          sessionStorage.removeItem('draftItineraryId');
+                          sessionStorage.removeItem('itineraryId');
+                          
+                          // Clear all state to re-enable form
+                          setResult(null);
+                          setHasSubmitted(false);
+                          setHasCreatedPlanWhileLoggedOut(false); // Clear this state too!
+                          
+                          toast.success("Itinerary saved to your account!", {
+                            description: "Your travel plan is now permanently saved",
+                            action: {
+                              label: "View My Plans",
+                              onClick: () => window.location.href = "/my-plans",
+                            },
+                          });
                         
                         // Refresh gallery to show the newly published itinerary
                         queryClient.invalidateQueries({ queryKey: ["public-itineraries"] });
@@ -475,7 +477,7 @@ export default function Home() {
                   <div className="flex flex-col gap-4">
                     <div className="flex-1 space-y-3">
                       <div className="flex items-center gap-2">
-                        <span className="text-2xl">🔐</span>
+                        <LogIn className="w-6 h-6 text-indigo-600" />
                         <h3 className="text-xl font-semibold text-slate-900">
                           Sign in to save your itinerary
                         </h3>
@@ -485,23 +487,23 @@ export default function Home() {
                       </p>
                       <ul className="space-y-2 text-sm text-slate-700">
                         <li className="flex items-start gap-2">
-                          <span className="text-green-600 font-bold mt-0.5">✓</span>
+                          <Check className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
                           <span><strong>100% Free</strong> – No hidden costs or subscriptions</span>
                         </li>
                         <li className="flex items-start gap-2">
-                          <span className="text-green-600 font-bold mt-0.5">✓</span>
+                          <Check className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
                           <span><strong>Quick Setup</strong> – Takes only 30 seconds to create an account</span>
                         </li>
                         <li className="flex items-start gap-2">
-                          <span className="text-green-600 font-bold mt-0.5">✓</span>
+                          <Check className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
                           <span><strong>Full Control</strong> – Edit, update, and regenerate your plans anytime</span>
                         </li>
                         <li className="flex items-start gap-2">
-                          <span className="text-green-600 font-bold mt-0.5">✓</span>
+                          <Check className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
                           <span><strong>Save & Share</strong> – Access your itineraries from any device and share with friends</span>
                         </li>
                         <li className="flex items-start gap-2">
-                          <span className="text-red-600 font-bold mt-0.5">⚠</span>
+                          <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
                           <span className="text-red-700"><strong>Without an account</strong> – This plan will be lost when you close this page</span>
                         </li>
                       </ul>
@@ -671,7 +673,9 @@ export default function Home() {
                               <div className="flex items-center gap-2">
                                 <h4 className="font-semibold text-slate-900">{day.title}</h4>
                                 {isLocked && (
-                                  <span className="text-xs text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">🔒</span>
+                                  <span className="flex items-center gap-1 text-xs text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">
+                                    <Lock className="w-3 h-3" />
+                                  </span>
                                 )}
                               </div>
                               <span className="text-xs text-slate-500">
@@ -695,15 +699,27 @@ export default function Home() {
                                 return (
                                   <div
                                     key={placeIndex}
-                                    className={`mt-3 rounded-xl border-l-4 border-blue-500 bg-white p-4 shadow-sm ${shouldBlur ? 'blur-[0.5px] select-none pointer-events-none' : ''}`}
+                                    className={`mt-3 rounded-xl border-l-4 border-blue-500 bg-white p-5 shadow-sm hover:bg-slate-50 transition-colors ${shouldBlur ? 'blur-[0.5px] select-none pointer-events-none' : ''}`}
                                   >
-                                    <div className="flex items-start gap-3">
-                                      <div className="flex-shrink-0 bg-blue-600 text-white rounded-md px-2 py-1 text-xs font-bold whitespace-nowrap">
-                                        {place.time}
+                                    <div className="flex flex-col md:flex-row items-start gap-4">
+                                      {/* Time Badge - Above on mobile, left on desktop */}
+                                      <div className="w-full md:w-auto flex-shrink-0">
+                                        <div className="bg-blue-600 text-white rounded-lg px-3 py-2 text-center md:min-w-[120px]">
+                                          <div className="flex items-center justify-center gap-1 mb-1">
+                                            <Clock className="w-4 h-4" />
+                                          </div>
+                                          <div className="text-sm font-bold leading-tight whitespace-nowrap">
+                                            {place.time}
+                                          </div>
+                                        </div>
                                       </div>
+                                      
+                                      {/* Place Details */}
                                       <div className="flex-1 min-w-0">
-                                        <p className="font-semibold text-slate-900">{place.name}</p>
-                                        <p className="text-sm text-slate-600 mt-1">{place.desc}</p>
+                                        <h3 className="text-lg font-semibold text-slate-900 mb-2">
+                                          {place.name}
+                                        </h3>
+                                        <p className="text-slate-700">{place.desc}</p>
                                       </div>
                                     </div>
                                   </div>
@@ -712,20 +728,68 @@ export default function Home() {
                               
                               {/* Sign up overlay for first day when not authenticated */}
                               {!isAuthenticated && isFirstDay && (
-                                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-100 via-slate-50/95 to-transparent pt-12 pb-4 flex items-end justify-center">
-                                  <div className="text-center px-4 py-3 rounded-2xl bg-white/80 backdrop-blur-sm border border-indigo-200 shadow-lg max-w-sm mx-auto">
-                                    <div className="flex items-center justify-center gap-2 mb-2">
-                                      <span className="text-2xl">✈️</span>
-                                      <p className="text-base font-bold text-slate-900">
-                                        See Your Complete Journey
-                                      </p>
+                                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-100 via-slate-50/98 to-transparent pt-16 pb-5 flex items-end justify-center">
+                                  <div className="text-center px-8 py-6 rounded-2xl bg-white backdrop-blur-md border border-slate-200 shadow-2xl max-w-xl mx-auto">
+                                    {/* Icon and Title */}
+                                    <div className="flex items-center justify-center gap-3 mb-4">
+                                      <div className="rounded-full bg-blue-600 p-2.5 shadow-md">
+                                        <Plane className="w-6 h-6 text-white" />
+                                      </div>
+                                      <h3 className="text-xl font-bold text-slate-900">
+                                        Unlock Your Complete Journey
+                                      </h3>
                                     </div>
-                                    <p className="text-sm text-slate-600 mb-1">
-                                      Sign up free to see all <span className="font-semibold text-indigo-600">{result.aiPlan?.days?.length || 0} days</span>
+                                    
+                                    {/* Description */}
+                                    <p className="text-base text-slate-600 mb-6 leading-relaxed mt-6">
+                                      Sign up <span className="font-bold text-blue-600">free</span> to see all <span className="inline-flex items-center justify-center font-bold text-blue-600">{result.aiPlan?.days?.length || 0} days</span> of your personalized itinerary
                                     </p>
-                                    <p className="text-xs text-slate-500">
-                                      Plus edit, save, and share your plans
-                                    </p>
+                                    
+                                    {/* Benefits List */}
+                                    <div className="grid grid-cols-2 gap-3 text-sm mb-6">
+                                      <span className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5">
+                                        <span className="text-blue-600 font-bold">✓</span>
+                                        <span className="text-slate-700">Edit & Save</span>
+                                      </span>
+                                      <span className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5">
+                                        <span className="text-blue-600 font-bold">✓</span>
+                                        <span className="text-slate-700">Share Plans</span>
+                                      </span>
+                                      <span className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5">
+                                        <span className="text-blue-600 font-bold">✓</span>
+                                        <span className="text-slate-700">Download PDF</span>
+                                      </span>
+                                      <span className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5">
+                                        <span className="text-blue-600 font-bold">✓</span>
+                                        <span className="text-slate-700">Better AI Models</span>
+                                      </span>
+                                      <span className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5">
+                                        <span className="text-blue-600 font-bold">✓</span>
+                                        <span className="text-slate-700">Book Hotels</span>
+                                      </span>
+                                      <span className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5">
+                                        <span className="text-blue-600 font-bold">✓</span>
+                                        <span className="text-slate-700">Google Maps</span>
+                                      </span>
+                                    </div>
+                                    
+                                    {/* CTA Button */}
+                                    <Button 
+                                      onClick={() => handleAuthRedirect('sign-up')}
+                                      className="mt-2 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-md hover:shadow-lg transition-all"
+                                      size="lg"
+                                    >
+                                      <Plane className="w-4 h-4 mr-2" />
+                                      Create Free Account
+                                    </Button>
+                                    
+                                    {/* Already have account link */}
+                                    <button
+                                      onClick={() => handleAuthRedirect('sign-in')}
+                                      className="mt-4 text-sm text-slate-600 hover:text-slate-900 font-medium underline"
+                                    >
+                                      Already have an account? Sign in
+                                    </button>
                                   </div>
                                 </div>
                               )}
@@ -755,8 +819,9 @@ export default function Home() {
 
                     {result.aiPlan?.id && (
                       <div className="rounded-2xl border border-emerald-100 bg-emerald-50/80 p-4">
-                        <p className="text-emerald-800 text-sm">
-                          ✅ <strong>Itinerary saved!</strong> You can open the full itinerary or explore more plans below.
+                        <p className="text-emerald-800 text-sm flex items-center gap-2">
+                          <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+                          <span><strong>Itinerary saved!</strong> You can open the full itinerary or explore more plans below.</span>
                         </p>
                         <div className="mt-3 grid gap-2 sm:grid-cols-2">
                           <Button size="lg" className="w-full" onClick={() => window.location.href = `/itinerary/${result.aiPlan?.id}`} disabled={!isAuthenticated}>
