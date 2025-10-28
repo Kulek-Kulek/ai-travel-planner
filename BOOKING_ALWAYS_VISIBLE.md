@@ -211,3 +211,6 @@ const handleFindHotels = (e: React.MouseEvent) => {
 
 **This is how you maximize affiliate revenue - make every pixel count!** 💰🚀
 
+
+
+
