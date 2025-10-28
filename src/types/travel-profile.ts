@@ -62,8 +62,8 @@ export interface QuizResponse {
   travelingWith: 'solo' | 'partner' | 'friends' | 'family' | 'varies';
   dietaryNeeds: string[];
   
-  // Dream scenario (1 question - open ended for AI context)
-  perfectDay: string; // "Describe your perfect travel day in one sentence"
+  // Dream scenario (1 question - closed question)
+  perfectDay: 'slow-foodie' | 'adventure-packed' | 'culture-deep-dive' | 'relaxed-explorer' | 'luxury-leisure' | 'balanced-mix';
 }
 
 export interface TravelProfile {
