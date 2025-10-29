@@ -78,51 +78,77 @@ export default function Home() {
   useEffect(() => {
     const supabase = createClient();
     
-    // Function to handle auth state
-    const handleAuthState = (user: any) => {
-      const isAuth = !!user;
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const isAuth = !!session?.user;
       setIsAuthenticated(isAuth);
       
-      // If user is authenticated, always clear the "created plan while logged out" flags
-      if (isAuth) {
-        sessionStorage.removeItem('createdPlanWhileLoggedOut');
-        sessionStorage.removeItem('draftItineraryId');
-        setHasCreatedPlanWhileLoggedOut(false);
-        
-        // Check if there's a pending bucket list add
-        const pendingBucketListAdd = sessionStorage.getItem('pendingBucketListAdd');
-        if (pendingBucketListAdd) {
-          // Import and execute the add
-          import('@/lib/actions/itinerary-actions').then(({ addToBucketList }) => {
-            addToBucketList(pendingBucketListAdd).then((result) => {
-              if (result.success) {
-                toast.success('Added to your bucket list! ❤️');
-                // Invalidate queries to refresh bucket list state
-                queryClient.invalidateQueries({ queryKey: ['bucket-list-ids'] });
-                queryClient.invalidateQueries({ queryKey: ['bucket-list'] });
-              }
-            });
-          });
-          // Clear the pending add
-          sessionStorage.removeItem('pendingBucketListAdd');
-        }
-      } else {
-        // Only if NOT authenticated, check sessionStorage for previous anonymous session
+      // On initial load, check for previous anonymous session
+      if (!isAuth) {
         const createdPlanWhileLoggedOut = sessionStorage.getItem('createdPlanWhileLoggedOut');
         if (createdPlanWhileLoggedOut === 'true') {
           setHasCreatedPlanWhileLoggedOut(true);
         }
       }
-    };
-    
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      handleAuthState(session?.user ?? null);
     });
     
     // Listen to auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      handleAuthState(session?.user ?? null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      const isAuth = !!session?.user;
+      
+      // Handle sign in
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') && isAuth) {
+        setIsAuthenticated(true);
+        // Clear anonymous user flags
+        sessionStorage.removeItem('createdPlanWhileLoggedOut');
+        sessionStorage.removeItem('draftItineraryId');
+        setHasCreatedPlanWhileLoggedOut(false);
+        
+        // Check if there's a pending bucket list add (only on actual sign in, not on refresh)
+        if (event === 'SIGNED_IN') {
+          const pendingBucketListAdd = sessionStorage.getItem('pendingBucketListAdd');
+          if (pendingBucketListAdd) {
+            // Import and execute the add
+            import('@/lib/actions/itinerary-actions').then(({ addToBucketList }) => {
+              addToBucketList(pendingBucketListAdd).then((result) => {
+                if (result.success) {
+                  toast.success('Added to your bucket list! ❤️');
+                  // Invalidate queries to refresh bucket list state
+                  queryClient.invalidateQueries({ queryKey: ['bucket-list-ids'] });
+                  queryClient.invalidateQueries({ queryKey: ['bucket-list'] });
+                }
+              });
+            });
+            // Clear the pending add
+            sessionStorage.removeItem('pendingBucketListAdd');
+          }
+        }
+      }
+      
+      // Handle sign out - be explicit about sign out events
+      if (event === 'SIGNED_OUT') {
+        setIsAuthenticated(false);
+        // Clear all form and result state
+        setResult(null);
+        setHasSubmitted(false);
+        setHasCreatedPlanWhileLoggedOut(false);
+        
+        // Clear all sessionStorage items
+        sessionStorage.removeItem('createdPlanWhileLoggedOut');
+        sessionStorage.removeItem('draftItineraryId');
+        sessionStorage.removeItem('itineraryId');
+      }
+      
+      // Also handle the case where session becomes null but no explicit SIGNED_OUT event (safety check)
+      if (!isAuth && session === null && event !== 'SIGNED_OUT') {
+        setIsAuthenticated(false);
+        setResult(null);
+        setHasSubmitted(false);
+        setHasCreatedPlanWhileLoggedOut(false);
+        sessionStorage.removeItem('createdPlanWhileLoggedOut');
+        sessionStorage.removeItem('draftItineraryId');
+        sessionStorage.removeItem('itineraryId');
+      }
     });
     
     // Cleanup subscription on unmount
@@ -478,6 +504,7 @@ export default function Home() {
 
             <div className="mt-5">
               <ItineraryFormAIEnhanced
+                key={`form-${isAuthenticated}`}
                 onSubmit={handleSubmit}
                 isLoading={mutation.isPending}
                 modelOverride="anthropic/claude-3.5-haiku"
