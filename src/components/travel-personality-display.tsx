@@ -292,7 +292,7 @@ export function TravelPersonalityDisplay({ profile }: TravelPersonalityDisplayPr
               </h3>
               <p className="text-slate-700 mb-4">
                 Every itinerary we generate for you will be tailored to match your travel personality. 
-                We'll consider your pace, interests, dining preferences, and social style to create 
+                We&apos;ll consider your pace, interests, dining preferences, and social style to create 
                 trips that feel like they were designed by someone who truly knows you.
               </p>
               <Link href="/">

@@ -85,7 +85,7 @@ export async function generateTravelProfile(
     let parsedResponse;
     try {
       parsedResponse = JSON.parse(content);
-    } catch (parseError) {
+    } catch {
       console.error('AI response parse error:', content);
       return { success: false, error: 'Invalid AI response format' };
     }
@@ -134,7 +134,7 @@ export async function generateTravelProfile(
 
   } catch (error) {
     if (error instanceof z.ZodError) {
-      console.error('Validation error:', error.errors);
+      console.error('Validation error:', error.issues);
       return { success: false, error: 'Invalid quiz data' };
     }
     
