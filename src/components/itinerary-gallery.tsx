@@ -56,7 +56,7 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
 
   // Fetch itineraries with TanStack Query (using API route instead of server action)
   const { data: itinerariesData, isLoading, isFetching, error: queryError } = useQuery({
-    queryKey: ['public-itineraries', selectedTags, destinationSearch],
+    queryKey: ['public-itineraries-v2', selectedTags, destinationSearch],
     queryFn: async () => {
       // Build URL with query params
       const params = new URLSearchParams();
@@ -66,7 +66,7 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
       if (destinationSearch) {
         params.set('destination', destinationSearch);
       }
-      params.set('limit', '20');
+      params.set('limit', '24');
       
       const url = `/api/itineraries?${params.toString()}`;
       
@@ -163,7 +163,7 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
     
     if (result.success) {
       toast.success('Itinerary deleted');
-      queryClient.invalidateQueries({ queryKey: ['public-itineraries'] });
+      queryClient.invalidateQueries({ queryKey: ['public-itineraries-v2'] });
       queryClient.invalidateQueries({ queryKey: ['all-tags'] });
     } else {
       toast.error(result.error);
@@ -176,7 +176,7 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
     
     if (result.success) {
       toast.success(`Set to ${!currentPrivacy ? 'private' : 'public'}`);
-      queryClient.invalidateQueries({ queryKey: ['public-itineraries'] });
+      queryClient.invalidateQueries({ queryKey: ['public-itineraries-v2'] });
     } else {
       toast.error(result.error);
     }
