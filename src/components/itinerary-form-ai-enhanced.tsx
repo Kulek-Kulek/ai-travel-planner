@@ -134,18 +134,20 @@ export const ItineraryFormAIEnhanced = ({
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractionTimeout, setExtractionTimeout] = useState<NodeJS.Timeout | null>(null);
 
+  const defaultFormValues = {
+    destination: "",
+    days: 0,
+    travelers: 1,
+    children: undefined,
+    childAges: [],
+    hasAccessibilityNeeds: false,
+    notes: "",
+    model: "google/gemini-flash-1.5-8b" as const, // Default to free tier model
+  };
+
   const form = useForm<ItineraryFormData>({
     resolver: zodResolver(itineraryFormSchema),
-    defaultValues: {
-      destination: "",
-      days: 0,
-      travelers: 1,
-      children: undefined,
-      childAges: [],
-      hasAccessibilityNeeds: false,
-      notes: "",
-      model: "google/gemini-flash-1.5-8b", // Default to free tier model
-    },
+    defaultValues: defaultFormValues,
   });
 
   const watchChildren = form.watch("children");

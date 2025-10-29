@@ -1,21 +1,12 @@
-import { getUser, signOut } from '@/lib/actions/auth-actions';
+import { getUser } from '@/lib/actions/auth-actions';
 import { isAdmin } from '@/lib/auth/admin';
 import { Button, buttonVariants } from '@/components/ui/button';
 import Link from 'next/link';
 import { HideOnScroll } from '@/components/hide-on-scroll';
 import { MobileNav } from '@/components/mobile-nav';
+import { SignOutButton } from '@/components/sign-out-button';
 import { Plane, Shield, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-async function SignOutButton() {
-  return (
-    <form action={signOut}>
-      <Button variant="outline" size="sm" type="submit">
-        Sign Out
-      </Button>
-    </form>
-  );
-}
 
 export async function NavHeader() {
   const user = await getUser();
