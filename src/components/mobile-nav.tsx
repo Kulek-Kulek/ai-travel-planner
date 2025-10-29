@@ -17,6 +17,8 @@ import {
   Sparkles
 } from 'lucide-react';
 import { signInWithGoogle } from '@/lib/actions/auth-actions';
+import { clientSignOut } from '@/lib/auth/client-auth';
+import { toast } from 'sonner';
 
 interface MobileNavProps {
   user: { email?: string } | null;
@@ -27,6 +29,7 @@ export function MobileNav({ user, isAdmin }: MobileNavProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -38,6 +41,19 @@ export function MobileNav({ user, isAdmin }: MobileNavProps) {
     startTransition(async () => {
       await signInWithGoogle();
     });
+  };
+
+  const handleSignOut = async () => {
+    try {
+      setIsSigningOut(true);
+      closeMenu();
+      await clientSignOut();
+    } catch (error) {
+      setIsSigningOut(false);
+      toast.error('Failed to sign out', {
+        description: 'Please try again',
+      });
+    }
   };
 
   // Prevent body scroll when menu is open
@@ -179,16 +195,15 @@ export function MobileNav({ user, isAdmin }: MobileNavProps) {
                   </div>
 
                   {/* Sign Out Button */}
-                  <form action="/api/auth/signout" method="POST" className="w-full">
-                    <button
-                      type="submit"
-                      onClick={closeMenu}
-                      className="flex items-center justify-center gap-2 w-full px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg transition-colors font-medium"
-                    >
-                      <LogOut className="w-5 h-5" />
-                      Sign Out
-                    </button>
-                  </form>
+                  <button
+                    type="button"
+                    onClick={handleSignOut}
+                    disabled={isSigningOut}
+                    className="flex items-center justify-center gap-2 w-full px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <LogOut className="w-5 h-5" />
+                    {isSigningOut ? 'Signing out...' : 'Sign Out'}
+                  </button>
                 </>
               ) : (
                 <>
