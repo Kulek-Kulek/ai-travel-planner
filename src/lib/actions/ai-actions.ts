@@ -67,18 +67,14 @@ type SavedItinerary = z.infer<typeof aiResponseSchema> & {
 
 // Helper function to map OpenRouter model ID to ModelKey for pricing
 function mapOpenRouterModelToKey(openRouterModel: string): ModelKey {
-  // Map OpenRouter model IDs to our pricing model keys
+  // Map OpenRouter model IDs to pricing model keys
+  // NOTE: Must match the keys in the database function can_generate_plan
   const mapping: Record<string, ModelKey> = {
-    'google/gemini-flash-1.5-8b': 'gemini-flash',
+    'google/gemini-2.0-flash-lite-001': 'gemini-flash',
     'openai/gpt-4o-mini': 'gpt-4o-mini',
-    'deepseek/deepseek-chat': 'deepseek-chat',
+    'google/gemini-2.5-pro': 'gemini-flash', // Use gemini-flash for now
     'anthropic/claude-3-haiku': 'claude-haiku',
-    'google/gemini-2.0-flash-exp:free': 'gemini-pro',
-    'google/gemini-2.0-flash-thinking-exp:free': 'gemini-2.0-thinking',
-    'openai/gpt-4o': 'gpt-4o',
-    'anthropic/claude-3-sonnet': 'claude-sonnet',
-    'anthropic/claude-3.5-sonnet': 'claude-3.5-sonnet',
-    'anthropic/claude-3-opus': 'claude-opus',
+    'google/gemini-2.5-flash': 'gemini-flash', // Use gemini-flash for now
   };
   
   // Return mapped key or default to gemini-flash
@@ -143,6 +139,7 @@ export async function generateItinerary(
           temperature: 0.7,
           max_tokens: 8000,
         });
+        
         if (completion) {
           usedModel = modelId;
           break;

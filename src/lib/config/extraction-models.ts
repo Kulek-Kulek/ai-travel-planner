@@ -19,29 +19,18 @@ export interface ExtractionModelConfig {
 
 // Available models for extraction (ordered by cost)
 export const EXTRACTION_MODELS = {
-  // Ultra cheap - good for high-volume basic users
-  'gemini-flash-8b': {
-    model: 'google/gemini-flash-1.5-8b',
-    displayName: 'Gemini Flash 8B',
+  // Free tier - fast and reliable
+  'gemini-2.0-flash': {
+    model: 'google/gemini-2.0-flash-lite-001',
+    displayName: 'Gemini 2.0 Flash Lite',
     costPer1MTokens: {
-      input: 0.0375,
-      output: 0.15,
+      input: 0.05,
+      output: 0.20,
     },
-    description: 'Ultra cheap, good for simple extraction',
+    description: 'Fast and reliable, great for extraction',
   },
   
-  // Cheap - best value for most users (but has rate limits on free tier)
-  'gemini-flash': {
-    model: 'google/gemini-2.0-flash-exp:free',
-    displayName: 'Gemini Flash 2.0 (Free)',
-    costPer1MTokens: {
-      input: 0.00, // Free during preview
-      output: 0.00,
-    },
-    description: 'FREE but limited to 50 requests/day on free tier',
-  },
-  
-  // Mid-range - OpenAI alternative
+  // Mid-range - OpenAI alternative (default for free tier)
   'gpt-4o-mini': {
     model: 'openai/gpt-4o-mini',
     displayName: 'GPT-4o Mini',
@@ -52,10 +41,10 @@ export const EXTRACTION_MODELS = {
     description: 'OpenAI quality at low cost',
   },
   
-  // Recommended - best balance
+  // Premium - best balance for paid users
   'claude-haiku': {
-    model: 'anthropic/claude-3.5-haiku',
-    displayName: 'Claude 3.5 Haiku',
+    model: 'anthropic/claude-3-haiku',
+    displayName: 'Claude 3 Haiku',
     costPer1MTokens: {
       input: 0.25,
       output: 1.25,
@@ -63,15 +52,15 @@ export const EXTRACTION_MODELS = {
     description: 'Fast, cheap, excellent for extraction',
   },
   
-  // Premium - overkill for extraction but available
-  'claude-sonnet': {
-    model: 'anthropic/claude-3.5-sonnet',
-    displayName: 'Claude 3.5 Sonnet',
+  // Premium alternative
+  'gemini-2.5-flash': {
+    model: 'google/gemini-2.5-flash',
+    displayName: 'Gemini 2.5 Flash',
     costPer1MTokens: {
-      input: 3.00,
-      output: 15.00,
+      input: 0.10,
+      output: 0.40,
     },
-    description: 'Premium model, use for full itinerary generation',
+    description: 'Latest Gemini with enhanced speed',
   },
 } as const;
 
@@ -79,8 +68,8 @@ export type ExtractionModelKey = keyof typeof EXTRACTION_MODELS;
 
 // Model selection by user tier
 export const TIER_MODEL_CONFIG: Record<UserTier, ExtractionModelKey> = {
-  free: 'gemini-flash',        // Free users get fast, cheap model
-  basic: 'gemini-flash',       // Basic paid users get same
+  free: 'gemini-2.0-flash',    // Free users get fast, cost-effective model
+  basic: 'gemini-2.0-flash',   // Basic paid users get same
   premium: 'claude-haiku',     // Premium users get better model
   enterprise: 'claude-haiku',  // Enterprise users get best balance
 };
@@ -124,26 +113,25 @@ export function estimateCost(
 }
 
 /**
- * Get cost comparison vs Claude Sonnet
+ * Get cost comparison vs Claude Haiku
  */
-export function getSavingsVsSonnet(modelKey: ExtractionModelKey): {
+export function getSavingsVsHaiku(modelKey: ExtractionModelKey): {
   percentage: number;
   description: string;
 } {
-  const sonnetCost = estimateCost('claude-sonnet', 1000);
+  const haikuCost = estimateCost('claude-haiku', 1000);
   const modelCost = estimateCost(modelKey, 1000);
-  const savings = ((sonnetCost - modelCost) / sonnetCost) * 100;
+  const savings = ((haikuCost - modelCost) / haikuCost) * 100;
   
   return {
     percentage: Math.round(savings),
-    description: `${Math.round(savings)}% cheaper than Claude Sonnet`,
+    description: `${Math.round(savings)}% ${savings > 0 ? 'cheaper' : 'more expensive'} than Claude Haiku`,
   };
 }
 
 // Default model for new implementations (RECOMMENDED)
-// Using Claude Haiku - fast, cheap, excellent for extraction
-// Note: Free Gemini has rate limits (50/day), so we use paid Claude Haiku instead
-export const DEFAULT_EXTRACTION_MODEL = EXTRACTION_MODELS['claude-haiku'].model;
+// Using Gemini 2.0 Flash - fast, reliable, and most cost-effective
+export const DEFAULT_EXTRACTION_MODEL = EXTRACTION_MODELS['gemini-2.0-flash'].model;
 
 // Current production model (change this to switch globally)
 export const CURRENT_EXTRACTION_MODEL = DEFAULT_EXTRACTION_MODEL;

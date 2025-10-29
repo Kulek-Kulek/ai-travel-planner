@@ -6,16 +6,13 @@
 export type SubscriptionTier = 'free' | 'payg' | 'pro';
 export type ModelTier = 'economy' | 'premium';
 export type ModelKey = 
-  | 'gemini-flash' 
+  | 'gemini-flash' // Database uses this
+  | 'gemini-2.0-flash' 
   | 'gpt-4o-mini' 
+  | 'gemini-2.5-pro'
   | 'claude-haiku' 
-  | 'deepseek-chat'
-  | 'gemini-pro'
-  | 'gemini-2.0-thinking'
-  | 'gpt-4o' 
-  | 'claude-sonnet'
-  | 'claude-3.5-sonnet'
-  | 'claude-opus';
+  | 'gpt-4o' // Database uses this
+  | 'gemini-2.5-flash';
 
 export interface AIModel {
   key: ModelKey;
@@ -30,16 +27,29 @@ export interface AIModel {
 }
 
 export const AI_MODELS: Record<ModelKey, AIModel> = {
-  // Economy tier - Fast & Affordable
+  // Economy tier - Fast & Affordable (Free tier access)
+  // Database key (for can_generate_plan function)
   'gemini-flash': {
     key: 'gemini-flash',
-    name: 'Gemini Flash 1.5 8B',
-    provider: 'google/gemini-flash-1.5-8b',
-    cost: 0.10,
+    name: 'Gemini Flash',
+    provider: 'google/gemini-2.0-flash-lite-001',
+    cost: 0.15,
     tier: 'economy',
     freeAccess: true,
     badge: 'Fast',
-    description: 'Ultra-fast and cost-effective, great for quick travel plans',
+    description: 'Fast and reliable, great for quick travel plans',
+    speed: 'fast',
+  },
+  // Modern key (keeping for compatibility)
+  'gemini-2.0-flash': {
+    key: 'gemini-2.0-flash',
+    name: 'Gemini 2.0 Flash Lite',
+    provider: 'google/gemini-2.0-flash-lite-001',
+    cost: 0.15,
+    tier: 'economy',
+    freeAccess: true,
+    badge: 'Fast',
+    description: 'Fast and reliable, great for quick travel plans',
     speed: 'fast',
   },
   'gpt-4o-mini': {
@@ -53,95 +63,51 @@ export const AI_MODELS: Record<ModelKey, AIModel> = {
     description: 'Fast and affordable with excellent quality',
     speed: 'fast',
   },
-  'deepseek-chat': {
-    key: 'deepseek-chat',
-    name: 'DeepSeek Chat',
-    provider: 'deepseek/deepseek-chat',
-    cost: 0.12,
-    tier: 'economy',
+  
+  // Premium tier - High Quality (Paid plans only)
+  'gemini-2.5-pro': {
+    key: 'gemini-2.5-pro',
+    name: 'Gemini 2.5 Pro',
+    provider: 'google/gemini-2.5-pro',
+    cost: 0.35,
+    tier: 'premium',
     freeAccess: false,
-    badge: 'Budget',
-    description: 'Budget-friendly with solid analytical performance',
-    speed: 'fast',
+    badge: 'Advanced',
+    description: 'Advanced reasoning and comprehensive planning capabilities',
+    speed: 'medium',
   },
   'claude-haiku': {
     key: 'claude-haiku',
     name: 'Claude 3 Haiku',
     provider: 'anthropic/claude-3-haiku',
-    cost: 0.20,
-    tier: 'economy',
+    cost: 0.25,
+    tier: 'premium',
     freeAccess: false,
     badge: 'Efficient',
     description: 'Lightning-fast and efficient, perfect for balanced itineraries',
     speed: 'fast',
   },
-  
-  // Premium tier - High Quality
-  'gemini-pro': {
-    key: 'gemini-pro',
-    name: 'Gemini 2.0 Flash',
-    provider: 'google/gemini-2.0-flash-exp:free',
-    cost: 0.35,
-    tier: 'premium',
-    freeAccess: false,
-    badge: 'Advanced',
-    description: 'Latest Gemini with enhanced reasoning and quality',
-    speed: 'medium',
-  },
-  'gemini-2.0-thinking': {
-    key: 'gemini-2.0-thinking',
-    name: 'Gemini 2.0 Flash Thinking',
-    provider: 'google/gemini-2.0-flash-thinking-exp:free',
-    cost: 0.40,
-    tier: 'premium',
-    freeAccess: false,
-    badge: 'Reasoning',
-    description: 'Advanced Gemini 2.0 with deep reasoning capabilities',
-    speed: 'medium',
-  },
   'gpt-4o': {
     key: 'gpt-4o',
     name: 'GPT-4o',
     provider: 'openai/gpt-4o',
-    cost: 0.45,
-    tier: 'premium',
-    freeAccess: false,
-    badge: 'Premium',
-    description: 'Premium quality with advanced reasoning for complex trips',
-    speed: 'medium',
-  },
-  'claude-sonnet': {
-    key: 'claude-sonnet',
-    name: 'Claude 3 Sonnet',
-    provider: 'anthropic/claude-3-sonnet',
     cost: 0.50,
     tier: 'premium',
     freeAccess: false,
-    badge: 'Excellent',
-    description: 'Balanced performance with excellent creative planning',
+    badge: 'Premium',
+    description: 'OpenAI\'s most capable model for complex itineraries',
     speed: 'medium',
   },
-  'claude-3.5-sonnet': {
-    key: 'claude-3.5-sonnet',
-    name: 'Claude 3.5 Sonnet',
-    provider: 'anthropic/claude-3.5-sonnet',
-    cost: 0.60,
+  'gemini-2.5-flash': {
+    key: 'gemini-2.5-flash',
+    name: 'Gemini 2.5 Flash',
+    provider: 'google/gemini-2.5-flash',
+    cost: 0.20,
     tier: 'premium',
     freeAccess: false,
-    badge: 'Superior',
-    description: 'Latest Anthropic model with exceptional reasoning and detail',
-    speed: 'medium',
-  },
-  'claude-opus': {
-    key: 'claude-opus',
-    name: 'Claude 3 Opus',
-    provider: 'anthropic/claude-3-opus',
-    cost: 0.80,
-    tier: 'premium',
-    freeAccess: false,
-    badge: 'Best',
-    description: 'Top-tier flagship model for the most sophisticated itineraries',
-    speed: 'slow',
+    badge: 'Premium',
+    description: 'Latest Gemini with enhanced speed and quality',
+    speed: 'fast',
   },
 } as const;
 
@@ -169,7 +135,7 @@ export const TIER_CONFIG: Record<SubscriptionTier, TierLimits> = {
     displayName: 'Free',
     price: 0,
     plansLimit: 2,
-    allowedModels: ['gemini-flash', 'gpt-4o-mini'],
+    allowedModels: ['gemini-2.0-flash', 'gpt-4o-mini'],
     economyLimit: null,
     premiumLimit: null,
     premiumRolloverMax: 0,
@@ -180,7 +146,7 @@ export const TIER_CONFIG: Record<SubscriptionTier, TierLimits> = {
     },
     features: [
       '2 AI-powered itineraries',
-      'Gemini Flash & GPT-4o Mini',
+      'Gemini 2.0 Flash & GPT-4o Mini',
       '1 edit per plan',
       'Full feature access',
       'Browse public plans',
@@ -192,16 +158,11 @@ export const TIER_CONFIG: Record<SubscriptionTier, TierLimits> = {
     price: 0, // Variable pricing
     plansLimit: null,
     allowedModels: [
-      'gemini-flash', 
+      'gemini-2.0-flash', 
       'gpt-4o-mini', 
-      'deepseek-chat',
+      'gemini-2.5-pro',
       'claude-haiku', 
-      'gemini-pro',
-      'gemini-2.0-thinking',
-      'gpt-4o',
-      'claude-sonnet',
-      'claude-3.5-sonnet',
-      'claude-opus'
+      'gemini-2.5-flash'
     ],
     economyLimit: null,
     premiumLimit: null,
@@ -213,7 +174,7 @@ export const TIER_CONFIG: Record<SubscriptionTier, TierLimits> = {
     },
     features: [
       'Pay per itinerary',
-      'All 10 AI models available',
+      'All 5 AI models available',
       'Credits never expire',
       'Unlimited edits',
       'All premium features',
@@ -225,16 +186,11 @@ export const TIER_CONFIG: Record<SubscriptionTier, TierLimits> = {
     price: 9.99,
     plansLimit: null,
     allowedModels: [
-      'gemini-flash', 
+      'gemini-2.0-flash', 
       'gpt-4o-mini', 
-      'deepseek-chat',
+      'gemini-2.5-pro',
       'claude-haiku', 
-      'gemini-pro',
-      'gemini-2.0-thinking',
-      'gpt-4o',
-      'claude-sonnet',
-      'claude-3.5-sonnet',
-      'claude-opus'
+      'gemini-2.5-flash'
     ],
     economyLimit: 100,
     premiumLimit: 20,
@@ -246,7 +202,7 @@ export const TIER_CONFIG: Record<SubscriptionTier, TierLimits> = {
     },
     features: [
       '100 economy + 20 premium plans/month',
-      'All 10 AI models included',
+      'All 5 AI models included',
       'Unused premium plans roll over',
       'Priority generation',
       'Unlimited edits',

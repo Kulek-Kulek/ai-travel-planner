@@ -9,7 +9,7 @@
  * Use this if the regex-based extraction isn't accurate enough.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -133,6 +133,9 @@ export const ItineraryFormAIEnhanced = ({
   const [extractedInfo, setExtractedInfo] = useState<ExtractedTravelInfo | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractionTimeout, setExtractionTimeout] = useState<NodeJS.Timeout | null>(null);
+  
+  // Ref for the submit button to enable auto-scroll
+  const submitButtonRef = useRef<HTMLButtonElement>(null);
 
   const defaultFormValues = {
     destination: "",
@@ -142,7 +145,7 @@ export const ItineraryFormAIEnhanced = ({
     childAges: [],
     hasAccessibilityNeeds: false,
     notes: "",
-    model: "google/gemini-flash-1.5-8b" as const, // Default to free tier model
+    model: "google/gemini-2.0-flash-lite-001" as const, // Default to free tier model
   };
 
   const form = useForm<ItineraryFormData>({
@@ -224,6 +227,9 @@ export const ItineraryFormAIEnhanced = ({
             console.error("Failed to parse endDate:", extracted.endDate, error);
           }
         }
+        
+        // Trigger validation after all fields are set to update isValid state
+        await form.trigger();
       } catch (error) {
         console.error("Extraction error:", error);
         toast.error("Failed to analyze your description", {
@@ -241,6 +247,20 @@ export const ItineraryFormAIEnhanced = ({
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchNotes]); // Only depend on watchNotes to trigger extraction
+
+  // Auto-scroll to submit button when AI extraction completes and form is valid
+  useEffect(() => {
+    // Only scroll when extraction finishes (isExtracting becomes false), we have extracted info, and form is valid
+    if (!isExtracting && extractedInfo && submitButtonRef.current && form.formState.isValid) {
+      // Wait a bit for the UI to update before scrolling
+      setTimeout(() => {
+        submitButtonRef.current?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center' 
+        });
+      }, 300);
+    }
+  }, [isExtracting, extractedInfo, form.formState.isValid]);
 
   // Auto-calculate days when dates are selected, BUT only if days weren't already extracted from description
   useEffect(() => {
@@ -784,16 +804,11 @@ export const ItineraryFormAIEnhanced = ({
               const getPricingModelKey = (openRouterValue: string) => {
                 // Map openrouter values to pricing model keys
                 const mapping: Record<string, string> = {
-                  'google/gemini-flash-1.5-8b': 'gemini-flash',
+                  'google/gemini-2.0-flash-lite-001': 'gemini-2.0-flash',
                   'openai/gpt-4o-mini': 'gpt-4o-mini',
-                  'deepseek/deepseek-chat': 'deepseek-chat',
+                  'google/gemini-2.5-pro': 'gemini-2.5-pro',
                   'anthropic/claude-3-haiku': 'claude-haiku',
-                  'google/gemini-2.0-flash-exp:free': 'gemini-pro',
-                  'google/gemini-2.0-flash-thinking-exp:free': 'gemini-2.0-thinking',
-                  'openai/gpt-4o': 'gpt-4o',
-                  'anthropic/claude-3-sonnet': 'claude-sonnet',
-                  'anthropic/claude-3.5-sonnet': 'claude-3.5-sonnet',
-                  'anthropic/claude-3-opus': 'claude-opus',
+                  'google/gemini-2.5-flash': 'gemini-2.5-flash',
                 };
                 return mapping[openRouterValue];
               };
@@ -925,8 +940,9 @@ export const ItineraryFormAIEnhanced = ({
         </section>
 
         <Button 
+          ref={submitButtonRef}
           type="submit" 
-          className="w-full" 
+          className="w-full h-12 text-base" 
           disabled={isLoading || isExtracting || (hasResult && !isAuthenticated)} 
           size="lg"
         >
