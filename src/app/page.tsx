@@ -481,7 +481,7 @@ export default function Home() {
       <Masthead onPlanTrip={handlePlanTripScroll} />
 
       {/* Main Content */}
-      <main className="relative z-10 mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
+      <main className="relative z-10 mx-auto max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
         {/* Form and Preview Section */}
         <div
           ref={formRef}
