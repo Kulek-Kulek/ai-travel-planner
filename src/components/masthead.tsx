@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Sparkles, Zap, Compass, Sunrise, Sun, Moon } from "lucide-react";
+import { Sparkles, Compass, Sunrise, Sun, Moon } from "lucide-react";
 
 type MastheadProps = {
   onPlanTrip: () => void;

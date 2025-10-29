@@ -47,7 +47,7 @@ export default function TestTravelQuizPage() {
                 Quiz Complete! 🎉
               </h1>
               <p className="text-slate-600">
-                Here's what you told us (AI profile generation coming next!)
+                Here&apos;s what you told us (AI profile generation coming next!)
               </p>
             </div>
 
