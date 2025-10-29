@@ -10,7 +10,7 @@ import { TravelPersonalityBanner } from "@/components/travel-personality-banner"
 import { generateItinerary } from "@/lib/actions/ai-actions";
 import { claimDraftItinerary } from "@/lib/actions/itinerary-actions";
 import { getUserRole } from "@/lib/auth/admin";
-import { getUser } from "@/lib/actions/auth-actions";
+import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import type { OpenRouterModel } from "@/lib/openrouter/models";
 import { Button } from "@/components/ui/button";
@@ -74,49 +74,61 @@ export default function Home() {
     });
   }, []);
 
-  // Check authentication status on mount
+  // Check authentication status on mount and listen to auth changes
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const user = await getUser();
-        const isAuth = !!user;
-        setIsAuthenticated(isAuth);
+    const supabase = createClient();
+    
+    // Function to handle auth state
+    const handleAuthState = (user: any) => {
+      const isAuth = !!user;
+      setIsAuthenticated(isAuth);
+      
+      // If user is authenticated, always clear the "created plan while logged out" flags
+      if (isAuth) {
+        sessionStorage.removeItem('createdPlanWhileLoggedOut');
+        sessionStorage.removeItem('draftItineraryId');
+        setHasCreatedPlanWhileLoggedOut(false);
         
-        // If user is now authenticated, clear the "created plan while logged out" flags
-        if (isAuth) {
-          sessionStorage.removeItem('createdPlanWhileLoggedOut');
-          sessionStorage.removeItem('draftItineraryId');
-          setHasCreatedPlanWhileLoggedOut(false);
-          
-          // Check if there's a pending bucket list add
-          const pendingBucketListAdd = sessionStorage.getItem('pendingBucketListAdd');
-          if (pendingBucketListAdd) {
-            // Import and execute the add
-            import('@/lib/actions/itinerary-actions').then(({ addToBucketList }) => {
-              addToBucketList(pendingBucketListAdd).then((result) => {
-                if (result.success) {
-                  toast.success('Added to your bucket list! ❤️');
-                  // Invalidate queries to refresh bucket list state
-                  queryClient.invalidateQueries({ queryKey: ['bucket-list-ids'] });
-                  queryClient.invalidateQueries({ queryKey: ['bucket-list'] });
-                }
-              });
+        // Check if there's a pending bucket list add
+        const pendingBucketListAdd = sessionStorage.getItem('pendingBucketListAdd');
+        if (pendingBucketListAdd) {
+          // Import and execute the add
+          import('@/lib/actions/itinerary-actions').then(({ addToBucketList }) => {
+            addToBucketList(pendingBucketListAdd).then((result) => {
+              if (result.success) {
+                toast.success('Added to your bucket list! ❤️');
+                // Invalidate queries to refresh bucket list state
+                queryClient.invalidateQueries({ queryKey: ['bucket-list-ids'] });
+                queryClient.invalidateQueries({ queryKey: ['bucket-list'] });
+              }
             });
-            // Clear the pending add
-            sessionStorage.removeItem('pendingBucketListAdd');
-          }
+          });
+          // Clear the pending add
+          sessionStorage.removeItem('pendingBucketListAdd');
         }
-      } catch {
-        setIsAuthenticated(false);
+      } else {
+        // Only if NOT authenticated, check sessionStorage for previous anonymous session
+        const createdPlanWhileLoggedOut = sessionStorage.getItem('createdPlanWhileLoggedOut');
+        if (createdPlanWhileLoggedOut === 'true') {
+          setHasCreatedPlanWhileLoggedOut(true);
+        }
       }
     };
-    checkAuth();
     
-    // Check if user created a plan while logged out (persisted in sessionStorage)
-    const createdPlanWhileLoggedOut = sessionStorage.getItem('createdPlanWhileLoggedOut');
-    if (createdPlanWhileLoggedOut === 'true') {
-      setHasCreatedPlanWhileLoggedOut(true);
-    }
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      handleAuthState(session?.user ?? null);
+    });
+    
+    // Listen to auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      handleAuthState(session?.user ?? null);
+    });
+    
+    // Cleanup subscription on unmount
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [queryClient]);
 
   // Load itinerary from URL param or sessionStorage if present
@@ -165,8 +177,9 @@ export default function Home() {
               
               // If this is a draft, check if user is now authenticated and claim it
               if (itinerary.status === 'draft') {
-                getUser().then((user) => {
-                  if (user) {
+                const supabase = createClient();
+                supabase.auth.getSession().then(({ data: { session } }) => {
+                  if (session?.user) {
                       claimDraftItinerary(itineraryId!).then((result) => {
                         if (result.success) {
                           
