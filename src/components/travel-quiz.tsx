@@ -410,7 +410,7 @@ export function TravelQuiz({ onComplete, isGenerating = false }: TravelQuizProps
       return selectedOptions.length > 0;
     }
     
-    return !!responses[currentQ.id];
+    return !!(responses as Record<string, any>)[currentQ.id];
   };
 
   const isLastQuestion = currentQuestion === questions.length - 1;
@@ -419,7 +419,7 @@ export function TravelQuiz({ onComplete, isGenerating = false }: TravelQuizProps
   if (showSummary) {
     const getAnswerDisplay = (questionId: string) => {
       const question = questions.find(q => q.id === questionId);
-      const answer = responses[questionId];
+      const answer = (responses as Record<string, any>)[questionId];
       
       if (!answer) return 'Not answered';
       
@@ -427,12 +427,12 @@ export function TravelQuiz({ onComplete, isGenerating = false }: TravelQuizProps
         if (answer.length === 0) return 'Skipped';
         return answer.map(val => {
           const option = question?.options?.find(opt => opt.value === val);
-          return option?.label || val;
+          return (option as any)?.label || (option as any)?.title || val;
         }).join(', ');
       }
       
       const option = question?.options?.find(opt => opt.value === answer);
-      return option?.title || option?.label || answer as string;
+      return (option as any)?.title || (option as any)?.label || answer as string;
     };
 
     return (
@@ -545,7 +545,7 @@ export function TravelQuiz({ onComplete, isGenerating = false }: TravelQuizProps
                     key={option.value}
                     onClick={() => handleSingleSelect(option.value)}
                     className={`p-6 rounded-xl border-2 transition-all hover:scale-105 text-left ${
-                      responses[currentQ.id] === option.value
+                      (responses as Record<string, any>)[currentQ.id] === option.value
                         ? 'border-blue-500 bg-blue-50 shadow-lg'
                         : 'border-slate-200 hover:border-blue-300 bg-white'
                     }`}
@@ -554,9 +554,9 @@ export function TravelQuiz({ onComplete, isGenerating = false }: TravelQuizProps
                       <IconComponent className="w-10 h-10 text-blue-600" />
                     </div>
                     <div className="text-lg font-semibold text-slate-900 mb-1">
-                      {option.title}
+                      {(option as any).title}
                     </div>
-                    <div className="text-sm text-slate-600">{option.desc}</div>
+                    <div className="text-sm text-slate-600">{(option as any).desc}</div>
                   </button>
                 );
               })}
@@ -573,7 +573,7 @@ export function TravelQuiz({ onComplete, isGenerating = false }: TravelQuizProps
                     key={option.value}
                     onClick={() => handleSingleSelect(option.value)}
                     className={`p-4 rounded-lg border-2 transition-all hover:scale-105 ${
-                      responses[currentQ.id] === option.value
+                      (responses as Record<string, any>)[currentQ.id] === option.value
                         ? 'border-blue-500 bg-blue-50 shadow-md'
                         : 'border-slate-200 hover:border-blue-300 bg-white'
                     }`}
@@ -582,9 +582,9 @@ export function TravelQuiz({ onComplete, isGenerating = false }: TravelQuizProps
                       <IconComponent className="w-8 h-8 text-blue-600" />
                     </div>
                     <div className="font-semibold text-slate-900 text-sm">
-                      {option.label}
+                      {(option as any).label}
                     </div>
-                    <div className="text-xs text-slate-600 mt-1">{option.desc}</div>
+                    <div className="text-xs text-slate-600 mt-1">{(option as any).desc}</div>
                   </button>
                 );
               })}
@@ -609,7 +609,7 @@ export function TravelQuiz({ onComplete, isGenerating = false }: TravelQuizProps
                       } disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
                       <IconComponent className="w-4 h-4" />
-                      <span className="font-medium text-sm">{option.label}</span>
+                      <span className="font-medium text-sm">{(option as any).label}</span>
                     </button>
                   );
                 })}
@@ -649,7 +649,7 @@ export function TravelQuiz({ onComplete, isGenerating = false }: TravelQuizProps
                         </div>
                         {IconComponent && <IconComponent className="w-5 h-5 text-slate-600" />}
                         <span className="font-medium text-slate-900 text-sm">
-                          {option.label}
+                          {(option as any).label}
                         </span>
                       </div>
                     </button>
