@@ -41,7 +41,7 @@ export function Masthead({ onPlanTrip }: MastheadProps) {
     }
     
     // Try to get itineraries with 3+ days first
-    let filtered = itinerariesData.itineraries.filter(itinerary => itinerary.days >= 3);
+    let filtered = itinerariesData.itineraries.filter((itinerary: any) => itinerary.days >= 3);
     
     // If no itineraries with 3+ days, use all itineraries
     if (filtered.length === 0) {
@@ -158,7 +158,7 @@ export function Masthead({ onPlanTrip }: MastheadProps) {
                   </p>
 
                   <ul className="mt-4 space-y-2 text-sm text-indigo-100 flex-1 min-h-0 overflow-hidden">
-                    {currentItinerary.ai_plan?.days?.slice(0, 3).map((day, idx) => {
+                    {currentItinerary.ai_plan?.days?.slice(0, 3).map((day: any, idx: number) => {
                       const DayIcon = [Sunrise, Sun, Moon][idx] || Sparkles;
                       return (
                         <li key={idx} className="flex items-start gap-3 min-h-[60px]">

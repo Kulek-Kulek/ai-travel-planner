@@ -265,6 +265,7 @@ export interface CreditPack {
     min: number; // Using premium models
     max: number; // Using economy models
   };
+  popular?: boolean;
 }
 
 export const CREDIT_PACKS: CreditPack[] = [
