@@ -137,7 +137,7 @@ export function TravelPersonalityQuizCTA() {
         {/* What You'll Get */}
         <Card className="p-8 bg-gradient-to-br from-slate-50 to-slate-100">
           <h2 className="text-2xl font-bold text-slate-900 mb-4 text-center">
-            What You'll Discover
+            What You&apos;ll Discover
           </h2>
           <div className="space-y-3 max-w-2xl mx-auto">
             {[

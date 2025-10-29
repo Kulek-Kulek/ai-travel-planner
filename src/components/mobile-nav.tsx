@@ -48,7 +48,7 @@ export function MobileNav({ user, isAdmin }: MobileNavProps) {
       setIsSigningOut(true);
       closeMenu();
       await clientSignOut();
-    } catch (error) {
+    } catch {
       setIsSigningOut(false);
       toast.error('Failed to sign out', {
         description: 'Please try again',

@@ -12,7 +12,7 @@ export function SignOutButton() {
     try {
       setIsSigningOut(true);
       await clientSignOut();
-    } catch (error) {
+    } catch {
       setIsSigningOut(false);
       toast.error('Failed to sign out', {
         description: 'Please try again',
