@@ -128,7 +128,6 @@ export function ItineraryCard({
     setIsLiking(true);
     setJustLiked(true);
     
-    // Remove animation after it completes (500ms)
     setTimeout(() => setJustLiked(false), 500);
     
     // Optimistic update
