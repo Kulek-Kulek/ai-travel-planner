@@ -9,6 +9,7 @@ import { DownloadPDFButton } from '@/components/download-pdf-button';
 import { BookingAccommodationCard } from '@/components/booking-accommodation-card';
 import { ItineraryMap } from '@/components/itinerary-map';
 import { GoogleMapsButton } from '@/components/google-maps-button';
+import { ScrollToTop } from '@/components/scroll-to-top';
 import { isGoogleMapsEnabled } from '@/lib/config/google-maps';
 import { createClient } from '@/lib/supabase/server';
 import { 
@@ -64,8 +65,10 @@ export default async function ItineraryPage({
   const isOwner = user?.id === user_id;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12">
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <>
+      <ScrollToTop />
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12">
+        <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Back button */}
         <div className="flex gap-4 mb-6">
           <Link
@@ -293,6 +296,7 @@ export default async function ItineraryPage({
         />
       </main>
     </div>
+    </>
   );
 }
 

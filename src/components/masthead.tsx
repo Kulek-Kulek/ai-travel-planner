@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getPublicItineraries } from "@/lib/actions/itinerary-actions";
 import { Sparkles, Zap, Compass, Sunrise, Sun, Moon } from "lucide-react";
 
 type MastheadProps = {
@@ -14,28 +13,47 @@ export function Masthead({ onPlanTrip }: MastheadProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
 
-  // Use TanStack Query with the same cache key as the gallery
+  // Use TanStack Query with API route (same approach as gallery)
   const { data: itinerariesData, isLoading } = useQuery({
-    queryKey: ['public-itineraries', []], // Same key as gallery uses
+    queryKey: ['public-itineraries', [], ''], // Same key structure as gallery
     queryFn: async () => {
-      const result = await getPublicItineraries({ limit: 20, tags: [] });
-      if (!result.success) {
+      const params = new URLSearchParams();
+      params.set('limit', '20');
+      
+      const url = `/api/itineraries?${params.toString()}`;
+      const response = await fetch(url);
+      
+      if (!response.ok) {
         return { itineraries: [], total: 0 };
       }
-      return result.data;
+      
+      const data = await response.json();
+      return data;
     },
     staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
+    retry: 2,
   });
 
   // Memoize the carousel itineraries to avoid re-shuffling
   const itineraries = useMemo(() => {
-    if (!itinerariesData?.itineraries.length) return [];
+    if (!itinerariesData?.itineraries.length) {
+      return [];
+    }
     
-    // Shuffle and take 5 random itineraries with 3+ days
-    return [...itinerariesData.itineraries]
-      .filter(itinerary => itinerary.days >= 3)
+    // Try to get itineraries with 3+ days first
+    let filtered = itinerariesData.itineraries.filter(itinerary => itinerary.days >= 3);
+    
+    // If no itineraries with 3+ days, use all itineraries
+    if (filtered.length === 0) {
+      filtered = itinerariesData.itineraries;
+    }
+    
+    // Shuffle and take up to 5 random itineraries
+    const shuffled = [...filtered]
       .sort(() => Math.random() - 0.5)
-      .slice(0, Math.min(5, itinerariesData.itineraries.length));
+      .slice(0, Math.min(5, filtered.length));
+      
+    return shuffled;
   }, [itinerariesData]);
 
   useEffect(() => {
@@ -113,11 +131,19 @@ export function Masthead({ onPlanTrip }: MastheadProps) {
               onMouseEnter={() => setIsPaused(true)}
               onMouseLeave={() => setIsPaused(false)}
             >
-              {isLoading || !currentItinerary ? (
+              {isLoading ? (
                 <div className="flex items-center justify-center h-96">
                   <div className="text-center">
                     <div className="mb-4 inline-block h-8 w-8 animate-spin rounded-full border-4 border-white/30 border-t-white"></div>
                     <p className="text-sm text-white/60">Loading trips...</p>
+                  </div>
+                </div>
+              ) : !currentItinerary ? (
+                <div className="flex items-center justify-center h-96">
+                  <div className="text-center">
+                    <Compass className="w-12 h-12 text-white/40 mx-auto mb-3" />
+                    <p className="text-sm text-white/70">No trips available yet</p>
+                    <p className="text-xs text-white/50 mt-2">Create your first itinerary to see it here!</p>
                   </div>
                 </div>
               ) : (
