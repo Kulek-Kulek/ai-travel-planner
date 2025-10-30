@@ -46,6 +46,7 @@ export type Itinerary = {
   image_url?: string | null;
   image_photographer?: string | null;
   image_photographer_url?: string | null;
+  ai_model_used?: string | null; // The AI model used to generate this itinerary
   likes: number; // Number of thumb-ups this itinerary has received
   created_at: string;
 };

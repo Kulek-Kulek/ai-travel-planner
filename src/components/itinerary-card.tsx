@@ -4,7 +4,9 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Itinerary } from '@/lib/actions/itinerary-actions';
 import { likeItinerary, addToBucketList, removeFromBucketList, isInBucketList } from '@/lib/actions/itinerary-actions';
+import { canEditItinerary } from '@/lib/actions/subscription-actions';
 import { Button } from './ui/button';
+import { UpgradeModal } from './upgrade-modal';
 import { createClient } from '@/lib/supabase/client';
 import {
   DropdownMenu,
@@ -31,7 +33,8 @@ import {
   Pencil, 
   MoreVertical,
   RotateCcw,
-  Hotel
+  Hotel,
+  Sparkles
 } from 'lucide-react';
 
 interface ItineraryCardProps {
@@ -92,6 +95,19 @@ export function ItineraryCard({
   const [isCheckingBucketList, setIsCheckingBucketList] = useState(isInBucketListProp === undefined);
   const [isAddingToBucket, setIsAddingToBucket] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const [isCheckingEdit, setIsCheckingEdit] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgradeModalConfig, setUpgradeModalConfig] = useState({
+    title: "Free Tier Limit Reached",
+    description: "You've reached the edit limit for this itinerary. Upgrade to continue editing your travel plans!",
+    features: [
+      "Unlimited edits & regenerations",
+      "All AI models (including premium)",
+      "Unlimited itinerary creations",
+      "Priority generation",
+      "Save & organize all your plans",
+    ],
+  });
   
   // Check if itinerary is in bucket list on mount - only if not provided via props
   useEffect(() => {
@@ -293,6 +309,64 @@ export function ItineraryCard({
     } catch (error) {
       console.error('Error generating booking link:', error);
       toast.error('Failed to open booking search');
+    }
+  };
+  
+  const handleEditClick = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (isCheckingEdit) return;
+    
+    setIsCheckingEdit(true);
+    
+    try {
+      // Check if user can edit this itinerary
+      const result = await canEditItinerary(id);
+      
+      if (!result.allowed) {
+        // Configure and show upgrade modal
+        if (result.needsUpgrade) {
+          // Free tier - edit limit reached
+          setUpgradeModalConfig({
+            title: "Edit Limit Reached",
+            description: result.reason || "You've reached the edit limit for this itinerary. Upgrade to continue editing your travel plans!",
+            features: [
+              "Unlimited edits & regenerations",
+              "All AI models (including premium)",
+              "Unlimited itinerary creations",
+              "Priority generation",
+              "Save & organize all your plans",
+            ],
+          });
+          setShowUpgradeModal(true);
+        } else if (result.needsTopup) {
+          // PAYG/Pro - insufficient credits
+          setUpgradeModalConfig({
+            title: "Insufficient Credits",
+            description: result.reason || "You don't have enough credits to edit this itinerary. Top up to continue!",
+            features: [
+              "Add credits anytime",
+              "Pay only for what you use",
+              "All AI models available",
+              "No monthly commitment",
+              "Credits never expire",
+            ],
+          });
+          setShowUpgradeModal(true);
+        } else {
+          // Other errors - show toast
+          toast.error(result.reason || 'Cannot edit itinerary');
+        }
+      } else {
+        // Editing is allowed - navigate to edit page
+        router.push(`/itinerary/${id}/edit`);
+      }
+    } catch (error) {
+      console.error('Error checking edit permission:', error);
+      toast.error('Something went wrong. Please try again.');
+    } finally {
+      setIsCheckingEdit(false);
     }
   };
   
@@ -559,11 +633,23 @@ export function ItineraryCard({
                   <Eye className="w-4 h-4" /> View
                 </Button>
               </Link>
-              <Link href={`/itinerary/${id}/edit`} className="flex-1">
-                <Button variant="outline" size="sm" className="w-full gap-1.5">
-                  <Pencil className="w-4 h-4" /> Edit & Regenerate
-                </Button>
-              </Link>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="flex-1 gap-1.5"
+                onClick={handleEditClick}
+                disabled={isCheckingEdit}
+              >
+                {isCheckingEdit ? (
+                  <>
+                    <Sparkles className="w-4 h-4 animate-spin" /> Checking...
+                  </>
+                ) : (
+                  <>
+                    <Pencil className="w-4 h-4" /> Edit & Regenerate
+                  </>
+                )}
+              </Button>
               
               {/* More Actions Dropdown */}
               <DropdownMenu>
@@ -646,12 +732,36 @@ export function ItineraryCard({
   // Don't wrap if showing bucket list actions or my plans actions
   if (!showActions && !showBucketListActions) {
     return (
-      <Link href={`/itinerary/${id}`} prefetch scroll={true}>
-        {cardContent}
-      </Link>
+      <>
+        <Link href={`/itinerary/${id}`} prefetch scroll={true}>
+          {cardContent}
+        </Link>
+        
+        {/* Upgrade Modal */}
+        <UpgradeModal 
+          open={showUpgradeModal} 
+          onOpenChange={setShowUpgradeModal}
+          title={upgradeModalConfig.title}
+          description={upgradeModalConfig.description}
+          features={upgradeModalConfig.features}
+        />
+      </>
     );
   }
 
-  return cardContent;
+  return (
+    <>
+      {cardContent}
+      
+      {/* Upgrade Modal */}
+      <UpgradeModal 
+        open={showUpgradeModal} 
+        onOpenChange={setShowUpgradeModal}
+        title={upgradeModalConfig.title}
+        description={upgradeModalConfig.description}
+        features={upgradeModalConfig.features}
+      />
+    </>
+  );
 }
 

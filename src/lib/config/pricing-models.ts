@@ -135,7 +135,7 @@ export const TIER_CONFIG: Record<SubscriptionTier, TierLimits> = {
     displayName: 'Free',
     price: 0,
     plansLimit: 2,
-    allowedModels: ['gemini-2.0-flash', 'gpt-4o-mini'],
+    allowedModels: ['gemini-flash', 'gemini-2.0-flash', 'gpt-4o-mini'], // gemini-flash is the database key
     economyLimit: null,
     premiumLimit: null,
     premiumRolloverMax: 0,
@@ -158,6 +158,7 @@ export const TIER_CONFIG: Record<SubscriptionTier, TierLimits> = {
     price: 0, // Variable pricing
     plansLimit: null,
     allowedModels: [
+      'gemini-flash',
       'gemini-2.0-flash', 
       'gpt-4o-mini', 
       'gemini-2.5-pro',
@@ -174,7 +175,7 @@ export const TIER_CONFIG: Record<SubscriptionTier, TierLimits> = {
     },
     features: [
       'Pay per itinerary',
-      'All 5 AI models available',
+      'All 5 AI models',
       'Credits never expire',
       'Unlimited edits',
       'All premium features',
@@ -186,6 +187,7 @@ export const TIER_CONFIG: Record<SubscriptionTier, TierLimits> = {
     price: 9.99,
     plansLimit: null,
     allowedModels: [
+      'gemini-flash',
       'gemini-2.0-flash', 
       'gpt-4o-mini', 
       'gemini-2.5-pro',
@@ -202,7 +204,7 @@ export const TIER_CONFIG: Record<SubscriptionTier, TierLimits> = {
     },
     features: [
       '100 economy + 20 premium plans/month',
-      'All 5 AI models included',
+      'All 5 AI models',
       'Unused premium plans roll over',
       'Priority generation',
       'Unlimited edits',
@@ -335,7 +337,8 @@ export function validateModelSelection(
     monthlyPremiumUsed?: number;
     premiumRollover?: number;
     plansCreatedCount?: number;
-  }
+  },
+  operation: 'create' | 'edit' | 'regenerate' = 'create'
 ): { valid: boolean; reason?: string; cost?: number } {
   // Check if model is allowed for tier
   if (!isModelAvailable(model, tier)) {
@@ -350,7 +353,9 @@ export function validateModelSelection(
   // Check tier-specific rules
   switch (tier) {
     case 'free':
-      if ((profile.plansCreatedCount ?? 0) >= TIER_CONFIG.free.plansLimit!) {
+      // For edit/regenerate operations, don't check creation limit
+      // Edit limits are checked separately in canGeneratePlan
+      if (operation === 'create' && (profile.plansCreatedCount ?? 0) >= TIER_CONFIG.free.plansLimit!) {
         return {
           valid: false,
           reason: 'Free tier limit reached (2 plans). Please upgrade.',
