@@ -40,7 +40,7 @@ const generateItinerarySchema = z.object({
     })
     .optional(),
   model: z.enum(OPENROUTER_MODEL_VALUES).default(DEFAULT_OPENROUTER_MODEL),
-  turnstileToken: z.string().min(1, "Security verification required"),
+  turnstileToken: z.string().optional(), // Optional for authenticated users editing their own itineraries
 });
 
 // AI response schema matching your PRD
@@ -93,21 +93,32 @@ export async function generateItinerary(
     // 1. Validate input
     const validated = generateItinerarySchema.parse(input);
 
-    // 1.5. Verify Turnstile token (bot protection)
-    const isValidToken = await verifyTurnstileToken(validated.turnstileToken);
-    if (!isValidToken) {
-      console.error('❌ Invalid Turnstile token - possible bot activity');
-      return {
-        success: false,
-        error: 'Security verification failed. Please refresh the page and try again.',
-      };
-    }
-
     // 2. Check if user is authenticated and can generate
     const supabase = await createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
+
+    // 1.5. Verify Turnstile token (bot protection) - only required for unauthenticated users
+    // Authenticated users editing/regenerating their itineraries are already verified
+    if (!user?.id && !validated.turnstileToken) {
+      console.error('❌ Missing Turnstile token for unauthenticated user');
+      return {
+        success: false,
+        error: 'Security verification required. Please refresh the page and try again.',
+      };
+    }
+    
+    if (!user?.id && validated.turnstileToken) {
+      const isValidToken = await verifyTurnstileToken(validated.turnstileToken);
+      if (!isValidToken) {
+        console.error('❌ Invalid Turnstile token - possible bot activity');
+        return {
+          success: false,
+          error: 'Security verification failed. Please refresh the page and try again.',
+        };
+      }
+    }
 
     // Get the model key for usage tracking
     const modelKey = mapOpenRouterModelToKey(validated.model);
