@@ -559,6 +559,7 @@ export default function Home() {
       notes: data.notes,
       model: data.model,
       turnstileToken: data.turnstileToken,
+      operation: 'create',
     });
   };
 

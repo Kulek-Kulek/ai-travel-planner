@@ -961,7 +961,7 @@ export const ItineraryFormAIEnhanced = ({
         {/* Cloudflare Turnstile - Bot Protection */}
      
           <Turnstile
-            siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+            siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ''}
             onSuccess={(token) => setTurnstileToken(token)}
             onError={() => {
               setTurnstileToken(null);

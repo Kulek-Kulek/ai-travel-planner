@@ -25,6 +25,7 @@ import confetti from "canvas-confetti";
 import {
   OPENROUTER_MODEL_OPTIONS,
   DEFAULT_OPENROUTER_MODEL,
+  type OpenRouterModel,
 } from "@/lib/openrouter/models";
 import {
   AI_MODELS,
@@ -181,7 +182,7 @@ export default function EditItineraryPage() {
         travelers,
         hasAccessibilityNeeds,
         notes,
-        model: selectedModel, // Use user-selected model
+        model: selectedModel as OpenRouterModel, // Use user-selected model
         keepExistingPhoto: true,
         existingPhotoData: {
           image_url: itinerary.image_url,
