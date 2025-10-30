@@ -1,11 +1,9 @@
 export const OPENROUTER_MODEL_VALUES = [
-  "google/gemini-2.5-flash",
-  "google/gemini-2.5-pro-exp",
-  "openai/gpt-5",
+  "google/gemini-2.0-flash-lite-001",
   "openai/gpt-4o-mini",
-  "google/gemini-1.5-flash",
-  "deepseek/deepseek-chat",
+  "google/gemini-2.5-pro",
   "anthropic/claude-3-haiku",
+  "google/gemini-2.5-flash",
 ] as const;
 
 export type OpenRouterModel = (typeof OPENROUTER_MODEL_VALUES)[number];
@@ -16,51 +14,39 @@ export const OPENROUTER_MODEL_OPTIONS: Array<{
   description: string;
 }> = [
   {
-    value: "google/gemini-2.5-flash",
-    label: "Gemini Flash 2.5 (Google)",
-    description: "Very fast and low-cost; great for structured trip plans.",
-  },
-  {
-    value: "google/gemini-2.5-pro-exp",
-    label: "Gemini 2.5 Pro (Google)",
-    description: "High quality and detailed planning; experimental version.",
-  },
-  {
-    value: "openai/gpt-5",
-    label: "GPT-5 (OpenAI)",
-    description: "Most advanced OpenAI model with exceptional reasoning.",
+    value: "google/gemini-2.0-flash-lite-001",
+    label: "Gemini 2.0 Flash Lite (Google)",
+    description: "Fast and reliable, great for quick travel plans.",
   },
   {
     value: "openai/gpt-4o-mini",
     label: "GPT-4o mini (OpenAI)",
-    description: "Fast, affordable, and solid general performance.",
+    description: "Fast and affordable with excellent quality.",
   },
   {
-    value: "google/gemini-1.5-flash",
-    label: "Gemini Flash 1.5 (Google)",
-    description: "Budget-friendly alternative; good for itineraries.",
-  },
-  {
-    value: "deepseek/deepseek-chat",
-    label: "DeepSeek Chat",
-    description: "Analytical model with detail-oriented suggestions.",
+    value: "google/gemini-2.5-pro",
+    label: "Gemini 2.5 Pro (Google)",
+    description: "Advanced reasoning and comprehensive planning capabilities.",
   },
   {
     value: "anthropic/claude-3-haiku",
     label: "Claude 3 Haiku (Anthropic)",
-    description: "Efficient option with strong clarity for summaries.",
+    description: "Lightning-fast and efficient, perfect for balanced itineraries.",
+  },
+  {
+    value: "google/gemini-2.5-flash",
+    label: "Gemini 2.5 Flash (Google)",
+    description: "Latest Gemini with enhanced speed and quality.",
   },
 ];
 
 export const DEFAULT_OPENROUTER_MODEL: OpenRouterModel =
-  "google/gemini-2.5-flash";
+  "google/gemini-2.0-flash-lite-001";
 
 export const OPENROUTER_BUDGET_FIRST_ORDER: OpenRouterModel[] = [
-  "google/gemini-2.5-flash",
+  "google/gemini-2.0-flash-lite-001",
   "openai/gpt-4o-mini",
-  "google/gemini-1.5-flash",
-  "deepseek/deepseek-chat",
+  "google/gemini-2.5-flash",
   "anthropic/claude-3-haiku",
-  "google/gemini-2.5-pro-exp",
-  "openai/gpt-5",
+  "google/gemini-2.5-pro",
 ];

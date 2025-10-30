@@ -128,7 +128,6 @@ export function ItineraryCard({
     setIsLiking(true);
     setJustLiked(true);
     
-    // Remove animation after it completes (500ms)
     setTimeout(() => setJustLiked(false), 500);
     
     // Optimistic update
@@ -399,24 +398,26 @@ export function ItineraryCard({
         </p>
       </div>
       
-      {/* Tags */}
-      {tags && tags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-3">
-          {tags.slice(0, 6).map((tag, idx) => (
-            <span
-              key={idx}
-              className="inline-block bg-blue-50 text-blue-700 text-xs px-2 py-1 rounded-full border border-blue-200"
-            >
-              {tag}
-            </span>
-          ))}
-          {tags.length > 6 && (
-            <span className="inline-block text-blue-600 text-xs px-2 py-1">
-              +{tags.length - 6} more
-            </span>
-          )}
-        </div>
-      )}
+      {/* Tags - Fixed height for consistency */}
+      <div className="mb-3 h-[52px]">
+        {tags && tags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {tags.slice(0, 6).map((tag, idx) => (
+              <span
+                key={idx}
+                className="inline-block bg-blue-50 text-blue-700 text-xs px-2 py-1 rounded-full border border-blue-200"
+              >
+                {tag}
+              </span>
+            ))}
+            {tags.length > 6 && (
+              <span className="inline-block text-blue-600 text-xs px-2 py-1">
+                +{tags.length - 6} more
+              </span>
+            )}
+          </div>
+        )}
+      </div>
       
       {/* Footer - different for gallery vs my plans */}
       {!showActions ? (

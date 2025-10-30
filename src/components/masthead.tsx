@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getPublicItineraries } from "@/lib/actions/itinerary-actions";
-import { Sparkles, Zap, Compass, Sunrise, Sun, Moon } from "lucide-react";
+import { Sparkles, Compass, Sunrise, Sun, Moon } from "lucide-react";
+import type { Itinerary } from "@/lib/actions/itinerary-actions";
 
 type MastheadProps = {
   onPlanTrip: () => void;
@@ -14,28 +14,47 @@ export function Masthead({ onPlanTrip }: MastheadProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
 
-  // Use TanStack Query with the same cache key as the gallery
+  // Use TanStack Query with API route (same approach as gallery)
   const { data: itinerariesData, isLoading } = useQuery({
-    queryKey: ['public-itineraries', []], // Same key as gallery uses
+    queryKey: ['public-itineraries', [], ''], // Same key structure as gallery
     queryFn: async () => {
-      const result = await getPublicItineraries({ limit: 20, tags: [] });
-      if (!result.success) {
+      const params = new URLSearchParams();
+      params.set('limit', '20');
+      
+      const url = `/api/itineraries?${params.toString()}`;
+      const response = await fetch(url);
+      
+      if (!response.ok) {
         return { itineraries: [], total: 0 };
       }
-      return result.data;
+      
+      const data = await response.json();
+      return data;
     },
     staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
+    retry: 2,
   });
 
   // Memoize the carousel itineraries to avoid re-shuffling
   const itineraries = useMemo(() => {
-    if (!itinerariesData?.itineraries.length) return [];
+    if (!itinerariesData?.itineraries.length) {
+      return [];
+    }
     
-    // Shuffle and take 5 random itineraries with 3+ days
-    return [...itinerariesData.itineraries]
-      .filter(itinerary => itinerary.days >= 3)
+    // Try to get itineraries with 3+ days first
+    let filtered = itinerariesData.itineraries.filter((itinerary: Itinerary) => itinerary.days >= 3);
+    
+    // If no itineraries with 3+ days, use all itineraries
+    if (filtered.length === 0) {
+      filtered = itinerariesData.itineraries;
+    }
+    
+    // Shuffle and take up to 5 random itineraries
+    const shuffled = [...filtered]
       .sort(() => Math.random() - 0.5)
-      .slice(0, Math.min(5, itinerariesData.itineraries.length));
+      .slice(0, Math.min(5, filtered.length));
+      
+    return shuffled;
   }, [itinerariesData]);
 
   useEffect(() => {
@@ -62,11 +81,6 @@ export function Masthead({ onPlanTrip }: MastheadProps) {
 
       <div className="relative mx-auto flex max-w-7xl flex-col gap-12 px-4 pt-6 pb-20 sm:px-6 sm:py-20 lg:flex-row lg:items-center lg:gap-16 lg:px-8 lg:pb-24 lg:pt-8">
         <div className="flex-1 space-y-8">
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-1 text-sm font-medium backdrop-blur">
-            <Sparkles className="w-4 h-4" />
-            Smarter planning, happier travels
-          </span>
-
           <div className="space-y-5">
             <h1 className="text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl leading-tight">
               Personal itineraries curated by AI, tailored to your travelers
@@ -76,51 +90,20 @@ export function Masthead({ onPlanTrip }: MastheadProps) {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
             <button
               type="button"
               onClick={onPlanTrip}
-              className="inline-flex items-center justify-center rounded-full bg-white px-8 py-3.5 text-base font-semibold text-indigo-900 shadow-lg shadow-indigo-950/30 transition-all hover:shadow-xl hover:shadow-indigo-900/40 hover:scale-105 active:scale-100"
+              className="inline-flex items-center justify-center rounded-full bg-white px-8 py-3.5 text-base font-semibold text-indigo-900 shadow-lg shadow-indigo-950/30 transition-all hover:shadow-xl hover:shadow-indigo-900/40 w-full sm:w-auto"
             >
               Plan a trip
             </button>
             <Link
               href="#public-itineraries"
-              className="inline-flex items-center justify-center rounded-full border-2 border-white/30 px-7 py-3 text-base font-semibold text-white transition-all hover:border-white hover:bg-white/10 hover:scale-105 active:scale-100"
+              className="inline-flex items-center justify-center rounded-full border-2 border-white/30 px-7 py-3 text-base font-semibold text-white transition-all hover:border-white hover:bg-white/10 w-full sm:w-auto"
             >
               Explore sample itineraries
             </Link>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            {[
-              {
-                icon: Zap,
-                title: "AI-powered drafting",
-                desc: "Capture preferences, accessibility needs, and family details with one guided prompt.",
-              },
-              {
-                icon: Compass,
-                title: "Balanced daily flow",
-                desc: "Curate mornings, afternoons, and evenings that feel effortless for every traveler.",
-              },
-            ].map((feature) => {
-              const IconComponent = feature.icon;
-              return (
-                <div
-                  key={feature.title}
-                  className="flex gap-3.5 rounded-2xl border border-white/15 bg-white/5 p-5 backdrop-blur transition-all hover:bg-white/10 hover:border-white/25"
-                >
-                  <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
-                    <IconComponent className="w-5 h-5 text-white" aria-hidden />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-sm font-semibold text-white">{feature.title}</p>
-                    <p className="text-sm text-indigo-100/90 leading-relaxed">{feature.desc}</p>
-                  </div>
-                </div>
-              );
-            })}
           </div>
 
           <div className="pt-6 border-t border-white/10">
@@ -149,11 +132,19 @@ export function Masthead({ onPlanTrip }: MastheadProps) {
               onMouseEnter={() => setIsPaused(true)}
               onMouseLeave={() => setIsPaused(false)}
             >
-              {isLoading || !currentItinerary ? (
+              {isLoading ? (
                 <div className="flex items-center justify-center h-96">
                   <div className="text-center">
                     <div className="mb-4 inline-block h-8 w-8 animate-spin rounded-full border-4 border-white/30 border-t-white"></div>
                     <p className="text-sm text-white/60">Loading trips...</p>
+                  </div>
+                </div>
+              ) : !currentItinerary ? (
+                <div className="flex items-center justify-center h-96">
+                  <div className="text-center">
+                    <Compass className="w-12 h-12 text-white/40 mx-auto mb-3" />
+                    <p className="text-sm text-white/70">No trips available yet</p>
+                    <p className="text-xs text-white/50 mt-2">Create your first itinerary to see it here!</p>
                   </div>
                 </div>
               ) : (
@@ -168,7 +159,7 @@ export function Masthead({ onPlanTrip }: MastheadProps) {
                   </p>
 
                   <ul className="mt-4 space-y-2 text-sm text-indigo-100 flex-1 min-h-0 overflow-hidden">
-                    {currentItinerary.ai_plan?.days?.slice(0, 3).map((day, idx) => {
+                    {currentItinerary.ai_plan?.days?.slice(0, 3).map((day: Itinerary['ai_plan']['days'][0], idx: number) => {
                       const DayIcon = [Sunrise, Sun, Moon][idx] || Sparkles;
                       return (
                         <li key={idx} className="flex items-start gap-3 min-h-[60px]">

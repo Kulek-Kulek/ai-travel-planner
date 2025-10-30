@@ -9,7 +9,7 @@
  * Use this if the regex-based extraction isn't accurate enough.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { format, differenceInDays, isBefore, startOfDay } from "date-fns";
 import Link from "next/link";
 import { Calendar as CalendarIcon, CheckCircle2, AlertCircle, Sparkles, Lock, Info } from "lucide-react";
+import { Turnstile } from "@marsidev/react-turnstile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -107,8 +108,13 @@ const itineraryFormSchema = z
 
 export type ItineraryFormData = z.infer<typeof itineraryFormSchema>;
 
+// Extended type that includes the Turnstile token
+export type ItineraryFormDataWithToken = ItineraryFormData & {
+  turnstileToken?: string; // Optional for authenticated users regenerating itineraries
+};
+
 interface ItineraryFormProps {
-  onSubmit: (data: ItineraryFormData) => void;
+  onSubmit: (data: ItineraryFormDataWithToken) => void;
   isLoading?: boolean;
   modelOverride?: string; // Allow overriding the default model based on user tier
   isAuthenticated?: boolean; // Whether the user is logged in
@@ -133,19 +139,25 @@ export const ItineraryFormAIEnhanced = ({
   const [extractedInfo, setExtractedInfo] = useState<ExtractedTravelInfo | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractionTimeout, setExtractionTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  
+  // Ref for the submit button to enable auto-scroll
+  const submitButtonRef = useRef<HTMLButtonElement>(null);
+
+  const defaultFormValues = {
+    destination: "",
+    days: 0,
+    travelers: 1,
+    children: undefined,
+    childAges: [],
+    hasAccessibilityNeeds: false,
+    notes: "",
+    model: "google/gemini-2.0-flash-lite-001" as const, // Default to free tier model
+  };
 
   const form = useForm<ItineraryFormData>({
     resolver: zodResolver(itineraryFormSchema),
-    defaultValues: {
-      destination: "",
-      days: 0,
-      travelers: 1,
-      children: undefined,
-      childAges: [],
-      hasAccessibilityNeeds: false,
-      notes: "",
-      model: "google/gemini-1.5-flash", // Default to free tier model
-    },
+    defaultValues: defaultFormValues,
   });
 
   const watchChildren = form.watch("children");
@@ -222,6 +234,9 @@ export const ItineraryFormAIEnhanced = ({
             console.error("Failed to parse endDate:", extracted.endDate, error);
           }
         }
+        
+        // Trigger validation after all fields are set to update isValid state
+        await form.trigger();
       } catch (error) {
         console.error("Extraction error:", error);
         toast.error("Failed to analyze your description", {
@@ -239,6 +254,20 @@ export const ItineraryFormAIEnhanced = ({
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchNotes]); // Only depend on watchNotes to trigger extraction
+
+  // Auto-scroll to submit button when AI extraction completes and form is valid
+  useEffect(() => {
+    // Only scroll when extraction finishes (isExtracting becomes false), we have extracted info, and form is valid
+    if (!isExtracting && extractedInfo && submitButtonRef.current && form.formState.isValid) {
+      // Wait a bit for the UI to update before scrolling
+      setTimeout(() => {
+        submitButtonRef.current?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center' 
+        });
+      }, 300);
+    }
+  }, [isExtracting, extractedInfo, form.formState.isValid]);
 
   // Auto-calculate days when dates are selected, BUT only if days weren't already extracted from description
   useEffect(() => {
@@ -276,8 +305,16 @@ export const ItineraryFormAIEnhanced = ({
   }, [watchChildren, form]);
 
   const handleFormSubmit = (data: ItineraryFormData) => {
+    // Check for Turnstile token (bot protection)
+    if (!turnstileToken) {
+      toast.error("Security verification required", {
+        description: "Please complete the security check to continue",
+      });
+      return;
+    }
+
     // Capitalize destination
-    const capitalizedData = {
+    const capitalizedData: ItineraryFormDataWithToken = {
       ...data,
       destination: data.destination
         .split(" ")
@@ -287,9 +324,13 @@ export const ItineraryFormAIEnhanced = ({
         .join(" "),
       children: data.children ?? 0,
       childAges: data.childAges ?? [],
+      turnstileToken, // Add the token to the data
     };
 
     onSubmit(capitalizedData);
+    
+    // Reset token after submission to require new verification
+    setTurnstileToken(null);
   };
 
   const handleFormError = () => {
@@ -782,11 +823,11 @@ export const ItineraryFormAIEnhanced = ({
               const getPricingModelKey = (openRouterValue: string) => {
                 // Map openrouter values to pricing model keys
                 const mapping: Record<string, string> = {
-                  'google/gemini-1.5-flash': 'gemini-flash',
-                  'google/gemini-2.5-flash': 'gemini-flash', // Also map newer version to same tier
+                  'google/gemini-2.0-flash-lite-001': 'gemini-2.0-flash',
                   'openai/gpt-4o-mini': 'gpt-4o-mini',
+                  'google/gemini-2.5-pro': 'gemini-2.5-pro',
                   'anthropic/claude-3-haiku': 'claude-haiku',
-                  'openai/gpt-5': 'gpt-4o', // Map GPT-5 to premium tier
+                  'google/gemini-2.5-flash': 'gemini-2.5-flash',
                 };
                 return mapping[openRouterValue];
               };
@@ -817,7 +858,7 @@ export const ItineraryFormAIEnhanced = ({
                     <FormLabel>AI Model</FormLabel>
                     <FormControl>
                       <Select value={field.value} onValueChange={field.onChange} disabled={isLoading}>
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className="w-full cursor-pointer">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -831,7 +872,7 @@ export const ItineraryFormAIEnhanced = ({
                                 const pricingKey = getPricingModelKey(option.value);
                                 const pricingModel = AI_MODELS[pricingKey as keyof typeof AI_MODELS];
                                 return (
-                                  <SelectItem key={option.value} value={option.value}>
+                                  <SelectItem key={option.value} value={option.value} className="cursor-pointer">
                                     <div className="flex items-center justify-between w-full gap-3">
                                       <span>{option.label}</span>
                                       <div className="flex items-center gap-2">
@@ -856,14 +897,15 @@ export const ItineraryFormAIEnhanced = ({
                           {/* Locked Models */}
                           {lockedModels.length > 0 && (
                             <>
-                              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-t mt-2 pt-2">
-                                🔒 Premium Models
+                              <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-t mt-2 pt-2 flex items-center gap-2">
+                              <Lock className="size-3.5" />  
+                              <span>Premium Models</span>
                               </div>
                               {lockedModels.map((option) => {
                                 const pricingKey = getPricingModelKey(option.value);
                                 const pricingModel = AI_MODELS[pricingKey as keyof typeof AI_MODELS];
                                 return (
-                                  <SelectItem key={option.value} value={option.value} disabled>
+                                  <SelectItem key={option.value} value={option.value} disabled className="cursor-not-allowed">
                                     <div className="flex items-center justify-between w-full gap-2">
                                       <div className="flex items-center gap-2">
                                         <Lock className="size-3.5 text-muted-foreground" />
@@ -916,10 +958,30 @@ export const ItineraryFormAIEnhanced = ({
           />
         </section>
 
+        {/* Cloudflare Turnstile - Bot Protection */}
+        <div className="flex justify-center">
+          <Turnstile
+            siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "1x00000000000000000000AA"}
+            onSuccess={(token) => setTurnstileToken(token)}
+            onError={() => {
+              setTurnstileToken(null);
+              toast.error("Security verification failed", {
+                description: "Please refresh the page and try again",
+              });
+            }}
+            onExpire={() => setTurnstileToken(null)}
+            options={{
+              theme: "light",
+              size: "normal",
+            }}
+          />
+        </div>
+
         <Button 
+          ref={submitButtonRef}
           type="submit" 
-          className="w-full" 
-          disabled={isLoading || isExtracting || (hasResult && !isAuthenticated)} 
+          className="w-full h-12 text-base" 
+          disabled={isLoading || isExtracting || (hasResult && !isAuthenticated) || !turnstileToken} 
           size="lg"
         >
           {isLoading ? (

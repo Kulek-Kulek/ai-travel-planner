@@ -33,6 +33,7 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
   
   const [bucketListIds, setBucketListIds] = useState<Set<string>>(new Set());
   const [visibleNatureTags, setVisibleNatureTags] = useState(12); // Show ~2 lines initially (~6 tags per line)
+  const [randomSeed] = useState(() => Date.now()); // Generate once on mount for random queries
   const queryClient = useQueryClient();
 
   // Update URL when filters change
@@ -55,8 +56,12 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
   }, [selectedTags, destinationSearch, pathname, router]);
 
   // Fetch itineraries with TanStack Query (using API route instead of server action)
+  // Add timestamp to force refetch on each mount when no filters
+  const hasFilters = selectedTags.length > 0 || destinationSearch;
+  const timestampKey = hasFilters ? 'filtered' : randomSeed;
+  
   const { data: itinerariesData, isLoading, isFetching, error: queryError } = useQuery({
-    queryKey: ['public-itineraries', selectedTags, destinationSearch],
+    queryKey: ['public-itineraries-v2', selectedTags, destinationSearch, timestampKey],
     queryFn: async () => {
       // Build URL with query params
       const params = new URLSearchParams();
@@ -66,7 +71,12 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
       if (destinationSearch) {
         params.set('destination', destinationSearch);
       }
-      params.set('limit', '20');
+      params.set('limit', '24');
+      
+      // Use random ordering when no filters are applied
+      if (!hasFilters) {
+        params.set('random', 'true');
+      }
       
       const url = `/api/itineraries?${params.toString()}`;
       
@@ -84,6 +94,7 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
     },
     retry: false,
     staleTime: 0,
+    gcTime: hasFilters ? 5 * 60 * 1000 : 0, // Keep filtered results cached for 5 min, but clear random results immediately
   });
   
   // Log query errors
@@ -163,7 +174,7 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
     
     if (result.success) {
       toast.success('Itinerary deleted');
-      queryClient.invalidateQueries({ queryKey: ['public-itineraries'] });
+      queryClient.invalidateQueries({ queryKey: ['public-itineraries-v2'] });
       queryClient.invalidateQueries({ queryKey: ['all-tags'] });
     } else {
       toast.error(result.error);
@@ -176,7 +187,7 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
     
     if (result.success) {
       toast.success(`Set to ${!currentPrivacy ? 'private' : 'public'}`);
-      queryClient.invalidateQueries({ queryKey: ['public-itineraries'] });
+      queryClient.invalidateQueries({ queryKey: ['public-itineraries-v2'] });
     } else {
       toast.error(result.error);
     }

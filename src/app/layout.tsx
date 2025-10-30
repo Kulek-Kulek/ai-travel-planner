@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { NavHeader } from "@/components/nav-header";
 import { RouteProgress } from "@/components/route-progress";
 import { BackToTop } from "@/components/back-to-top";
+import { Footer } from "@/components/footer";
 import { Manrope, IBM_Plex_Mono } from "next/font/google";
 
 export const metadata: Metadata = {
@@ -38,6 +39,7 @@ export default function RootLayout({
           <RouteProgress />
           <NavHeader />
           {children}
+          <Footer />
           <BackToTop />
         </QueryProvider>
         <Toaster />

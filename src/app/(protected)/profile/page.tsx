@@ -2,10 +2,11 @@ import { getUser } from '@/lib/actions/auth-actions';
 import { getProfile } from '@/lib/actions/profile-actions';
 import { ProfileSettingsForm } from '@/components/profile-settings-form';
 import { getUserSubscription } from '@/lib/actions/subscription-actions';
+import { getUserTravelProfile } from '@/lib/actions/profile-ai-actions';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Crown, CreditCard, Sparkles, ArrowRight, BarChart3 } from 'lucide-react';
+import { Crown, CreditCard, Sparkles, ArrowRight, BarChart3, Compass, RefreshCw } from 'lucide-react';
 import { TIER_CONFIG, formatCurrency } from '@/lib/config/pricing-models';
 
 export default async function ProfilePage() {
@@ -17,11 +18,13 @@ export default async function ProfilePage() {
   
   const profileResult = await getProfile();
   const subscription = await getUserSubscription();
+  const travelProfileResult = await getUserTravelProfile();
+  const hasTravelProfile = travelProfileResult.success && travelProfileResult.data;
   
   if (!profileResult.success) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="bg-white rounded-lg shadow-md p-8">
             <h1 className="text-3xl font-bold text-gray-900 mb-6">
               Profile Settings
@@ -41,7 +44,7 @@ export default async function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">
             Profile Settings
@@ -254,27 +257,105 @@ export default async function ProfilePage() {
             </div>
           </div>
         )}
+
+        {/* Travel Personality Quiz Banner */}
+        {!hasTravelProfile ? (
+          <div className="mb-8 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 rounded-lg shadow-lg overflow-hidden sm:pr-0 lg:pr-20">
+            <div className="p-6 sm:p-8">
+              <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
+                  <Compass className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">
+                  Unlock Personalized Travel Experiences
+                  </h2>
+                  <p className="text-white/90 mb-4 text-base sm:text-lg">
+                    Take our fun 2-minute quiz to discover your unique travel personality and get AI-powered recommendations tailored just for you!
+                  </p>
+                  <div className="flex flex-wrap gap-2 sm:gap-3 mb-4">
+                    <div className="flex items-center gap-2 text-white/90 text-xs sm:text-sm">
+                      <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <span>AI-Powered Insights</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-white/90 text-xs sm:text-sm">
+                      <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <span>Personalized Itineraries</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-white/90 text-xs sm:text-sm">
+                      <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <span>Expert Travel Tips</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:gap-3 sm:mt-0 gap-4 lg:mt-8">
+                    <Button size="lg" variant="secondary" asChild className="shadow-lg w-full sm:w-auto">
+                      <Link href="/profile/travel-personality/quiz">
+                        Take the Quiz Now
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                      </Link>
+                    </Button>
+                    <Button size="lg" variant="outline" asChild className="bg-white/10 hover:bg-white/20 text-white border-white/30 w-full sm:w-auto">
+                      <Link href="/profile/travel-personality">
+                        Learn More
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : travelProfileResult.data && (
+          <div className="mb-8 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 rounded-lg shadow-lg overflow-hidden sm:pr-0 lg:pr-20">
+            <div className="p-6 sm:p-8">
+              <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
+                  <Sparkles className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">
+                    Your Travel Personality: {travelProfileResult.data.archetype}
+                  </h2>
+                  <p className="text-white/90 mb-4 text-base sm:text-lg">
+                    Your AI-powered travel profile is active and personalizing your itineraries. Want to update your preferences? Retake the quiz anytime!
+                  </p>
+                  <div className="flex flex-wrap gap-2 sm:gap-3 mb-4">
+                    <div className="flex items-center gap-2 text-white/90 text-xs sm:text-sm">
+                      <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <span>Active Profile</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-white/90 text-xs sm:text-sm">
+                      <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <span>Personalized Itineraries</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-white/90 text-xs sm:text-sm">
+                      <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <span>Custom Recommendations</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:gap-3 sm:mt-0 gap-4 lg:mt-8">
+                    <Button size="lg" variant="secondary" asChild className="shadow-lg w-full sm:w-auto">
+                      <Link href="/profile/travel-personality">
+                        View Full Profile
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                      </Link>
+                    </Button>
+                    <Button size="lg" variant="outline" asChild className="bg-white/10 hover:bg-white/20 text-white border-white/30 w-full sm:w-auto">
+                      <Link href="/profile/travel-personality/quiz">
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Retake Quiz
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         
         <ProfileSettingsForm 
           initialName={profileResult.data.name} 
           email={profileResult.data.email} 
         />
-
-        <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
-          <h2 className="text-lg font-semibold text-blue-900 mb-2">
-            Travel Preferences Coming Soon 🚀
-          </h2>
-          <p className="text-blue-700">
-            In the next phase, you&apos;ll be able to customize:
-          </p>
-          <ul className="list-disc list-inside text-blue-700 mt-2 space-y-1">
-            <li>Travel interests and preferences</li>
-            <li>Budget ranges and spending habits</li>
-            <li>Dietary requirements and restrictions</li>
-            <li>Accessibility needs</li>
-            <li>Travel pace (slow, moderate, fast)</li>
-          </ul>
-        </div>
       </div>
     </div>
   );

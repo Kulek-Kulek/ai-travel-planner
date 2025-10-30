@@ -2,33 +2,24 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ItineraryFormAIEnhanced } from "@/components/itinerary-form-ai-enhanced";
+import { ItineraryFormAIEnhanced, type ItineraryFormDataWithToken } from "@/components/itinerary-form-ai-enhanced";
 import { ItineraryGallery } from "@/components/itinerary-gallery";
 import { Masthead } from "@/components/masthead";
 import { UpgradeModal } from "@/components/upgrade-modal";
+import { TravelPersonalityBanner } from "@/components/travel-personality-banner";
 import { generateItinerary } from "@/lib/actions/ai-actions";
 import { claimDraftItinerary } from "@/lib/actions/itinerary-actions";
 import { getUserRole } from "@/lib/auth/admin";
-import { getUser } from "@/lib/actions/auth-actions";
+import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import type { OpenRouterModel } from "@/lib/openrouter/models";
 import { Button } from "@/components/ui/button";
 import { Plane, Clock, Lock, CheckCircle2, LogIn, AlertTriangle, Check } from "lucide-react";
+import confetti from "canvas-confetti";
 
-type FormData = {
-  destination: string;
-  days: number;
-  travelers: number;
-  startDate?: Date;
-  endDate?: Date;
-  children?: number;
-  childAges?: number[];
-  hasAccessibilityNeeds?: boolean;
-  notes?: string;
-  model: OpenRouterModel;
-};
+type FormData = ItineraryFormDataWithToken;
 
-type ResultData = FormData & {
+// ResultData doesn't need turnstileToken since it's for display, not submission
+type ResultData = Omit<FormData, 'turnstileToken'> & {
   aiPlan?: {
     id: string;
     city: string;
@@ -73,21 +64,52 @@ export default function Home() {
     });
   }, []);
 
-  // Check authentication status on mount
+  // Check authentication status on mount and listen to auth changes
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const user = await getUser();
-        const isAuth = !!user;
-        setIsAuthenticated(isAuth);
+    const supabase = createClient();
+    
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const isAuth = !!session?.user;
+      setIsAuthenticated(isAuth);
+      
+      // On initial load, check for previous anonymous session
+      if (!isAuth) {
+        const createdPlanWhileLoggedOut = sessionStorage.getItem('createdPlanWhileLoggedOut');
+        if (createdPlanWhileLoggedOut === 'true') {
+          setHasCreatedPlanWhileLoggedOut(true);
+        }
+      }
+    });
+    
+    // Listen to auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      const isAuth = !!session?.user;
+      
+      // Handle sign in
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') && isAuth) {
+        setIsAuthenticated(true);
+        // Clear anonymous user flags
+        sessionStorage.removeItem('createdPlanWhileLoggedOut');
+        sessionStorage.removeItem('draftItineraryId');
+        setHasCreatedPlanWhileLoggedOut(false);
         
-        // If user is now authenticated, clear the "created plan while logged out" flags
-        if (isAuth) {
-          sessionStorage.removeItem('createdPlanWhileLoggedOut');
-          sessionStorage.removeItem('draftItineraryId');
-          setHasCreatedPlanWhileLoggedOut(false);
+        // Check if there's a pending bucket list add (only on actual sign in, not on refresh)
+        if (event === 'SIGNED_IN') {
+          // Invalidate all itinerary queries to show user's itineraries
+          queryClient.invalidateQueries({ 
+            queryKey: ["public-itineraries-v2"],
+            refetchType: 'all'
+          });
+          queryClient.invalidateQueries({ 
+            queryKey: ["public-itineraries"],
+            refetchType: 'all'
+          });
+          queryClient.invalidateQueries({ 
+            queryKey: ["my-itineraries"],
+            refetchType: 'all'
+          });
           
-          // Check if there's a pending bucket list add
           const pendingBucketListAdd = sessionStorage.getItem('pendingBucketListAdd');
           if (pendingBucketListAdd) {
             // Import and execute the add
@@ -105,17 +127,38 @@ export default function Home() {
             sessionStorage.removeItem('pendingBucketListAdd');
           }
         }
-      } catch {
-        setIsAuthenticated(false);
       }
-    };
-    checkAuth();
+      
+      // Handle sign out - be explicit about sign out events
+      if (event === 'SIGNED_OUT') {
+        setIsAuthenticated(false);
+        // Clear all form and result state
+        setResult(null);
+        setHasSubmitted(false);
+        setHasCreatedPlanWhileLoggedOut(false);
+        
+        // Clear all sessionStorage items
+        sessionStorage.removeItem('createdPlanWhileLoggedOut');
+        sessionStorage.removeItem('draftItineraryId');
+        sessionStorage.removeItem('itineraryId');
+      }
+      
+      // Also handle the case where session becomes null but no explicit SIGNED_OUT event (safety check)
+      if (!isAuth && session === null && event !== 'SIGNED_OUT') {
+        setIsAuthenticated(false);
+        setResult(null);
+        setHasSubmitted(false);
+        setHasCreatedPlanWhileLoggedOut(false);
+        sessionStorage.removeItem('createdPlanWhileLoggedOut');
+        sessionStorage.removeItem('draftItineraryId');
+        sessionStorage.removeItem('itineraryId');
+      }
+    });
     
-    // Check if user created a plan while logged out (persisted in sessionStorage)
-    const createdPlanWhileLoggedOut = sessionStorage.getItem('createdPlanWhileLoggedOut');
-    if (createdPlanWhileLoggedOut === 'true') {
-      setHasCreatedPlanWhileLoggedOut(true);
-    }
+    // Cleanup subscription on unmount
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [queryClient]);
 
   // Load itinerary from URL param or sessionStorage if present
@@ -164,8 +207,9 @@ export default function Home() {
               
               // If this is a draft, check if user is now authenticated and claim it
               if (itinerary.status === 'draft') {
-                getUser().then((user) => {
-                  if (user) {
+                const supabase = createClient();
+                supabase.auth.getSession().then(({ data: { session } }) => {
+                  if (session?.user) {
                       claimDraftItinerary(itineraryId!).then((result) => {
                         if (result.success) {
                           
@@ -188,8 +232,22 @@ export default function Home() {
                           });
                         
                         // Refresh gallery to show the newly published itinerary
-                        queryClient.invalidateQueries({ queryKey: ["public-itineraries"] });
-                        queryClient.invalidateQueries({ queryKey: ["my-itineraries"] });
+                        queryClient.invalidateQueries({ 
+                          queryKey: ["public-itineraries-v2"],
+                          refetchType: 'all'
+                        });
+                        queryClient.invalidateQueries({ 
+                          queryKey: ["public-itineraries"],
+                          refetchType: 'all'
+                        });
+                        queryClient.invalidateQueries({ 
+                          queryKey: ["my-itineraries"],
+                          refetchType: 'all'
+                        });
+                        queryClient.invalidateQueries({ 
+                          queryKey: ["all-tags"],
+                          refetchType: 'all'
+                        });
                         
                         // Scroll to gallery
                         setTimeout(() => {
@@ -198,9 +256,25 @@ export default function Home() {
                           }
                         }, 300);
                       } else {
-                        toast.error('Failed to save itinerary', {
-                          description: result.error,
-                        });
+                        // Check if this is a tier limit error
+                        const isTierLimitError = 
+                          result.error?.toLowerCase().includes('limit') ||
+                          result.error?.toLowerCase().includes('upgrade') ||
+                          result.error?.toLowerCase().includes('tier') ||
+                          result.error?.toLowerCase().includes('reached');
+                        
+                        if (isTierLimitError) {
+                          // Show upgrade modal for tier limit errors
+                          setShowUpgradeModal(true);
+                          toast.error('Plan limit reached', {
+                            description: result.error || 'You have reached your plan generation limit',
+                          });
+                        } else {
+                          // Show regular error toast for other errors
+                          toast.error('Failed to save itinerary', {
+                            description: result.error,
+                          });
+                        }
                       }
                     });
                   }
@@ -219,6 +293,17 @@ export default function Home() {
     }
   }, [queryClient]);
 
+  // Auto-scroll to gallery for authenticated users after plan is created
+  useEffect(() => {
+    if (isAuthenticated && result?.aiPlan?.id && galleryRef.current) {
+      // Scroll to gallery instead of showing preview
+      setTimeout(() => {
+        const galleryTop = galleryRef.current!.getBoundingClientRect().top + window.scrollY - 100;
+        window.scrollTo({ top: galleryTop, behavior: "smooth" });
+      }, 500);
+    }
+  }, [isAuthenticated, result]);
+
   // Use TanStack Query mutation for generating itinerary
   const mutation = useMutation({
     mutationFn: generateItinerary,
@@ -229,6 +314,9 @@ export default function Home() {
         return;
       }
       if (response.success) {
+        // Trigger confetti effect
+        triggerConfetti();
+        
         // Show success toast
         toast.success("Itinerary generated!", {
           description: `${variables.days}-day trip to ${response.data.city}`,
@@ -243,16 +331,38 @@ export default function Home() {
         setProgressDirection(1);
         setProgress(100);
 
-        const resultData = {
-          ...variables,
+        // Omit turnstileToken from result data (only needed for submission)
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { turnstileToken, ...resultData } = variables;
+        
+        setResult({
+          ...resultData,
+          notes: resultData.notes || '',
           aiPlan: response.data,
-        };
-
-        setResult(resultData);
+        } as ResultData);
 
         // Invalidate queries to refresh gallery and tags
-        queryClient.invalidateQueries({ queryKey: ["public-itineraries"] });
-        queryClient.invalidateQueries({ queryKey: ["all-tags"] });
+        // Use refetchType: 'all' to refetch even inactive queries
+        queryClient.invalidateQueries({ 
+          queryKey: ["public-itineraries-v2"],
+          refetchType: 'all'
+        });
+        queryClient.invalidateQueries({ 
+          queryKey: ["public-itineraries"],
+          refetchType: 'all'
+        });
+        queryClient.invalidateQueries({ 
+          queryKey: ["all-tags"],
+          refetchType: 'all'
+        });
+        
+        // Also invalidate my-itineraries if user is authenticated
+        if (isAuthenticated) {
+          queryClient.invalidateQueries({ 
+            queryKey: ["my-itineraries"],
+            refetchType: 'all'
+          });
+        }
 
         // Store state for non-authenticated users
         if (!isAuthenticated) {
@@ -359,6 +469,52 @@ export default function Home() {
     setProgressDirection(1);
   };
 
+  // Trigger subtle confetti effect
+  const triggerConfetti = () => {
+    const duration = 2500;
+    const animationEnd = Date.now() + duration;
+    const defaults = { 
+      startVelocity: 25, 
+      spread: 360, 
+      ticks: 60, 
+      zIndex: 9999,
+      particleCount: 60,
+      colors: ['#4F46E5', '#06B6D4', '#10B981', '#F59E0B', '#EC4899']
+    };
+
+    const interval = setInterval(() => {
+      const timeLeft = animationEnd - Date.now();
+
+      if (timeLeft <= 0) {
+        clearInterval(interval);
+        return;
+      }
+
+      const particleCount = 30 * (timeLeft / duration);
+      
+      // Center burst - higher on screen (near top toast position)
+      confetti({
+        ...defaults,
+        particleCount: particleCount * 0.8,
+        origin: { x: 0.5, y: 0.25 }
+      });
+      
+      // Left side confetti - higher
+      confetti({
+        ...defaults,
+        particleCount: particleCount * 0.3,
+        origin: { x: 0.25, y: 0.35 }
+      });
+      
+      // Right side confetti - higher
+      confetti({
+        ...defaults,
+        particleCount: particleCount * 0.3,
+        origin: { x: 0.75, y: 0.35 }
+      });
+    }, 250);
+  };
+
   // Open first day by default once result arrives
   useEffect(() => {
     if (result?.aiPlan?.days && result.aiPlan.days.length > 0) {
@@ -402,6 +558,7 @@ export default function Home() {
       hasAccessibilityNeeds: data.hasAccessibilityNeeds,
       notes: data.notes,
       model: data.model,
+      turnstileToken: data.turnstileToken,
     });
   };
 
@@ -430,7 +587,7 @@ export default function Home() {
       <Masthead onPlanTrip={handlePlanTripScroll} />
 
       {/* Main Content */}
-      <main className="relative z-10 mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
+      <main className="relative z-10 mx-auto max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
         {/* Form and Preview Section */}
         <div
           ref={formRef}
@@ -453,6 +610,7 @@ export default function Home() {
 
             <div className="mt-5">
               <ItineraryFormAIEnhanced
+                key={`form-${isAuthenticated}`}
                 onSubmit={handleSubmit}
                 isLoading={mutation.isPending}
                 modelOverride="anthropic/claude-3.5-haiku"
@@ -597,7 +755,7 @@ export default function Home() {
                 )}
 
 
-                {result && !mutation.isPending && (
+                {result && !mutation.isPending && !isAuthenticated && (
                   <div className="space-y-4">
                     <div className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-emerald-100/60 p-4">
                       <h3 className="mb-1 text-lg font-semibold text-emerald-900">
@@ -840,8 +998,13 @@ export default function Home() {
           )}
         </div>
 
+        {/* Travel Personality Banner - Before Gallery */}
+        <div className="mt-10 lg:mt-12">
+          <TravelPersonalityBanner />
+        </div>
+
         {/* Public Itineraries Gallery */}
-        <div id="public-itineraries" ref={galleryRef} className="mt-24">
+        <div id="public-itineraries" ref={galleryRef} className="mt-10">
           <ItineraryGallery isAdmin={isAdmin} />
         </div>
       </main>
