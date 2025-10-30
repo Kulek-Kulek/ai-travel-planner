@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ItineraryFormAIEnhanced } from "@/components/itinerary-form-ai-enhanced";
+import { ItineraryFormAIEnhanced, type ItineraryFormDataWithToken } from "@/components/itinerary-form-ai-enhanced";
 import { ItineraryGallery } from "@/components/itinerary-gallery";
 import { Masthead } from "@/components/masthead";
 import { UpgradeModal } from "@/components/upgrade-modal";
@@ -12,24 +12,14 @@ import { claimDraftItinerary } from "@/lib/actions/itinerary-actions";
 import { getUserRole } from "@/lib/auth/admin";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import type { OpenRouterModel } from "@/lib/openrouter/models";
 import { Button } from "@/components/ui/button";
 import { Plane, Clock, Lock, CheckCircle2, LogIn, AlertTriangle, Check } from "lucide-react";
+import confetti from "canvas-confetti";
 
-type FormData = {
-  destination: string;
-  days: number;
-  travelers: number;
-  startDate?: Date;
-  endDate?: Date;
-  children?: number;
-  childAges?: number[];
-  hasAccessibilityNeeds?: boolean;
-  notes?: string;
-  model: OpenRouterModel;
-};
+type FormData = ItineraryFormDataWithToken;
 
-type ResultData = FormData & {
+// ResultData doesn't need turnstileToken since it's for display, not submission
+type ResultData = Omit<FormData, 'turnstileToken'> & {
   aiPlan?: {
     id: string;
     city: string;
@@ -106,6 +96,20 @@ export default function Home() {
         
         // Check if there's a pending bucket list add (only on actual sign in, not on refresh)
         if (event === 'SIGNED_IN') {
+          // Invalidate all itinerary queries to show user's itineraries
+          queryClient.invalidateQueries({ 
+            queryKey: ["public-itineraries-v2"],
+            refetchType: 'all'
+          });
+          queryClient.invalidateQueries({ 
+            queryKey: ["public-itineraries"],
+            refetchType: 'all'
+          });
+          queryClient.invalidateQueries({ 
+            queryKey: ["my-itineraries"],
+            refetchType: 'all'
+          });
+          
           const pendingBucketListAdd = sessionStorage.getItem('pendingBucketListAdd');
           if (pendingBucketListAdd) {
             // Import and execute the add
@@ -228,8 +232,22 @@ export default function Home() {
                           });
                         
                         // Refresh gallery to show the newly published itinerary
-                        queryClient.invalidateQueries({ queryKey: ["public-itineraries"] });
-                        queryClient.invalidateQueries({ queryKey: ["my-itineraries"] });
+                        queryClient.invalidateQueries({ 
+                          queryKey: ["public-itineraries-v2"],
+                          refetchType: 'all'
+                        });
+                        queryClient.invalidateQueries({ 
+                          queryKey: ["public-itineraries"],
+                          refetchType: 'all'
+                        });
+                        queryClient.invalidateQueries({ 
+                          queryKey: ["my-itineraries"],
+                          refetchType: 'all'
+                        });
+                        queryClient.invalidateQueries({ 
+                          queryKey: ["all-tags"],
+                          refetchType: 'all'
+                        });
                         
                         // Scroll to gallery
                         setTimeout(() => {
@@ -238,9 +256,25 @@ export default function Home() {
                           }
                         }, 300);
                       } else {
-                        toast.error('Failed to save itinerary', {
-                          description: result.error,
-                        });
+                        // Check if this is a tier limit error
+                        const isTierLimitError = 
+                          result.error?.toLowerCase().includes('limit') ||
+                          result.error?.toLowerCase().includes('upgrade') ||
+                          result.error?.toLowerCase().includes('tier') ||
+                          result.error?.toLowerCase().includes('reached');
+                        
+                        if (isTierLimitError) {
+                          // Show upgrade modal for tier limit errors
+                          setShowUpgradeModal(true);
+                          toast.error('Plan limit reached', {
+                            description: result.error || 'You have reached your plan generation limit',
+                          });
+                        } else {
+                          // Show regular error toast for other errors
+                          toast.error('Failed to save itinerary', {
+                            description: result.error,
+                          });
+                        }
                       }
                     });
                   }
@@ -280,6 +314,9 @@ export default function Home() {
         return;
       }
       if (response.success) {
+        // Trigger confetti effect
+        triggerConfetti();
+        
         // Show success toast
         toast.success("Itinerary generated!", {
           description: `${variables.days}-day trip to ${response.data.city}`,
@@ -294,16 +331,38 @@ export default function Home() {
         setProgressDirection(1);
         setProgress(100);
 
-        const resultData = {
-          ...variables,
+        // Omit turnstileToken from result data (only needed for submission)
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { turnstileToken, ...resultData } = variables;
+        
+        setResult({
+          ...resultData,
+          notes: resultData.notes || '',
           aiPlan: response.data,
-        };
-
-        setResult(resultData);
+        } as ResultData);
 
         // Invalidate queries to refresh gallery and tags
-        queryClient.invalidateQueries({ queryKey: ["public-itineraries"] });
-        queryClient.invalidateQueries({ queryKey: ["all-tags"] });
+        // Use refetchType: 'all' to refetch even inactive queries
+        queryClient.invalidateQueries({ 
+          queryKey: ["public-itineraries-v2"],
+          refetchType: 'all'
+        });
+        queryClient.invalidateQueries({ 
+          queryKey: ["public-itineraries"],
+          refetchType: 'all'
+        });
+        queryClient.invalidateQueries({ 
+          queryKey: ["all-tags"],
+          refetchType: 'all'
+        });
+        
+        // Also invalidate my-itineraries if user is authenticated
+        if (isAuthenticated) {
+          queryClient.invalidateQueries({ 
+            queryKey: ["my-itineraries"],
+            refetchType: 'all'
+          });
+        }
 
         // Store state for non-authenticated users
         if (!isAuthenticated) {
@@ -410,6 +469,52 @@ export default function Home() {
     setProgressDirection(1);
   };
 
+  // Trigger subtle confetti effect
+  const triggerConfetti = () => {
+    const duration = 2500;
+    const animationEnd = Date.now() + duration;
+    const defaults = { 
+      startVelocity: 25, 
+      spread: 360, 
+      ticks: 60, 
+      zIndex: 9999,
+      particleCount: 60,
+      colors: ['#4F46E5', '#06B6D4', '#10B981', '#F59E0B', '#EC4899']
+    };
+
+    const interval = setInterval(() => {
+      const timeLeft = animationEnd - Date.now();
+
+      if (timeLeft <= 0) {
+        clearInterval(interval);
+        return;
+      }
+
+      const particleCount = 30 * (timeLeft / duration);
+      
+      // Center burst - higher on screen (near top toast position)
+      confetti({
+        ...defaults,
+        particleCount: particleCount * 0.8,
+        origin: { x: 0.5, y: 0.25 }
+      });
+      
+      // Left side confetti - higher
+      confetti({
+        ...defaults,
+        particleCount: particleCount * 0.3,
+        origin: { x: 0.25, y: 0.35 }
+      });
+      
+      // Right side confetti - higher
+      confetti({
+        ...defaults,
+        particleCount: particleCount * 0.3,
+        origin: { x: 0.75, y: 0.35 }
+      });
+    }, 250);
+  };
+
   // Open first day by default once result arrives
   useEffect(() => {
     if (result?.aiPlan?.days && result.aiPlan.days.length > 0) {
@@ -453,6 +558,7 @@ export default function Home() {
       hasAccessibilityNeeds: data.hasAccessibilityNeeds,
       notes: data.notes,
       model: data.model,
+      turnstileToken: data.turnstileToken,
     });
   };
 
