@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { getItinerary } from "@/lib/actions/itinerary-actions";
+import { getUserSubscription } from "@/lib/actions/subscription-actions";
 import { generateItinerary } from "@/lib/actions/ai-actions";
 import type { Itinerary } from "@/lib/actions/itinerary-actions";
 import { Button } from "@/components/ui/button";
@@ -10,9 +11,27 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import Link from "next/link";
 import { toast } from "sonner";
-import { DEFAULT_OPENROUTER_MODEL } from "@/lib/openrouter/models";
+import { Lock } from "lucide-react";
+import confetti from "canvas-confetti";
+import {
+  OPENROUTER_MODEL_OPTIONS,
+  DEFAULT_OPENROUTER_MODEL,
+  type OpenRouterModel,
+} from "@/lib/openrouter/models";
+import {
+  AI_MODELS,
+  type SubscriptionTier,
+  formatCurrency,
+} from "@/lib/config/pricing-models";
 
 export default function EditItineraryPage() {
   const router = useRouter();
@@ -27,32 +46,43 @@ export default function EditItineraryPage() {
   const [travelers, setTravelers] = useState(1);
   const [hasAccessibilityNeeds, setHasAccessibilityNeeds] = useState(false);
   const [notes, setNotes] = useState("");
+  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_OPENROUTER_MODEL);
+  const [userTier, setUserTier] = useState<SubscriptionTier>('free');
 
   useEffect(() => {
-    async function loadItinerary() {
-      const result = await getItinerary(id);
+    async function loadData() {
+      // Load itinerary
+      const itineraryResult = await getItinerary(id);
 
-      if (!result.success || !result.data) {
+      if (!itineraryResult.success || !itineraryResult.data) {
         toast.error("Itinerary not found or access denied");
         router.push("/my-plans");
         return;
       }
 
       // Check ownership - only owner can edit
-      if (!result.data.user_id) {
+      if (!itineraryResult.data.user_id) {
         toast.error("Cannot edit anonymous itineraries");
         router.push("/my-plans");
         return;
       }
 
-      setItinerary(result.data);
-      setDays(result.data.days);
-      setTravelers(result.data.travelers);
-      setNotes(result.data.notes || "");
+      setItinerary(itineraryResult.data);
+      setDays(itineraryResult.data.days);
+      setTravelers(itineraryResult.data.travelers);
+      setNotes(itineraryResult.data.notes || "");
+      setHasAccessibilityNeeds(itineraryResult.data.has_accessibility_needs || false);
+
+      // Load user subscription info
+      const subscriptionInfo = await getUserSubscription();
+      if (subscriptionInfo) {
+        setUserTier(subscriptionInfo.tier);
+      }
+
       setIsLoading(false);
     }
 
-    loadItinerary();
+    loadData();
   }, [id, router]);
 
   // Cycle through loading messages while regenerating
@@ -76,10 +106,55 @@ export default function EditItineraryPage() {
     const interval = setInterval(() => {
       currentIndex = (currentIndex + 1) % messages.length;
       setLoadingMessage(messages[currentIndex]);
-    }, 3000); // Change message every 3 seconds
+    }, 3000);
 
     return () => clearInterval(interval);
   }, [isRegenerating]);
+
+  // Trigger confetti effect for successful edit
+  const triggerConfetti = () => {
+    const duration = 2500;
+    const animationEnd = Date.now() + duration;
+    const defaults = { 
+      startVelocity: 25, 
+      spread: 360, 
+      ticks: 60, 
+      zIndex: 9999,
+      colors: ['#4F46E5', '#06B6D4', '#8B5CF6', '#EC4899', '#F59E0B']
+    };
+
+    const interval = setInterval(() => {
+      const timeLeft = animationEnd - Date.now();
+
+      if (timeLeft <= 0) {
+        clearInterval(interval);
+        return;
+      }
+
+      const particleCount = 30 * (timeLeft / duration);
+      
+      // Center burst - higher on screen
+      confetti({
+        ...defaults,
+        particleCount: particleCount * 0.8,
+        origin: { x: 0.5, y: 0.25 }
+      });
+      
+      // Left side confetti
+      confetti({
+        ...defaults,
+        particleCount: particleCount * 0.3,
+        origin: { x: 0.25, y: 0.35 }
+      });
+      
+      // Right side confetti
+      confetti({
+        ...defaults,
+        particleCount: particleCount * 0.3,
+        origin: { x: 0.75, y: 0.35 }
+      });
+    }, 250);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,26 +177,33 @@ export default function EditItineraryPage() {
     try {
       // Call AI to regenerate the itinerary with new parameters
       const result = await generateItinerary({
-        destination: itinerary.destination, // Keep same destination
+        destination: itinerary.destination,
         days,
         travelers,
         hasAccessibilityNeeds,
         notes,
-        model: DEFAULT_OPENROUTER_MODEL, // Use default model for regeneration
-        keepExistingPhoto: true, // Don't fetch new photo
+        model: selectedModel as OpenRouterModel, // Use user-selected model
+        keepExistingPhoto: true,
         existingPhotoData: {
           image_url: itinerary.image_url,
           image_photographer: itinerary.image_photographer,
           image_photographer_url: itinerary.image_photographer_url,
         },
+        existingItineraryId: id,
+        operation: 'regenerate',
       });
 
       if (result.success) {
-        toast.success("✅ Itinerary regenerated successfully!", {
+        // Trigger confetti effect
+        triggerConfetti();
+        
+        toast.success("✅ Itinerary updated successfully!", {
           description:
-            "Your plan has been updated with new AI-generated content",
+            "Your plan has been regenerated with your updated preferences",
         });
-        router.push(`/itinerary/${result.data.id}`);
+        // Redirect back to the same itinerary (now updated)
+        router.push(`/itinerary/${id}`);
+        router.refresh(); // Refresh to show updated data
       } else {
         toast.error("Failed to regenerate itinerary", {
           description: result.error,
@@ -134,6 +216,35 @@ export default function EditItineraryPage() {
       setIsRegenerating(false);
     }
   };
+
+  // Map OpenRouter model value to pricing model key for tier checking
+  const getPricingModelKey = (openRouterValue: string) => {
+    const mapping: Record<string, string> = {
+      'google/gemini-2.0-flash-lite-001': 'gemini-2.0-flash',
+      'openai/gpt-4o-mini': 'gpt-4o-mini',
+      'google/gemini-2.5-pro': 'gemini-2.5-pro',
+      'anthropic/claude-3-haiku': 'claude-haiku',
+      'google/gemini-2.5-flash': 'gemini-2.5-flash',
+    };
+    return mapping[openRouterValue];
+  };
+
+  // Group models by availability
+  const availableModels = OPENROUTER_MODEL_OPTIONS.filter((option) => {
+    const pricingKey = getPricingModelKey(option.value);
+    if (!pricingKey) return false;
+    if (!AI_MODELS[pricingKey as keyof typeof AI_MODELS]) return false;
+    const pricingModel = AI_MODELS[pricingKey as keyof typeof AI_MODELS];
+    return pricingModel.freeAccess || userTier !== 'free';
+  });
+
+  const lockedModels = OPENROUTER_MODEL_OPTIONS.filter((option) => {
+    const pricingKey = getPricingModelKey(option.value);
+    if (!pricingKey) return false;
+    if (!AI_MODELS[pricingKey as keyof typeof AI_MODELS]) return false;
+    const pricingModel = AI_MODELS[pricingKey as keyof typeof AI_MODELS];
+    return !pricingModel.freeAccess && userTier === 'free';
+  });
 
   if (isLoading) {
     return (
@@ -283,12 +394,122 @@ export default function EditItineraryPage() {
               </p>
             </div>
 
+            {/* AI Model Selection */}
+            <div className="space-y-6 rounded-2xl border border-slate-200 bg-slate-50/50 p-6">
+              <div className="space-y-2">
+                <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                  AI Settings
+                </h3>
+                <p className="text-sm text-slate-500">
+                  Choose which AI model will regenerate your travel plan.
+                </p>
+              </div>
+
+              <div className="max-w-sm">
+                <Label className="block text-sm font-medium text-gray-700 mb-2">
+                  AI Model
+                </Label>
+                <Select value={selectedModel} onValueChange={setSelectedModel} disabled={isRegenerating}>
+                  <SelectTrigger className="w-full cursor-pointer">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {/* Available Models */}
+                    {availableModels.length > 0 && (
+                      <>
+                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                          Available
+                        </div>
+                        {availableModels.map((option) => {
+                          const pricingKey = getPricingModelKey(option.value);
+                          const pricingModel = AI_MODELS[pricingKey as keyof typeof AI_MODELS];
+                          return (
+                            <SelectItem key={option.value} value={option.value} className="cursor-pointer">
+                              <div className="flex items-center justify-between w-full gap-3">
+                                <span>{option.label}</span>
+                                <div className="flex items-center gap-2">
+                                  {pricingModel && (
+                                    <span className="text-xs px-2 py-0.5 bg-muted rounded">
+                                      {pricingModel.badge}
+                                    </span>
+                                  )}
+                                  {userTier === 'payg' && pricingModel && (
+                                    <span className="text-xs text-muted-foreground">
+                                      {formatCurrency(pricingModel.cost)}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </SelectItem>
+                          );
+                        })}
+                      </>
+                    )}
+
+                    {/* Locked Models */}
+                    {lockedModels.length > 0 && (
+                      <>
+                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-t mt-2 pt-2 flex items-center gap-2">
+                          <Lock className="size-3.5" />
+                          <span>Premium Models</span>
+                        </div>
+                        {lockedModels.map((option) => {
+                          const pricingKey = getPricingModelKey(option.value);
+                          const pricingModel = AI_MODELS[pricingKey as keyof typeof AI_MODELS];
+                          return (
+                            <SelectItem key={option.value} value={option.value} disabled className="cursor-not-allowed">
+                              <div className="flex items-center justify-between w-full gap-2">
+                                <div className="flex items-center gap-2">
+                                  <Lock className="size-3.5 text-muted-foreground" />
+                                  <span className="font-medium">{option.label}</span>
+                                </div>
+                                {pricingModel && (
+                                  <span className="text-xs px-2 py-0.5 bg-muted rounded">
+                                    {pricingModel.badge}
+                                  </span>
+                                )}
+                              </div>
+                            </SelectItem>
+                          );
+                        })}
+                      </>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Upgrade prompt for locked models */}
+              {lockedModels.length > 0 && userTier === 'free' && (
+                <div className="mt-4 p-4 border border-blue-200 bg-blue-50/50 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <Lock className="size-4 text-blue-600 shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-blue-900 mb-1">
+                        Unlock Premium AI Models
+                      </p>
+                      <p className="text-xs text-blue-700 mb-2">
+                        Access <strong>Claude Haiku</strong> and <strong>GPT-4o</strong> with 
+                        Pay-as-you-go ({formatCurrency(0.3)}-{formatCurrency(0.5)} per plan) 
+                        or Pro plan ({formatCurrency(9.99)}/month).
+                      </p>
+                      <Link
+                        href="/pricing"
+                        className="inline-block text-sm font-semibold text-blue-600 hover:text-blue-700 underline underline-offset-2"
+                      >
+                        View Pricing Plans →
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Warning Box */}
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
               <p className="text-sm text-yellow-800">
                 <strong>⚠️ Important:</strong> Clicking &quot;Regenerate with
-                AI&quot; will create a completely new itinerary with fresh
-                AI-generated content. The current itinerary will be replaced.
+                AI&quot; will replace this itinerary with completely new
+                AI-generated content. This action cannot be undone.
               </p>
             </div>
 
@@ -330,12 +551,11 @@ export default function EditItineraryPage() {
               <strong>💡 How it works:</strong>
             </p>
             <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
-              <li>Update days, travelers, or notes above</li>
-              <li>AI will generate a completely new itinerary</li>
+              <li>Update days, travelers, notes, or AI model above</li>
+              <li>AI will regenerate this itinerary with your changes</li>
               <li>Destination stays the same ({itinerary.destination})</li>
-              <li>
-                This will create a NEW itinerary (your old one will remain)
-              </li>
+              <li>The updated itinerary replaces the current one</li>
+              <li>Free tier: 1 edit per plan (this counts as an edit)</li>
             </ul>
           </div>
         </div>

@@ -1,4 +1,10 @@
 import { Button } from '@/components/ui/button';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 import { Check, Sparkles, Zap, Crown, Lock } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -16,21 +22,38 @@ export const metadata = {
 };
 
 export default function PricingPage() {
+  // Filter out duplicate and unavailable models for display
+  const displayModels = Object.values(AI_MODELS).filter((model) => {
+    // Hide gemini-2.0-flash (duplicate of gemini-flash) and gpt-4o (not available)
+    return model.key !== 'gemini-2.0-flash' && model.key !== 'gpt-4o';
+  });
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
       {/* Hero Section */}
-      <section className="container mx-auto px-4 pt-20 pb-12 text-center">
-        <h1 className="text-5xl font-bold tracking-tight mb-4">
-          Simple, Transparent Pricing
-        </h1>
-        <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-          Choose the perfect plan for your travel planning needs. Upgrade or
-          downgrade anytime.
-        </p>
+      <section className="container mx-auto px-4 pt-20 pb-12">
+        <div className="max-w-6xl mx-auto bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 rounded-2xl shadow-xl overflow-hidden">
+          <div className="p-8 sm:p-12 text-center">
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                <Crown className="w-8 h-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-white mb-4">
+                  Simple, Transparent Pricing
+                </h1>
+                <p className="text-lg sm:text-xl text-white/90 max-w-2xl mx-auto">
+                  Choose the perfect plan for your travel planning needs. Upgrade or
+                  downgrade anytime.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* Pricing Cards */}
-      <section className="container mx-auto pb-24">
+      <section className="container mt-8 mx-auto px-4 pb-24">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {/* FREE TIER */}
           <PricingCard
@@ -76,7 +99,7 @@ export default function PricingPage() {
         </div>
 
         {/* PAYG Credit Packs */}
-        <div className="max-w-4xl mx-auto mt-12">
+        <div className="max-w-6xl mx-auto mt-12">
           <h3 className="text-2xl font-bold text-center mb-6">
             Pay-as-you-go Credit Packs
           </h3>
@@ -116,7 +139,7 @@ export default function PricingPage() {
         <h2 className="text-3xl font-bold text-center mb-12">
           AI Models & Pricing
         </h2>
-        <div className="max-w-4xl mx-auto bg-card rounded-lg border shadow-sm overflow-hidden">
+        <div className="max-w-6xl mx-auto bg-card rounded-lg border shadow-sm overflow-hidden">
           <table className="w-full">
             <thead>
               <tr className="border-b bg-muted/50">
@@ -134,7 +157,7 @@ export default function PricingPage() {
               </tr>
             </thead>
             <tbody>
-              {Object.values(AI_MODELS).map((model) => (
+              {displayModels.map((model) => (
                 <tr key={model.key} className="border-b last:border-0">
                   <td className="py-3 px-6">
                     <div>
@@ -184,7 +207,7 @@ export default function PricingPage() {
         <h2 className="text-3xl font-bold text-center mb-12">
           Compare All Features
         </h2>
-        <div className="max-w-5xl mx-auto bg-card rounded-lg border shadow-sm overflow-x-auto">
+        <div className="max-w-6xl mx-auto bg-card rounded-lg border shadow-sm overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b">
@@ -203,7 +226,7 @@ export default function PricingPage() {
               />
               <ComparisonRow
                 feature="AI Models"
-                values={['2 economy models', 'All 4 models', 'All 4 models']}
+                values={['2 economy models', 'All 5 models', 'All 5 models']}
               />
               <ComparisonRow
                 feature="Edits per plan"
@@ -251,54 +274,121 @@ export default function PricingPage() {
         <h2 className="text-3xl font-bold text-center mb-12">
           Frequently Asked Questions
         </h2>
-        <div className="max-w-3xl mx-auto space-y-6">
-          <FAQItem
-            question="Can I change my plan later?"
-            answer="Yes! You can upgrade or downgrade your plan at any time. Changes take effect immediately. PAYG credits never expire."
-          />
-          <FAQItem
-            question="What happens after I use my 2 free plans?"
-            answer="You can upgrade to Pay-as-you-go (buy credits) or Pro subscription to continue creating itineraries. You'll still have full access to your existing plans."
-          />
-          <FAQItem
-            question="How does Pay-as-you-go pricing work?"
-            answer="Add credits to your account, then pay per itinerary based on the AI model you choose (€0.15-€0.50 per plan). Credits never expire."
-          />
-          <FAQItem
-            question="What's the difference between economy and premium AI models?"
-            answer="Economy models (Gemini Flash, GPT-4o Mini) are fast and cost-effective. Premium models (Claude Haiku, GPT-4o) provide more detailed, nuanced itineraries."
-          />
-          <FAQItem
-            question="What happens if I exceed my Pro plan limits?"
-            answer="After using your 100 economy plans, you get unlimited economy models. For premium models, unused plans roll over (max 40). After that, they cost €0.20 each."
-          />
-          <FAQItem
-            question="Do you offer refunds?"
-            answer="Yes, we offer a 30-day money-back guarantee for Pro subscriptions. PAYG credits are non-refundable but never expire."
-          />
-          <FAQItem
-            question="What payment methods do you accept?"
-            answer="We accept all major credit cards, debit cards, and digital wallets through Stripe."
-          />
+        <div className="max-w-6xl mx-auto">
+          <Accordion type="single" collapsible className="space-y-4">
+            <AccordionItem value="item-1" className="bg-card rounded-lg border px-6">
+              <AccordionTrigger className="text-left hover:no-underline">
+                <span className="font-semibold text-lg">Can I change my plan later?</span>
+              </AccordionTrigger>
+              <AccordionContent className="text-muted-foreground">
+                Yes! You can upgrade or downgrade your plan at any time. Changes take effect immediately. PAYG credits never expire.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-2" className="bg-card rounded-lg border px-6">
+              <AccordionTrigger className="text-left hover:no-underline">
+                <span className="font-semibold text-lg">What happens after I use my 2 free plans?</span>
+              </AccordionTrigger>
+              <AccordionContent className="text-muted-foreground">
+                You can upgrade to Pay-as-you-go (buy credits) or Pro subscription to continue creating itineraries. You&apos;ll still have full access to your existing plans.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-3" className="bg-card rounded-lg border px-6">
+              <AccordionTrigger className="text-left hover:no-underline">
+                <span className="font-semibold text-lg">How does Pay-as-you-go pricing work?</span>
+              </AccordionTrigger>
+              <AccordionContent className="text-muted-foreground">
+                Add credits to your account, then pay per itinerary based on the AI model you choose (€0.15-€0.35 per plan). Credits never expire.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-4" className="bg-card rounded-lg border px-6">
+              <AccordionTrigger className="text-left hover:no-underline">
+                <span className="font-semibold text-lg">What&apos;s the difference between economy and premium AI models?</span>
+              </AccordionTrigger>
+              <AccordionContent className="text-muted-foreground">
+                Economy models (Gemini Flash, GPT-4o Mini) are fast and cost-effective at €0.15 per plan. Premium models (Gemini 2.5 Pro, Claude Haiku, Gemini 2.5 Flash) provide more detailed, nuanced itineraries at €0.20-€0.35 per plan.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-5" className="bg-card rounded-lg border px-6">
+              <AccordionTrigger className="text-left hover:no-underline">
+                <span className="font-semibold text-lg">What happens if I exceed my Pro plan limits?</span>
+              </AccordionTrigger>
+              <AccordionContent className="text-muted-foreground">
+                After using your 100 economy plans, you get unlimited economy models. For premium models, unused plans roll over (max 40). After that, they cost €0.20 each.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-6" className="bg-card rounded-lg border px-6">
+              <AccordionTrigger className="text-left hover:no-underline">
+                <span className="font-semibold text-lg">Do you offer refunds?</span>
+              </AccordionTrigger>
+              <AccordionContent className="text-muted-foreground">
+                Yes, we offer a 30-day money-back guarantee for Pro subscriptions. PAYG credits are non-refundable but never expire.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-7" className="bg-card rounded-lg border px-6">
+              <AccordionTrigger className="text-left hover:no-underline">
+                <span className="font-semibold text-lg">What payment methods do you accept?</span>
+              </AccordionTrigger>
+              <AccordionContent className="text-muted-foreground">
+                We accept all major credit cards, debit cards, and digital wallets through Stripe.
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         </div>
       </section>
 
       {/* CTA Section */}
       <section className="container mx-auto px-4 pb-24">
-        <div className="max-w-4xl mx-auto bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 rounded-2xl p-12 text-center">
-          <h2 className="text-3xl font-bold mb-4">
-            Ready to Plan Your Next Adventure?
-          </h2>
-          <p className="text-lg text-muted-foreground mb-8">
-            Join travelers using AI to create perfect itineraries
-          </p>
-          <div className="flex gap-4 justify-center flex-wrap">
-            <Button size="lg" asChild>
-              <Link href="/sign-up">Start Free</Link>
-            </Button>
-            <Button size="lg" variant="outline" asChild>
-              <Link href="/">View Demo</Link>
-            </Button>
+        <div className="max-w-6xl mx-auto bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 rounded-2xl shadow-xl overflow-hidden">
+          <div className="p-8 sm:p-12">
+            <div className="flex flex-col sm:flex-row items-start gap-6">
+              <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
+                <Sparkles className="w-8 h-8 text-white" />
+              </div>
+              <div className="flex-1">
+                <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3">
+                  Ready to Plan Your Next Adventure?
+                </h2>
+                <p className="text-white/90 mb-6 text-base sm:text-lg">
+                  Join travelers using AI to create perfect itineraries. Start with 2 free plans, upgrade anytime!
+                </p>
+                <div className="flex flex-wrap gap-3 mb-6">
+                  <div className="flex items-center gap-2 text-white/90 text-sm">
+                    <Sparkles className="w-4 h-4" />
+                    <span>2 Free Plans</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-white/90 text-sm">
+                    <Sparkles className="w-4 h-4" />
+                    <span>5 AI Models</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-white/90 text-sm">
+                    <Sparkles className="w-4 h-4" />
+                    <span>Upgrade Anytime</span>
+                  </div>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button size="lg" variant="secondary" asChild className="shadow-lg w-full sm:w-auto">
+                    <Link href="/sign-up">
+                      Start Free
+                      <Zap className="w-4 h-4 ml-2" />
+                    </Link>
+                  </Button>
+                  <Button 
+                    size="lg" 
+                    variant="outline" 
+                    asChild 
+                    className="bg-white/10 hover:bg-white/20 text-white border-white/30 w-full sm:w-auto"
+                  >
+                    <Link href="/">View Demo</Link>
+                  </Button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -416,13 +506,3 @@ function ComparisonRow({
     </tr>
   );
 }
-
-function FAQItem({ question, answer }: { question: string; answer: string }) {
-  return (
-    <div className="bg-card rounded-lg border p-6">
-      <h3 className="font-semibold text-lg mb-2">{question}</h3>
-      <p className="text-muted-foreground">{answer}</p>
-    </div>
-  );
-}
-

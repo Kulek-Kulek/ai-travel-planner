@@ -12,6 +12,7 @@ import {
   AI_MODELS,
   TIER_CONFIG,
   validateModelSelection,
+  isModelAvailable,
 } from '@/lib/config/pricing-models';
 
 export interface UserSubscriptionInfo {
@@ -89,10 +90,64 @@ export async function getUserSubscription(): Promise<UserSubscriptionInfo | null
 }
 
 /**
+ * Check if user can edit a specific itinerary
+ * Returns the edit eligibility status
+ */
+export async function canEditItinerary(
+  itineraryId: string
+): Promise<CanGenerateResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return {
+      allowed: false,
+      reason: 'Please sign in to edit your itinerary',
+    };
+  }
+
+  // Get the itinerary to check its model
+  const { data: itinerary } = await supabase
+    .from('itineraries')
+    .select('ai_model_used, user_id')
+    .eq('id', itineraryId)
+    .single();
+
+  if (!itinerary) {
+    return {
+      allowed: false,
+      reason: 'Itinerary not found',
+    };
+  }
+
+  // Verify ownership
+  if (itinerary.user_id !== user.id) {
+    return {
+      allowed: false,
+      reason: 'You do not own this itinerary',
+    };
+  }
+
+  // Use the existing canGeneratePlan logic with the original model
+  const modelKey = (itinerary.ai_model_used || 'gemini-flash') as ModelKey;
+  
+  return canGeneratePlan(modelKey, {
+    operation: 'edit',
+    existingItineraryId: itineraryId,
+  });
+}
+
+/**
  * Check if user can generate a plan with specified model
  */
 export async function canGeneratePlan(
-  model: ModelKey
+  model: ModelKey,
+  options?: {
+    operation?: 'create' | 'edit' | 'regenerate';
+    existingItineraryId?: string;
+  }
 ): Promise<CanGenerateResult> {
   const supabase = await createClient();
   const {
@@ -121,6 +176,62 @@ export async function canGeneratePlan(
   }
 
   const tier = (profile.subscription_tier as SubscriptionTier) || 'free';
+  const operation = options?.operation || 'create';
+  const existingItineraryId = options?.existingItineraryId;
+
+  // For edit operations, check edit count instead of creation count
+  if (operation === 'edit' || operation === 'regenerate') {
+    if (tier === 'free' && existingItineraryId) {
+      // Check if this specific plan has exceeded edit limit
+      const { data: itinerary } = await supabase
+        .from('itineraries')
+        .select('edit_count, user_id, ai_model_used')
+        .eq('id', existingItineraryId)
+        .single();
+
+      if (!itinerary) {
+        return {
+          allowed: false,
+          reason: 'Itinerary not found',
+        };
+      }
+
+      // Verify ownership
+      if (itinerary.user_id !== user.id) {
+        return {
+          allowed: false,
+          reason: 'You do not own this itinerary',
+        };
+      }
+
+      const editLimit = TIER_CONFIG.free.editsPerPlan;
+      const currentEditCount = itinerary.edit_count || 0;
+      
+      if (editLimit !== null && currentEditCount >= editLimit) {
+        return {
+          allowed: false,
+          reason: `You've reached the edit limit (${editLimit} edit per plan) for free tier. Upgrade to edit more.`,
+          needsUpgrade: true,
+        };
+      }
+
+      // Check if model is available for free tier
+      if (!isModelAvailable(model, tier)) {
+        return {
+          allowed: false,
+          reason: `${AI_MODELS[model].name} is not available on ${TIER_CONFIG[tier].displayName} tier`,
+          needsUpgrade: true,
+        };
+      }
+
+      // Free tier edit passed all checks - allow it
+      return {
+        allowed: true,
+      };
+    }
+    // For paid tiers editing, continue to normal validation below
+    // (they might need to check credits, monthly limits, etc.)
+  }
   // const modelInfo = AI_MODELS[model];
 
   // Use database function for validation
@@ -132,13 +243,18 @@ export async function canGeneratePlan(
   if (error) {
     console.error('Error checking generation permission:', error);
     // Fallback to client-side validation
-    const validation = validateModelSelection(model, tier, {
-      creditsBalance: Number(profile.credits_balance) || 0,
-      monthlyEconomyUsed: profile.monthly_economy_used || 0,
-      monthlyPremiumUsed: profile.monthly_premium_used || 0,
-      premiumRollover: profile.premium_rollover || 0,
-      plansCreatedCount: profile.plans_created_count || 0,
-    });
+    const validation = validateModelSelection(
+      model, 
+      tier, 
+      {
+        creditsBalance: Number(profile.credits_balance) || 0,
+        monthlyEconomyUsed: profile.monthly_economy_used || 0,
+        monthlyPremiumUsed: profile.monthly_premium_used || 0,
+        premiumRollover: profile.premium_rollover || 0,
+        plansCreatedCount: profile.plans_created_count || 0,
+      },
+      operation // Pass operation type to skip creation checks for edits
+    );
 
     if (!validation.valid) {
       return {
@@ -256,20 +372,44 @@ export async function recordPlanGeneration(
   }
 
   // Update itinerary record
-  const { error: itineraryError } = await supabase
-    .from('itineraries')
-    .update({
-      ai_model_used: model,
-      generation_cost: cost,
-      edit_count:
-        operation === 'edit' || operation === 'regenerate'
-          ? supabase.rpc('increment', { row_id: planId })
-          : 0,
-    })
-    .eq('id', planId);
+  // For edit/regenerate operations, increment the edit_count
+  if (operation === 'edit' || operation === 'regenerate') {
+    // First, get the current edit_count
+    const { data: currentItinerary } = await supabase
+      .from('itineraries')
+      .select('edit_count')
+      .eq('id', planId)
+      .single();
 
-  if (itineraryError) {
-    console.error('Error updating itinerary:', itineraryError);
+    const oldEditCount = currentItinerary?.edit_count || 0;
+    const newEditCount = oldEditCount + 1;
+
+    const { error: itineraryError } = await supabase
+      .from('itineraries')
+      .update({
+        ai_model_used: model,
+        generation_cost: cost,
+        edit_count: newEditCount,
+      })
+      .eq('id', planId);
+
+    if (itineraryError) {
+      console.error('Error updating itinerary edit_count:', itineraryError);
+    }
+  } else {
+    // For create operations, just set edit_count to 0
+    const { error: itineraryError } = await supabase
+      .from('itineraries')
+      .update({
+        ai_model_used: model,
+        generation_cost: cost,
+        edit_count: 0,
+      })
+      .eq('id', planId);
+
+    if (itineraryError) {
+      console.error('Error updating itinerary:', itineraryError);
+    }
   }
 
   // Log usage
