@@ -222,6 +222,22 @@ export async function claimDraftItinerary(itineraryId: string): Promise<ActionRe
       };
     }
     
+    // IMPORTANT: Check if user has exceeded their tier limit before claiming
+    // This prevents free tier bypass where users create plans while logged out then claim them
+    const { data: tierCheck } = await supabase
+      .rpc('can_generate_plan', { 
+        user_id_input: user.id,
+        model_key_input: 'gemini-flash' // Use default model for check
+      });
+    
+    if (!tierCheck || !tierCheck.allowed) {
+      console.warn('⚠️ claimDraftItinerary: User has exceeded tier limit');
+      return {
+        success: false,
+        error: tierCheck?.reason || 'You have reached your plan generation limit. Please upgrade to save this itinerary.',
+      };
+    }
+    
     // Update the itinerary to published and assign to user
     const { data, error } = await supabase
       .from('itineraries')

@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { format, differenceInDays, isBefore, startOfDay } from "date-fns";
 import Link from "next/link";
 import { Calendar as CalendarIcon, CheckCircle2, AlertCircle, Sparkles, Lock, Info } from "lucide-react";
+import { Turnstile } from "@marsidev/react-turnstile";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -107,8 +108,13 @@ const itineraryFormSchema = z
 
 export type ItineraryFormData = z.infer<typeof itineraryFormSchema>;
 
+// Extended type that includes the Turnstile token
+export type ItineraryFormDataWithToken = ItineraryFormData & {
+  turnstileToken: string;
+};
+
 interface ItineraryFormProps {
-  onSubmit: (data: ItineraryFormData) => void;
+  onSubmit: (data: ItineraryFormDataWithToken) => void;
   isLoading?: boolean;
   modelOverride?: string; // Allow overriding the default model based on user tier
   isAuthenticated?: boolean; // Whether the user is logged in
@@ -133,6 +139,7 @@ export const ItineraryFormAIEnhanced = ({
   const [extractedInfo, setExtractedInfo] = useState<ExtractedTravelInfo | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractionTimeout, setExtractionTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   
   // Ref for the submit button to enable auto-scroll
   const submitButtonRef = useRef<HTMLButtonElement>(null);
@@ -298,8 +305,16 @@ export const ItineraryFormAIEnhanced = ({
   }, [watchChildren, form]);
 
   const handleFormSubmit = (data: ItineraryFormData) => {
+    // Check for Turnstile token (bot protection)
+    if (!turnstileToken) {
+      toast.error("Security verification required", {
+        description: "Please complete the security check to continue",
+      });
+      return;
+    }
+
     // Capitalize destination
-    const capitalizedData = {
+    const capitalizedData: ItineraryFormDataWithToken = {
       ...data,
       destination: data.destination
         .split(" ")
@@ -309,9 +324,13 @@ export const ItineraryFormAIEnhanced = ({
         .join(" "),
       children: data.children ?? 0,
       childAges: data.childAges ?? [],
+      turnstileToken, // Add the token to the data
     };
 
     onSubmit(capitalizedData);
+    
+    // Reset token after submission to require new verification
+    setTurnstileToken(null);
   };
 
   const handleFormError = () => {
@@ -939,11 +958,30 @@ export const ItineraryFormAIEnhanced = ({
           />
         </section>
 
+        {/* Cloudflare Turnstile - Bot Protection */}
+        <div className="flex justify-center">
+          <Turnstile
+            siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "1x00000000000000000000AA"}
+            onSuccess={(token) => setTurnstileToken(token)}
+            onError={() => {
+              setTurnstileToken(null);
+              toast.error("Security verification failed", {
+                description: "Please refresh the page and try again",
+              });
+            }}
+            onExpire={() => setTurnstileToken(null)}
+            options={{
+              theme: "light",
+              size: "normal",
+            }}
+          />
+        </div>
+
         <Button 
           ref={submitButtonRef}
           type="submit" 
           className="w-full h-12 text-base" 
-          disabled={isLoading || isExtracting || (hasResult && !isAuthenticated)} 
+          disabled={isLoading || isExtracting || (hasResult && !isAuthenticated) || !turnstileToken} 
           size="lg"
         >
           {isLoading ? (

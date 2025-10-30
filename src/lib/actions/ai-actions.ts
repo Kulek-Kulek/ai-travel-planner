@@ -17,6 +17,7 @@ import {
 import { getUserTravelProfile } from "@/lib/actions/profile-ai-actions";
 import { type ModelKey } from "@/lib/config/pricing-models";
 import { type TravelProfile } from "@/types/travel-profile";
+import { verifyTurnstileToken } from "@/lib/cloudflare/verify-turnstile";
 import { z } from "zod";
 
 // Input schema
@@ -39,6 +40,7 @@ const generateItinerarySchema = z.object({
     })
     .optional(),
   model: z.enum(OPENROUTER_MODEL_VALUES).default(DEFAULT_OPENROUTER_MODEL),
+  turnstileToken: z.string().min(1, "Security verification required"),
 });
 
 // AI response schema matching your PRD
@@ -90,6 +92,16 @@ export async function generateItinerary(
   try {
     // 1. Validate input
     const validated = generateItinerarySchema.parse(input);
+
+    // 1.5. Verify Turnstile token (bot protection)
+    const isValidToken = await verifyTurnstileToken(validated.turnstileToken);
+    if (!isValidToken) {
+      console.error('❌ Invalid Turnstile token - possible bot activity');
+      return {
+        success: false,
+        error: 'Security verification failed. Please refresh the page and try again.',
+      };
+    }
 
     // 2. Check if user is authenticated and can generate
     const supabase = await createClient();
