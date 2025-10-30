@@ -41,6 +41,8 @@ const generateItinerarySchema = z.object({
     .optional(),
   model: z.enum(OPENROUTER_MODEL_VALUES).default(DEFAULT_OPENROUTER_MODEL),
   turnstileToken: z.string().optional(), // Optional for authenticated users editing their own itineraries
+  existingItineraryId: z.string().optional(), // ID of itinerary being edited/regenerated
+  operation: z.enum(['create', 'edit', 'regenerate']).default('create'), // Operation type
 });
 
 // AI response schema matching your PRD
@@ -86,6 +88,23 @@ function mapOpenRouterModelToKey(openRouterModel: string): ModelKey {
   return mapping[openRouterModel] || 'gemini-flash';
 }
 
+// Helper function to reverse map ModelKey back to OpenRouter model ID
+// Used when editing itineraries to use the same model
+// function mapModelKeyToOpenRouter(modelKey: string): OpenRouterModel {
+//   // Reverse mapping from pricing keys to OpenRouter model IDs
+//   const reverseMapping: Record<string, OpenRouterModel> = {
+//     'gemini-flash': 'google/gemini-2.0-flash-lite-001',
+//     'gemini-2.0-flash': 'google/gemini-2.0-flash-lite-001',
+//     'gpt-4o-mini': 'openai/gpt-4o-mini',
+//     'gemini-2.5-pro': 'google/gemini-2.5-pro',
+//     'claude-haiku': 'anthropic/claude-3-haiku',
+//     'gemini-2.5-flash': 'google/gemini-2.5-flash',
+//   };
+//   
+//   // Return mapped OpenRouter model or default
+//   return reverseMapping[modelKey] || DEFAULT_OPENROUTER_MODEL;
+// }
+
 export async function generateItinerary(
   input: z.infer<typeof generateItinerarySchema>,
 ): Promise<ActionResult<SavedItinerary>> {
@@ -125,7 +144,10 @@ export async function generateItinerary(
 
     // Only check limits for authenticated users
     if (user?.id) {
-      const canGenerate = await canGeneratePlan(modelKey);
+      const canGenerate = await canGeneratePlan(modelKey, {
+        operation: validated.operation,
+        existingItineraryId: validated.existingItineraryId,
+      });
       if (!canGenerate.allowed) {
         return {
           success: false,
@@ -147,31 +169,23 @@ export async function generateItinerary(
     // 3.5. Fetch user's travel profile (if authenticated)
     let travelProfile: TravelProfile | null = null;
     if (user?.id) {
-      console.log('🔍 Fetching user travel profile...');
       const profileResult = await getUserTravelProfile();
       if (profileResult.success && profileResult.data) {
         travelProfile = profileResult.data;
-        console.log(`✅ Profile found: ${travelProfile.archetype}`);
-      } else {
-        console.log('ℹ️ No travel profile found - generating generic itinerary');
       }
     }
 
     // 3.6. Check user's subscription tier for quality level
     const subscriptionInfo = user?.id ? await getUserSubscription() : null;
     const isPaidUser = subscriptionInfo && subscriptionInfo.tier !== 'free';
-    
-    console.log(`📊 User tier: ${subscriptionInfo?.tier || 'anonymous'} | Agentic validation: ${isPaidUser ? 'ENABLED' : 'DISABLED'}`);
 
     // 4. TIERED AGENTIC ITINERARY GENERATION
     let validatedResponse: z.infer<typeof aiResponseSchema>;
 
     if (isPaidUser) {
       // PAID PLANS: Full 3-pass agentic system with validation & refinement
-      console.log(`💎 Premium Generation: 3-pass agentic with validation`);
       
       // Pass 1: Generate itinerary with chain-of-thought reasoning
-      console.log('📝 Pass 1: Generating itinerary...');
       const initialItinerary = await generateItineraryWithModel(
         validated.model,
         validated,
@@ -186,7 +200,6 @@ export async function generateItinerary(
       }
 
       // Pass 2: Validate quality (using same model)
-      console.log('🔍 Pass 2: Validating quality...');
       const qualityCheck = await validateItineraryQuality(
         initialItinerary,
         validated,
@@ -198,9 +211,6 @@ export async function generateItinerary(
 
       // Pass 3: Refine if needed (using same model)
       if (qualityCheck.score < 85 || qualityCheck.needsRefinement) {
-        console.log(`⚠️ Quality score: ${qualityCheck.score}/100`);
-        console.log(`🎨 Pass 3: Refining with ${validated.model}...`);
-        
         const refinedItinerary = await refineItineraryWithModel(
           validated.model,
           initialItinerary,
@@ -211,17 +221,10 @@ export async function generateItinerary(
         
         if (refinedItinerary) {
           validatedResponse = refinedItinerary;
-          console.log('✅ Refinement successful');
-        } else {
-          console.log('⚠️ Refinement failed, using initial itinerary');
         }
-      } else {
-        console.log(`✅ Quality score: ${qualityCheck.score}/100 - Approved!`);
       }
     } else {
       // FREE PLAN: Single-pass with profile personalization (no validation)
-      console.log(`🆓 Free Generation: Single-pass with profile personalization`);
-      console.log('📝 Generating itinerary...');
       
       const itinerary = await generateItineraryWithModel(
         validated.model,
@@ -237,7 +240,6 @@ export async function generateItinerary(
       }
       
       validatedResponse = itinerary;
-      console.log('✅ Itinerary generated');
     }
 
     // 6. Fetch destination photo and generate tags in parallel
@@ -287,11 +289,26 @@ export async function generateItinerary(
 
     // 7. Save to database
     // Note: supabase and user are already fetched at the beginning
-    // For non-authenticated users, save as draft (won't show in public gallery)
-    // For authenticated users, save as published (will show in gallery)
+    // For edit/regenerate operations, update the existing itinerary
+    // For create operations, insert a new one
     const isAnonymous = !user?.id;
+    const isEditOperation = (validated.operation === 'edit' || validated.operation === 'regenerate') && validated.existingItineraryId;
 
-    const insertData = {
+    // For edit operations, fetch existing privacy settings to preserve them
+    let existingPrivacy = false;
+    if (isEditOperation) {
+      const { data: existingItinerary } = await supabase
+        .from("itineraries")
+        .select("is_private")
+        .eq("id", validated.existingItineraryId)
+        .single();
+      
+      if (existingItinerary) {
+        existingPrivacy = existingItinerary.is_private;
+      }
+    }
+
+    const itineraryData = {
       user_id: user?.id || null, // NULL for anonymous users
       destination: validated.destination,
       days: validated.days,
@@ -304,7 +321,7 @@ export async function generateItinerary(
       notes: validated.notes || null,
       ai_plan: validatedResponse,
       tags,
-      is_private: false, // Default to public (users can change later)
+      is_private: isEditOperation ? existingPrivacy : false, // Preserve privacy on edit, default to public on create
       image_url: photo?.url || null,
       image_photographer: photo?.photographer || null,
       image_photographer_url: photo?.photographerUrl || null,
@@ -312,11 +329,31 @@ export async function generateItinerary(
       ai_model_used: modelKey, // Track which model was used
     };
 
-    const { data: savedItinerary, error: dbError } = await supabase
-      .from("itineraries")
-      .insert(insertData)
-      .select("id")
-      .single();
+    let savedItinerary: { id: string };
+    let dbError: Error | null = null;
+
+    if (isEditOperation) {
+      // Update existing itinerary
+      const { data, error } = await supabase
+        .from("itineraries")
+        .update(itineraryData)
+        .eq("id", validated.existingItineraryId)
+        .select("id")
+        .single();
+      
+      savedItinerary = data as { id: string };
+      dbError = error;
+    } else {
+      // Insert new itinerary
+      const { data, error } = await supabase
+        .from("itineraries")
+        .insert(itineraryData)
+        .select("id")
+        .single();
+      
+      savedItinerary = data as { id: string };
+      dbError = error;
+    }
 
     if (dbError || !savedItinerary) {
       console.error("Database save error:", dbError);
@@ -361,7 +398,7 @@ export async function generateItinerary(
       const recordResult = await recordPlanGeneration(
         savedItinerary.id,
         modelKey,
-        'create'
+        validated.operation
       );
       
       if (!recordResult.success) {
