@@ -110,7 +110,7 @@ export type ItineraryFormData = z.infer<typeof itineraryFormSchema>;
 
 // Extended type that includes the Turnstile token
 export type ItineraryFormDataWithToken = ItineraryFormData & {
-  turnstileToken: string;
+  turnstileToken?: string; // Optional for authenticated users regenerating itineraries
 };
 
 interface ItineraryFormProps {
