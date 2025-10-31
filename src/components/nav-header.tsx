@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { HideOnScroll } from '@/components/hide-on-scroll';
 import { MobileNav } from '@/components/mobile-nav';
 import { SignOutButton } from '@/components/sign-out-button';
-import { Plane, Shield, Sparkles } from 'lucide-react';
+import { Plane, Sparkles, Users, LayoutDashboard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export async function NavHeader() {
@@ -43,32 +43,46 @@ export async function NavHeader() {
                   {/* User-specific Navigation */}
                   {user && (
                     <>
-                      <Link
-                        href="/my-plans"
-                        className={cn(buttonVariants({ variant: "ghost" }))}
-                      >
-                        My Plans
-                      </Link>
-                      <Link
-                        href="/bucket-list"
-                        className={cn(buttonVariants({ variant: "ghost" }))}
-                      >
-                        Bucket List
-                      </Link>
-                      <Link
-                        href="/profile"
-                        className={cn(buttonVariants({ variant: "ghost" }))}
-                      >
-                        Profile
-                      </Link>
-                      {userIsAdmin && (
-                        <Link
-                          href="/admin/itineraries"
-                          className={cn(buttonVariants({ variant: "ghost" }), "text-red-600 hover:text-red-700 hover:bg-red-50 gap-1.5")}
-                        >
-                          <Shield className="w-4 h-4" />
-                          Admin
-                        </Link>
+                      {userIsAdmin ? (
+                        /* Admin Navigation */
+                        <>
+                          <Link
+                            href="/admin/itineraries"
+                            className={cn(buttonVariants({ variant: "ghost" }), "gap-1.5")}
+                          >
+                            <LayoutDashboard className="w-4 h-4" />
+                            Dashboard
+                          </Link>
+                          <Link
+                            href="/admin/users"
+                            className={cn(buttonVariants({ variant: "ghost" }), "gap-1.5")}
+                          >
+                            <Users className="w-4 h-4" />
+                            Users
+                          </Link>
+                        </>
+                      ) : (
+                        /* Regular User Navigation */
+                        <>
+                          <Link
+                            href="/my-plans"
+                            className={cn(buttonVariants({ variant: "ghost" }))}
+                          >
+                            My Plans
+                          </Link>
+                          <Link
+                            href="/bucket-list"
+                            className={cn(buttonVariants({ variant: "ghost" }))}
+                          >
+                            Bucket List
+                          </Link>
+                          <Link
+                            href="/profile"
+                            className={cn(buttonVariants({ variant: "ghost" }))}
+                          >
+                            Profile
+                          </Link>
+                        </>
                       )}
                     </>
                   )}
