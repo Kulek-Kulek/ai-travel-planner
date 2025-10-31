@@ -1,19 +1,18 @@
-import { Button } from '@/components/ui/button';
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
+import { Button } from '@/components/ui/button';
 import { Check, Sparkles, Zap, Crown, Lock } from 'lucide-react';
 import Link from 'next/link';
 import {
-  TIER_CONFIG,
-  CREDIT_PACKS,
   AI_MODELS,
   formatCurrency,
-  type SubscriptionTier,
 } from '@/lib/config/pricing-models';
+import { PricingCardsSection } from '@/components/pricing-cards-client';
+import { createClient } from '@/lib/supabase/server';
 
 export const metadata = {
   title: 'Pricing - AI Travel Planner',
@@ -21,12 +20,17 @@ export const metadata = {
     'Choose the perfect plan for your travel planning needs. Free, Pay-as-you-go, or Pro.',
 };
 
-export default function PricingPage() {
+export default async function PricingPage() {
   // Filter out duplicate and unavailable models for display
   const displayModels = Object.values(AI_MODELS).filter((model) => {
     // Hide gemini-2.0-flash (duplicate of gemini-flash) and gpt-4o (not available)
     return model.key !== 'gemini-2.0-flash' && model.key !== 'gpt-4o';
   });
+
+  // Check if user is authenticated
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const isAuthenticated = !!user;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
@@ -53,86 +57,7 @@ export default function PricingPage() {
       </section>
 
       {/* Pricing Cards */}
-      <section className="container mt-8 mx-auto px-4 pb-24">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-          {/* FREE TIER */}
-          <PricingCard
-            tier="free"
-            name="Free"
-            price="€0"
-            description="Perfect for trying out AI travel planning"
-            icon={<Zap className="size-5" />}
-            features={TIER_CONFIG.free.features}
-            cta="Get Started Free"
-            ctaLink="/sign-up"
-            variant="outline"
-          />
-
-          {/* PRO TIER (Most Popular) */}
-          <PricingCard
-            tier="pro"
-            name="Pro"
-            price="€9.99"
-            priceSubtext="/month"
-            description="Best for frequent travelers and planners"
-            icon={<Crown className="size-5" />}
-            features={TIER_CONFIG.pro.features}
-            cta="Start Pro"
-            ctaLink="/sign-up?tier=pro"
-            variant="default"
-            popular
-          />
-
-          {/* PAYG TIER */}
-          <PricingCard
-            tier="payg"
-            name="Pay as You Go"
-            price="€0.15"
-            priceSubtext="per plan"
-            description="Perfect for occasional travelers"
-            icon={<Sparkles className="size-5" />}
-            features={TIER_CONFIG.payg.features}
-            cta="Buy Credits"
-            ctaLink="/sign-up?tier=payg"
-            variant="outline"
-          />
-        </div>
-
-        {/* PAYG Credit Packs */}
-        <div className="max-w-6xl mx-auto mt-12">
-          <h3 className="text-2xl font-bold text-center mb-6">
-            Pay-as-you-go Credit Packs
-          </h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {CREDIT_PACKS.map((pack) => (
-              <div
-                key={pack.amount}
-                className={`relative bg-card border rounded-lg p-6 text-center ${
-                  pack.popular ? 'ring-2 ring-primary' : ''
-                }`}
-              >
-                {pack.popular && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-xs font-semibold px-3 py-1 rounded-full">
-                    Popular
-                  </div>
-                )}
-                <div className="text-3xl font-bold mb-2">
-                  {formatCurrency(pack.amount)}
-                </div>
-                <div className="text-sm text-muted-foreground mb-4">
-                  ~{pack.estimatedPlans.min}-{pack.estimatedPlans.max} plans
-                </div>
-                <Button size="sm" variant="outline" className="w-full" asChild>
-                  <Link href="/sign-up?tier=payg">Select</Link>
-                </Button>
-              </div>
-            ))}
-          </div>
-          <p className="text-center text-sm text-muted-foreground mt-4">
-            Plan count depends on AI model chosen. Credits never expire.
-          </p>
-        </div>
-      </section>
+      <PricingCardsSection isAuthenticated={isAuthenticated} />
 
       {/* AI Models Comparison */}
       <section className="container mx-auto px-4 pb-24">
@@ -397,75 +322,6 @@ export default function PricingPage() {
 }
 
 // Helper Components
-
-interface PricingCardProps {
-  tier: SubscriptionTier;
-  name: string;
-  price: string;
-  priceSubtext?: string;
-  description: string;
-  icon: React.ReactNode;
-  features: string[];
-  cta: string;
-  ctaLink: string;
-  variant: 'default' | 'outline';
-  popular?: boolean;
-}
-
-function PricingCard({
-  // tier,
-  name,
-  price,
-  priceSubtext,
-  description,
-  icon,
-  features,
-  cta,
-  ctaLink,
-  variant,
-  popular = false,
-}: PricingCardProps) {
-  return (
-    <div
-      className={`relative flex flex-col rounded-lg border bg-card p-8 shadow-sm transition-all hover:shadow-lg ${
-        popular ? 'ring-2 ring-primary shadow-xl scale-105' : ''
-      }`}
-    >
-      {popular && (
-        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-sm font-semibold px-4 py-1 rounded-full">
-          Most Popular
-        </div>
-      )}
-
-      <div className="mb-6">
-        <div className="flex items-center gap-2 mb-2">
-          {icon}
-          <h3 className="text-2xl font-bold">{name}</h3>
-        </div>
-        <div className="flex items-baseline gap-1 mb-2">
-          <span className="text-5xl font-bold">{price}</span>
-          {priceSubtext && (
-            <span className="text-muted-foreground">{priceSubtext}</span>
-          )}
-        </div>
-        <p className="text-sm text-muted-foreground">{description}</p>
-      </div>
-
-      <ul className="space-y-3 mb-8 flex-grow">
-        {features.map((feature, index) => (
-          <li key={index} className="flex items-start gap-3">
-            <Check className="size-5 text-primary shrink-0 mt-0.5" />
-            <span className="text-sm">{feature}</span>
-          </li>
-        ))}
-      </ul>
-
-      <Button variant={variant} size="lg" className="w-full" asChild>
-        <Link href={ctaLink}>{cta}</Link>
-      </Button>
-    </div>
-  );
-}
 
 function ComparisonRow({
   feature,
