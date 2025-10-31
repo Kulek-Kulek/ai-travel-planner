@@ -113,16 +113,19 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   }
 
   // Handle subscription checkout
-  if (session.mode === 'subscription') {
-    const subscriptionId = session.subscription as string;
-    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  if (session.mode === 'subscription' && session.subscription) {
+    const subscriptionId = typeof session.subscription === 'string' 
+      ? session.subscription 
+      : session.subscription.id;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId) as any;
 
     await updateUserSubscription(
       userId,
       'pro',
       'active',
       subscriptionId,
-      new Date(subscription.current_period_end * 1000)
+      subscription.current_period_end ? new Date(subscription.current_period_end * 1000) : undefined
     );
 
     await logStripeTransaction({
@@ -160,10 +163,22 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   const userId = subscription.metadata?.user_id;
+  const customerId = typeof subscription.customer === 'string' 
+    ? subscription.customer 
+    : subscription.customer?.id;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sub = subscription as any;
+  const periodEnd = sub.current_period_end 
+    ? new Date(sub.current_period_end * 1000) 
+    : undefined;
   
   if (!userId) {
     // Try to find user by customer ID
-    const user = await getUserByStripeCustomerId(subscription.customer as string);
+    if (!customerId) {
+      console.error('No customer ID found for subscription');
+      return;
+    }
+    const user = await getUserByStripeCustomerId(customerId);
     if (!user) {
       console.error('User not found for subscription');
       return;
@@ -174,7 +189,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
       'pro',
       subscription.status === 'active' ? 'active' : 'canceled',
       subscription.id,
-      new Date(subscription.current_period_end * 1000)
+      periodEnd
     );
   } else {
     await updateUserSubscription(
@@ -182,7 +197,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
       'pro',
       subscription.status === 'active' ? 'active' : 'canceled',
       subscription.id,
-      new Date(subscription.current_period_end * 1000)
+      periodEnd
     );
   }
 }
@@ -199,7 +214,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     user.id,
     'free',
     'expired',
-    null,
+    undefined,
     new Date()
   );
 }
@@ -242,13 +257,17 @@ async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
 }
 
 async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
-  if (!invoice.subscription) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const inv = invoice as any;
+  if (!inv.subscription) {
     return;
   }
 
-  const subscription = await stripe.subscriptions.retrieve(
-    invoice.subscription as string
-  );
+  const subscriptionId = typeof inv.subscription === 'string' 
+    ? inv.subscription 
+    : inv.subscription.id;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId) as any;
   
   const user = await getUserByStripeSubscriptionId(subscription.id);
   
@@ -256,35 +275,49 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
     return;
   }
 
+  const periodEnd = subscription.current_period_end 
+    ? new Date(subscription.current_period_end * 1000) 
+    : undefined;
+
   // Update subscription end date
   await updateUserSubscription(
     user.id,
     'pro',
     'active',
     subscription.id,
-    new Date(subscription.current_period_end * 1000)
+    periodEnd
   );
 
   // Log transaction
-  await logStripeTransaction({
-    userId: user.id,
-    paymentIntentId: invoice.payment_intent as string,
-    amount: invoice.amount_paid / 100,
-    currency: invoice.currency,
-    type: 'subscription',
-    status: 'succeeded',
-    metadata: { invoice_id: invoice.id },
-  });
+  const paymentIntentId = typeof inv.payment_intent === 'string' 
+    ? inv.payment_intent 
+    : inv.payment_intent?.id;
+  
+  if (paymentIntentId) {
+    await logStripeTransaction({
+      userId: user.id,
+      paymentIntentId,
+      amount: invoice.amount_paid / 100,
+      currency: invoice.currency ?? 'eur',
+      type: 'subscription',
+      status: 'succeeded',
+      metadata: { invoice_id: invoice.id },
+    });
+  }
 }
 
 async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
-  if (!invoice.subscription) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const inv = invoice as any;
+  if (!inv.subscription) {
     return;
   }
 
-  const subscription = await stripe.subscriptions.retrieve(
-    invoice.subscription as string
-  );
+  const subscriptionId = typeof inv.subscription === 'string' 
+    ? inv.subscription 
+    : inv.subscription.id;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId) as any;
   
   const user = await getUserByStripeSubscriptionId(subscription.id);
   
@@ -293,14 +326,20 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   }
 
   // Log failed payment
-  await logStripeTransaction({
-    userId: user.id,
-    paymentIntentId: invoice.payment_intent as string,
-    amount: invoice.amount_due / 100,
-    currency: invoice.currency,
-    type: 'subscription',
-    status: 'failed',
-    metadata: { invoice_id: invoice.id },
-  });
+  const paymentIntentId = typeof inv.payment_intent === 'string' 
+    ? inv.payment_intent 
+    : inv.payment_intent?.id;
+  
+  if (paymentIntentId) {
+    await logStripeTransaction({
+      userId: user.id,
+      paymentIntentId,
+      amount: invoice.amount_due / 100,
+      currency: invoice.currency ?? 'eur',
+      type: 'subscription',
+      status: 'failed',
+      metadata: { invoice_id: invoice.id },
+    });
+  }
 }
 
