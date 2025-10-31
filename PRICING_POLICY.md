@@ -45,18 +45,20 @@ After 2 plans, users must choose:
 - No monthly commitment
 
 **Top-up Options:**
-- €2 (~10-13 plans)
-- €5 (~25-33 plans)
-- €10 (~50-67 plans)
-- €20 (~100-133 plans)
+- €2 (1-2 plans)
+- €5 (2-5 plans)
+- €10 (5-10 plans)
+- €20 (11-20 plans)
 
 **Pricing per Plan:**
 | Model | Cost | Quality | Speed |
 |-------|------|---------|-------|
-| Gemini Flash | €0.15 | Good | Fast ⚡ |
-| GPT-4o Mini | €0.20 | Better | Fast ⚡ |
-| Claude Haiku | €0.30 | Great | Medium 🚀 |
-| GPT-4o | €0.50 | Best | Medium 🚀 |
+| Gemini Flash | €1.00 | Good | Fast ⚡ |
+| GPT-4o Mini | €1.00 | Better | Fast ⚡ |
+| Gemini 2.5 Flash | €1.20 | Great | Fast ⚡ |
+| Claude Haiku | €1.35 | Great | Fast 🚀 |
+| Gemini 2.5 Pro | €1.50 | Advanced | Medium 🚀 |
+| GPT-4o | €1.75 | Best | Medium 🚀 |
 
 **Included Features:**
 - ✅ All AI models unlocked
