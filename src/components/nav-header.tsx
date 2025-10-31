@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { HideOnScroll } from '@/components/hide-on-scroll';
 import { MobileNav } from '@/components/mobile-nav';
 import { SignOutButton } from '@/components/sign-out-button';
-import { Plane, Shield, Sparkles, Users, LayoutDashboard } from 'lucide-react';
+import { Plane, Sparkles, Users, LayoutDashboard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export async function NavHeader() {

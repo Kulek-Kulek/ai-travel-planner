@@ -15,8 +15,7 @@ interface UserManagementClientProps {
 }
 
 export function UserManagementClient({ 
-  initialUsers, 
-  totalCount 
+  initialUsers
 }: UserManagementClientProps) {
   const [users, setUsers] = useState<AdminUser[]>(initialUsers);
   const [filter, setFilter] = useState<'all' | 'user' | 'admin'>('all');
