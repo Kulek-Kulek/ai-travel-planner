@@ -9,6 +9,9 @@ import { UserManagementClient } from './user-management-client';
 import { Button } from '@/components/ui/button';
 import { Shield, LayoutDashboard, ArrowLeft } from 'lucide-react';
 
+// Mark page as dynamic since it uses authentication
+export const dynamic = 'force-dynamic';
+
 type UserStats = {
   totalUsers: number;
   adminUsers: number;

@@ -391,3 +391,4 @@ For questions or issues, refer to:
 - `PRICING_POLICY.md` - Complete pricing policy
 - `.cursor/rules/pricing-policy.mdc` - Implementation rules
 
+
