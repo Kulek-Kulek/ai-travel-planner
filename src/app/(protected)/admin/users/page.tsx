@@ -3,8 +3,7 @@ import Link from 'next/link';
 import { isAdmin } from '@/lib/auth/admin';
 import { 
   getAllUsers, 
-  getUserStats, 
-  type AdminUser 
+  getUserStats
 } from '@/lib/actions/admin-user-actions';
 import { UserManagementClient } from './user-management-client';
 import { Button } from '@/components/ui/button';
