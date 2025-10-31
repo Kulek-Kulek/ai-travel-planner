@@ -35,6 +35,20 @@ export function Masthead({ onPlanTrip }: MastheadProps) {
     retry: 2,
   });
 
+  // Fetch real statistics
+  const { data: statsData } = useQuery({
+    queryKey: ['stats'],
+    queryFn: async () => {
+      const response = await fetch('/api/stats');
+      if (!response.ok) {
+        return { totalItineraries: 0, uniqueDestinations: 0 };
+      }
+      return response.json();
+    },
+    staleTime: 2 * 60 * 1000, // Consider data fresh for 2 minutes
+    retry: 2,
+  });
+
   // Memoize the carousel itineraries to avoid re-shuffling
   const itineraries = useMemo(() => {
     if (!itinerariesData?.itineraries.length) {
@@ -109,8 +123,15 @@ export function Masthead({ onPlanTrip }: MastheadProps) {
           <div className="pt-6 border-t border-white/10">
             <dl className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               <div className="space-y-1">
-                <dt className="text-2xl font-bold text-white">2,300+</dt>
-                <dd className="text-sm text-indigo-100/80">Itineraries generated across 84 destinations</dd>
+                <dt className="text-2xl font-bold text-white">
+                  {statsData?.totalItineraries 
+                    ? `${statsData.totalItineraries.toLocaleString()}+`
+                    : '2,300+'}
+                </dt>
+                <dd className="text-sm text-indigo-100/80">
+                  Itineraries generated across{' '}
+                  {statsData?.uniqueDestinations || 84} destinations
+                </dd>
               </div>
               <div className="space-y-1">
                 <dt className="text-2xl font-bold text-white">&lt; 2 min</dt>
