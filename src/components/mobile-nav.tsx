@@ -14,7 +14,9 @@ import {
   UserPlus,
   LogOut,
   ListCheck,
-  Sparkles
+  Sparkles,
+  Users,
+  LayoutDashboard
 } from 'lucide-react';
 import { signInWithGoogle } from '@/lib/actions/auth-actions';
 import { clientSignOut } from '@/lib/auth/client-auth';
@@ -137,46 +139,60 @@ export function MobileNav({ user, isAdmin }: MobileNavProps) {
 
               {user && (
                 <>
-                  {/* My Plans */}
-                  <Link
-                    href="/my-plans"
-                    onClick={closeMenu}
-                    className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    <ClipboardList className="w-5 h-5" />
-                    <span className="font-medium">My Plans</span>
-                  </Link>
+                  {isAdmin ? (
+                    /* Admin Navigation */
+                    <>
+                      <Link
+                        href="/admin/itineraries"
+                        onClick={closeMenu}
+                        className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                      >
+                        <LayoutDashboard className="w-5 h-5" />
+                        <span className="font-semibold">Admin Dashboard</span>
+                      </Link>
 
-                  {/* Bucket List */}
-                  <Link
-                    href="/bucket-list"
-                    onClick={closeMenu}
-                    className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    <ListCheck className="w-5 h-5" />
-                    <span className="font-medium">Bucket List</span>
-                  </Link>
+                      <Link
+                        href="/admin/users"
+                        onClick={closeMenu}
+                        className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                      >
+                        <Users className="w-5 h-5" />
+                        <span className="font-semibold">User Management</span>
+                      </Link>
+                    </>
+                  ) : (
+                    /* Regular User Navigation */
+                    <>
+                      {/* My Plans */}
+                      <Link
+                        href="/my-plans"
+                        onClick={closeMenu}
+                        className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                      >
+                        <ClipboardList className="w-5 h-5" />
+                        <span className="font-medium">My Plans</span>
+                      </Link>
 
-                  {/* Profile */}
-                  <Link
-                    href="/profile"
-                    onClick={closeMenu}
-                    className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    <User className="w-5 h-5" />
-                    <span className="font-medium">Profile</span>
-                  </Link>
+                      {/* Bucket List */}
+                      <Link
+                        href="/bucket-list"
+                        onClick={closeMenu}
+                        className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                      >
+                        <ListCheck className="w-5 h-5" />
+                        <span className="font-medium">Bucket List</span>
+                      </Link>
 
-                  {/* Admin Link */}
-                  {isAdmin && (
-                    <Link
-                      href="/admin/itineraries"
-                      onClick={closeMenu}
-                      className="flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    >
-                      <Shield className="w-5 h-5" />
-                      <span className="font-semibold">Admin</span>
-                    </Link>
+                      {/* Profile */}
+                      <Link
+                        href="/profile"
+                        onClick={closeMenu}
+                        className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                      >
+                        <User className="w-5 h-5" />
+                        <span className="font-medium">Profile</span>
+                      </Link>
+                    </>
                   )}
                 </>
               )}
