@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { DeleteItineraryDialog } from '@/components/delete-itinerary-dialog';
+import { Shield, Users, ArrowLeft, Loader2, Lock, Globe } from 'lucide-react';
 
 type AdminStats = {
   totalItineraries: number;
@@ -75,51 +76,59 @@ export default function AdminItinerariesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12">
+    <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
           <Link
             href="/"
-            className="inline-flex items-center text-blue-600 hover:text-blue-800 mb-4"
+            className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 mb-4 transition-colors"
           >
-            ← Back to Home
+            <ArrowLeft className="w-4 h-4" />
+            Back to Home
           </Link>
           
-          <div className="flex items-start justify-between">
+          <div className="flex items-start justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                🛡️ Admin Dashboard
+              <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center gap-3">
+                <Shield className="w-8 h-8 text-blue-600" />
+                Admin Dashboard - Itineraries
               </h1>
               <p className="text-gray-600">
                 Manage all itineraries across the platform
               </p>
             </div>
             
+            <Button asChild>
+              <Link href="/admin/users" className="flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                View Users
+              </Link>
+            </Button>
           </div>
         </div>
 
         {/* Stats */}
         {stats && (
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
-            <div className="bg-white rounded-lg shadow p-6">
+            <div className="bg-white rounded-lg shadow p-6 border border-gray-200">
               <p className="text-sm text-gray-600 mb-1">Total Itineraries</p>
               <p className="text-3xl font-bold text-gray-900">{stats.totalItineraries}</p>
             </div>
-            <div className="bg-green-50 rounded-lg shadow p-6">
-              <p className="text-sm text-green-600 mb-1">Public</p>
-              <p className="text-3xl font-bold text-green-900">{stats.publicItineraries}</p>
+            <div className="bg-white rounded-lg shadow p-6 border border-gray-200">
+              <p className="text-sm text-gray-600 mb-1">Public</p>
+              <p className="text-3xl font-bold text-green-600">{stats.publicItineraries}</p>
             </div>
-            <div className="bg-gray-50 rounded-lg shadow p-6">
+            <div className="bg-white rounded-lg shadow p-6 border border-gray-200">
               <p className="text-sm text-gray-600 mb-1">Private</p>
               <p className="text-3xl font-bold text-gray-900">{stats.privateItineraries}</p>
             </div>
-            <div className="bg-blue-50 rounded-lg shadow p-6">
-              <p className="text-sm text-blue-600 mb-1">Anonymous</p>
-              <p className="text-3xl font-bold text-blue-900">{stats.anonymousItineraries}</p>
+            <div className="bg-white rounded-lg shadow p-6 border border-gray-200">
+              <p className="text-sm text-gray-600 mb-1">Anonymous</p>
+              <p className="text-3xl font-bold text-blue-600">{stats.anonymousItineraries}</p>
             </div>
-            <div className="bg-purple-50 rounded-lg shadow p-6">
-              <p className="text-sm text-purple-600 mb-1">Total Users</p>
-              <p className="text-3xl font-bold text-purple-900">{stats.totalUsers}</p>
+            <div className="bg-white rounded-lg shadow p-6 border border-gray-200">
+              <p className="text-sm text-gray-600 mb-1">Total Users</p>
+              <p className="text-3xl font-bold text-purple-600">{stats.totalUsers}</p>
             </div>
           </div>
         )}
@@ -159,10 +168,10 @@ export default function AdminItinerariesPage() {
         </div>
 
         {/* Itineraries Table */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="bg-white rounded-lg shadow overflow-hidden border border-gray-200">
           {isLoading ? (
             <div className="p-12 text-center">
-              <div className="animate-spin text-4xl mb-4">⏳</div>
+              <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
               <p className="text-gray-600">Loading...</p>
             </div>
           ) : itineraries.length === 0 ? (
@@ -201,12 +210,22 @@ export default function AdminItinerariesPage() {
                         {itinerary.user_email}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
                           itinerary.is_private 
                             ? 'bg-gray-100 text-gray-800' 
                             : 'bg-green-100 text-green-800'
                         }`}>
-                          {itinerary.is_private ? '🔒 Private' : '🌍 Public'}
+                          {itinerary.is_private ? (
+                            <>
+                              <Lock className="w-3 h-3" />
+                              Private
+                            </>
+                          ) : (
+                            <>
+                              <Globe className="w-3 h-3" />
+                              Public
+                            </>
+                          )}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">

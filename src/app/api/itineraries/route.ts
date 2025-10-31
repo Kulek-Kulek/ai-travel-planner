@@ -26,9 +26,10 @@ export async function GET(request: NextRequest) {
         .limit(fetchLimit);
       
       if (error) {
-        console.error('❌ API: Database error:', error);
+        console.error('❌ API Itineraries (random): Database error:', error);
+        console.error('❌ API Itineraries (random): Error details:', JSON.stringify(error, null, 2));
         return NextResponse.json(
-          { error: 'Failed to fetch itineraries' },
+          { error: 'Failed to fetch itineraries', details: error.message },
           { status: 500 }
         );
       }
@@ -144,9 +145,12 @@ export async function GET(request: NextRequest) {
     const { data, error, count } = await query;
     
     if (error) {
-      console.error('❌ API: Database error:', error);
+      console.error('❌ API Itineraries: Database error:', error);
+      console.error('❌ API Itineraries: Error code:', error.code);
+      console.error('❌ API Itineraries: Error message:', error.message);
+      console.error('❌ API Itineraries: Error details:', JSON.stringify(error, null, 2));
       return NextResponse.json(
-        { error: 'Failed to fetch itineraries' },
+        { error: 'Failed to fetch itineraries', details: error.message },
         { status: 500 }
       );
     }
