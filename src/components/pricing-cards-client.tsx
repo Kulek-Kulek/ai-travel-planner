@@ -119,7 +119,10 @@ export function CreditPackCards({ isAuthenticated = false }: { isAuthenticated?:
             )}
             <div className="text-3xl font-bold mb-2">€{pack.amount}</div>
             <div className="text-sm text-muted-foreground mb-4">
-              ~{pack.estimatedPlans.min}-{pack.estimatedPlans.max} plans
+              {pack.estimatedPlans.min === pack.estimatedPlans.max 
+                ? `${pack.estimatedPlans.min} ${pack.estimatedPlans.min === 1 ? 'plan' : 'plans'}`
+                : `~${pack.estimatedPlans.min}-${pack.estimatedPlans.max} plans`
+              }
             </div>
             {isAuthenticated ? (
               <PaymentButton
@@ -140,7 +143,7 @@ export function CreditPackCards({ isAuthenticated = false }: { isAuthenticated?:
         ))}
       </div>
       <p className="text-center text-sm text-muted-foreground mt-4">
-        Plan count depends on AI model chosen. Credits never expire.
+        Economy models: €1.00 | Premium models: €1.20-€1.75 | Credits never expire
       </p>
     </div>
   );
@@ -183,7 +186,7 @@ export function PricingCardsSection({ isAuthenticated = false }: { isAuthenticat
           <PricingCard
             tier="payg"
             name="Pay as You Go"
-            price="€0.15"
+            price="€1-€1.75"
             priceSubtext="per plan"
             description="Perfect for occasional travelers"
             icon={<Sparkles className="size-5" />}

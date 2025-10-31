@@ -151,7 +151,7 @@ export default async function PricingPage() {
               />
               <ComparisonRow
                 feature="AI Models"
-                values={['2 economy models', 'All 5 models', 'All 5 models']}
+                values={['2 economy models', 'All 6 models', 'All 6 models']}
               />
               <ComparisonRow
                 feature="Edits per plan"
@@ -224,7 +224,7 @@ export default async function PricingPage() {
                 <span className="font-semibold text-lg">How does Pay-as-you-go pricing work?</span>
               </AccordionTrigger>
               <AccordionContent className="text-muted-foreground">
-                Add credits to your account, then pay per itinerary based on the AI model you choose (€0.15-€0.35 per plan). Credits never expire.
+                Add credits to your account (€2, €5, €10, or €20), then pay based on the AI model: €1.00 for economy models, €1.20-€1.75 for premium models. Credits never expire.
               </AccordionContent>
             </AccordionItem>
 
@@ -233,7 +233,7 @@ export default async function PricingPage() {
                 <span className="font-semibold text-lg">What&apos;s the difference between economy and premium AI models?</span>
               </AccordionTrigger>
               <AccordionContent className="text-muted-foreground">
-                Economy models (Gemini Flash, GPT-4o Mini) are fast and cost-effective at €0.15 per plan. Premium models (Gemini 2.5 Pro, Claude Haiku, Gemini 2.5 Flash) provide more detailed, nuanced itineraries at €0.20-€0.35 per plan.
+                Economy models (Gemini Flash, GPT-4o Mini) cost €1.00 and are fast and cost-effective. Premium models (Gemini 2.5 Flash €1.20, Claude Haiku €1.35, Gemini 2.5 Pro €1.50, GPT-4o €1.75) provide more detailed, nuanced itineraries with advanced reasoning.
               </AccordionContent>
             </AccordionItem>
 
@@ -289,7 +289,7 @@ export default async function PricingPage() {
                   </div>
                   <div className="flex items-center gap-2 text-white/90 text-sm">
                     <Sparkles className="w-4 h-4" />
-                    <span>5 AI Models</span>
+                    <span>6 AI Models</span>
                   </div>
                   <div className="flex items-center gap-2 text-white/90 text-sm">
                     <Sparkles className="w-4 h-4" />
