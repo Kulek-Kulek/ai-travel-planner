@@ -26,10 +26,13 @@ PAYG_TIER = {
   credits_never_expire: true,
   show_cost_before_generation: true, // REQUIRED
   pricing: {
-    'gemini-flash': 0.15,
-    'gpt-4o-mini': 0.20,
-    'claude-haiku': 0.30,
-    'gpt-4o': 0.50
+    // Variable pricing based on model quality
+    'gemini-flash': 1.00,        // Economy - Fast
+    'gpt-4o-mini': 1.00,          // Economy - Balanced
+    'gemini-2.5-flash': 1.20,     // Premium - Enhanced
+    'claude-haiku': 1.35,         // Premium - Efficient
+    'gemini-2.5-pro': 1.50,       // Premium - Advanced
+    'gpt-4o': 1.75                // Premium - Best
   }
 }
 ```
@@ -139,8 +142,8 @@ if (tier === 'free' && plansCreated >= 2) {
 export const AI_MODELS = {
   'gemini-flash': {
     name: 'Gemini Flash',
-    provider: 'google/gemini-flash-1.5',
-    cost: 0.15,
+    provider: 'google/gemini-2.0-flash-lite-001',
+    cost: 1.00,
     tier: 'economy',
     free_tier: true,
     badge: 'Fast'
@@ -148,23 +151,39 @@ export const AI_MODELS = {
   'gpt-4o-mini': {
     name: 'GPT-4o Mini',
     provider: 'openai/gpt-4o-mini',
-    cost: 0.20,
+    cost: 1.00,
     tier: 'economy',
     free_tier: true,
     badge: 'Balanced'
   },
-  'claude-haiku': {
-    name: 'Claude Haiku',
-    provider: 'anthropic/claude-3.5-haiku',
-    cost: 0.30,
+  'gemini-2.5-flash': {
+    name: 'Gemini 2.5 Flash',
+    provider: 'google/gemini-2.5-flash',
+    cost: 1.20,
     tier: 'premium',
     free_tier: false,
-    badge: 'Better'
+    badge: 'Premium'
+  },
+  'claude-haiku': {
+    name: 'Claude Haiku',
+    provider: 'anthropic/claude-3-haiku',
+    cost: 1.35,
+    tier: 'premium',
+    free_tier: false,
+    badge: 'Efficient'
+  },
+  'gemini-2.5-pro': {
+    name: 'Gemini 2.5 Pro',
+    provider: 'google/gemini-2.5-pro',
+    cost: 1.50,
+    tier: 'premium',
+    free_tier: false,
+    badge: 'Advanced'
   },
   'gpt-4o': {
     name: 'GPT-4o',
     provider: 'openai/gpt-4o',
-    cost: 0.50,
+    cost: 1.75,
     tier: 'premium',
     free_tier: false,
     badge: 'Best'
