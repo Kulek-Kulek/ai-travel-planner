@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -52,6 +52,7 @@ interface TravelQuizProps {
 }
 
 export function TravelQuiz({ onComplete, isGenerating = false }: TravelQuizProps) {
+  const autoAdvanceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [responses, setResponses] = useState<Partial<QuizResponse>>({});
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
@@ -343,6 +344,15 @@ export function TravelQuiz({ onComplete, isGenerating = false }: TravelQuizProps
     }
   ];
 
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (autoAdvanceTimeoutRef.current) {
+        clearTimeout(autoAdvanceTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const currentQ = questions[currentQuestion];
   const totalQuestions = questions.length;
   const progress = ((currentQuestion + 1) / totalQuestions) * 100;
@@ -372,7 +382,10 @@ export function TravelQuiz({ onComplete, isGenerating = false }: TravelQuizProps
   const handleSingleSelect = (value: string) => {
     setResponses(prev => ({ ...prev, [currentQ.id]: value }));
     // Auto-advance after selection for better UX
-    setTimeout(() => {
+    if (autoAdvanceTimeoutRef.current) {
+      clearTimeout(autoAdvanceTimeoutRef.current);
+    }
+    autoAdvanceTimeoutRef.current = setTimeout(() => {
       if (currentQuestion < questions.length - 1) {
         setCurrentQuestion(currentQuestion + 1);
       } else {

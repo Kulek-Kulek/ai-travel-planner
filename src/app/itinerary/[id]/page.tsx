@@ -23,7 +23,9 @@ import {
   Tag, 
   Clock,
   ListCheck,
-  Map
+  Map,
+  Hotel,
+  ExternalLink
 } from 'lucide-react';
 
 export default async function ItineraryPage({
@@ -218,6 +220,26 @@ export default async function ItineraryPage({
             className="mb-6"
           />
         )}
+
+        {/* Quick Booking Button - Always visible */}
+        {!start_date || !end_date ? (
+          <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">
+              Find Hotels in {ai_plan.city || destination}
+            </h3>
+            <a
+              href={`https://www.booking.com/searchresults.html?ss=${encodeURIComponent(ai_plan.city || destination)}&aid=2388329`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full group relative overflow-hidden rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-6 py-3 transition-all duration-200 hover:shadow-lg active:scale-[0.98] flex items-center justify-center gap-2 text-white font-semibold"
+            >
+              <Hotel className="w-5 h-5 group-hover:scale-110 transition-transform" />
+              Search Hotels on Booking.com
+              <ExternalLink className="w-4 h-4" />
+              <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity" />
+            </a>
+          </div>
+        ) : null}
 
         {/* Interactive Map Section */}
         {isGoogleMapsEnabled() && (
