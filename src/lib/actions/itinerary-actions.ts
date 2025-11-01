@@ -1,7 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
-import type { ModelKey } from './subscription-actions';
+import type { ModelKey } from '@/lib/config/pricing-models';
 
 // AI Plan structure
 export type AIPlan = {
