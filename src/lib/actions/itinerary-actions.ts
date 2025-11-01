@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import type { ModelKey } from './subscription-actions';
 
 // AI Plan structure
 export type AIPlan = {
@@ -276,7 +277,7 @@ export async function claimDraftItinerary(itineraryId: string): Promise<ActionRe
     const { recordPlanGeneration } = await import('./subscription-actions');
     const recordResult = await recordPlanGeneration(
       itineraryId,
-      modelUsed as any,
+      modelUsed as ModelKey,
       'create' // Treat claiming as a "create" operation for counting purposes
     );
     
