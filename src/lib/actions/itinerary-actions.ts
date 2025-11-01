@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import type { ModelKey } from '@/lib/config/pricing-models';
 
 // AI Plan structure
 export type AIPlan = {
@@ -227,8 +228,8 @@ export async function claimDraftItinerary(itineraryId: string): Promise<ActionRe
     // This prevents free tier bypass where users create plans while logged out then claim them
     const { data: tierCheck } = await supabase
       .rpc('can_generate_plan', { 
-        user_id_input: user.id,
-        model_key_input: 'gemini-flash' // Use default model for check
+        p_user_id: user.id,
+        p_model: 'gemini-flash' // Use default model for check
       });
     
     if (!tierCheck || !tierCheck.allowed) {
@@ -265,6 +266,24 @@ export async function claimDraftItinerary(itineraryId: string): Promise<ActionRe
         success: false,
         error: 'Itinerary could not be claimed. It may have already been saved.',
       };
+    }
+    
+    // Record the plan generation to increment the user's plan count
+    // This is important for tier limit tracking
+    const claimedItinerary = data[0];
+    const modelUsed = claimedItinerary.ai_model_used || 'gemini-flash';
+    
+    // Import recordPlanGeneration dynamically to avoid circular dependency
+    const { recordPlanGeneration } = await import('./subscription-actions');
+    const recordResult = await recordPlanGeneration(
+      itineraryId,
+      modelUsed as ModelKey,
+      'create' // Treat claiming as a "create" operation for counting purposes
+    );
+    
+    if (!recordResult.success) {
+      console.error('Failed to record plan generation after claiming:', recordResult.error);
+      // Don't fail the whole operation, the itinerary is already claimed
     }
     
     return { success: true, data: undefined };

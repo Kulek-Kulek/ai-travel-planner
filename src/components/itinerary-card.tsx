@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Itinerary } from '@/lib/actions/itinerary-actions';
 import { likeItinerary, addToBucketList, removeFromBucketList, isInBucketList } from '@/lib/actions/itinerary-actions';
@@ -8,6 +8,7 @@ import { canEditItinerary } from '@/lib/actions/subscription-actions';
 import { Button } from './ui/button';
 import { UpgradeModal } from './upgrade-modal';
 import { createClient } from '@/lib/supabase/client';
+import { GoogleMapsButton } from './google-maps-button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -80,6 +81,7 @@ export function ItineraryCard({
   } = itinerary;
   
   const router = useRouter();
+  const justLikedTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [currentLikes, setCurrentLikes] = useState(likes || 0);
   const [isLiking, setIsLiking] = useState(false);
   const [hasLiked, setHasLiked] = useState(() => {
@@ -129,6 +131,15 @@ export function ItineraryCard({
     
     checkBucketListStatus();
   }, [id, isInBucketListProp]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (justLikedTimeoutRef.current) {
+        clearTimeout(justLikedTimeoutRef.current);
+      }
+    };
+  }, []);
   
   const handleLike = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -144,7 +155,11 @@ export function ItineraryCard({
     setIsLiking(true);
     setJustLiked(true);
     
-    setTimeout(() => setJustLiked(false), 500);
+    // Remove animation after it completes (500ms)
+    if (justLikedTimeoutRef.current) {
+      clearTimeout(justLikedTimeoutRef.current);
+    }
+    justLikedTimeoutRef.current = setTimeout(() => setJustLiked(false), 500);
     
     // Optimistic update
     setCurrentLikes(prev => prev + 1);
@@ -510,6 +525,13 @@ export function ItineraryCard({
             <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity" />
           </button>
           
+          {/* Google Maps button */}
+          <GoogleMapsButton
+            places={ai_plan.days.flatMap(day => day.places)}
+            destination={ai_plan.city || destination}
+            className="w-full"
+          />
+          
           {/* Creator and date info */}
           <div className="flex justify-between items-center gap-2">
             <div className="flex flex-col gap-0.5 flex-1 min-w-0">
@@ -599,6 +621,27 @@ export function ItineraryCard({
               </div>
             </div>
             
+            {/* Booking.com button */}
+            <button
+              onClick={handleFindHotels}
+              className="w-full group relative overflow-hidden rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-3 py-2 transition-all duration-200 hover:shadow-lg active:scale-[0.98]"
+            >
+              <div className="flex items-center justify-center gap-2 text-white">
+                <Hotel className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                <span className="font-semibold text-sm">
+                  {start_date && end_date ? 'Find Hotels for This Trip' : `Find Hotels in ${ai_plan.city || destination}`}
+                </span>
+              </div>
+              <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity" />
+            </button>
+            
+            {/* Google Maps button */}
+            <GoogleMapsButton
+              places={ai_plan.days.flatMap(day => day.places)}
+              destination={ai_plan.city || destination}
+              className="w-full"
+            />
+            
             {/* Action buttons for bucket list */}
             <div className="flex gap-2 pt-2">
               <button
@@ -623,6 +666,29 @@ export function ItineraryCard({
           <p className="text-xs text-gray-500 mb-4">
             Created {new Date(created_at).toLocaleDateString()}
           </p>
+          
+          {/* Booking.com button */}
+          <button
+            onClick={handleFindHotels}
+            className="w-full group relative overflow-hidden rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-4 py-2.5 mb-3 transition-all duration-200 hover:shadow-lg active:scale-[0.98]"
+          >
+            <div className="flex items-center justify-center gap-2 text-white">
+              <Hotel className="w-4 h-4 group-hover:scale-110 transition-transform" />
+              <span className="font-semibold text-sm">
+                {start_date && end_date ? 'Find Hotels for This Trip' : `Find Hotels in ${ai_plan.city || destination}`}
+              </span>
+            </div>
+            <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity" />
+          </button>
+          
+          {/* Google Maps button */}
+          <div className="mb-4">
+            <GoogleMapsButton
+              places={ai_plan.days.flatMap(day => day.places)}
+              destination={ai_plan.city || destination}
+              className="w-full"
+            />
+          </div>
           
           {/* Actions (only in My Plans) */}
           <div className="pt-4 border-t border-gray-200">

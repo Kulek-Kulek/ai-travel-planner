@@ -33,6 +33,7 @@ export function ItineraryMap({ days, city, className = '' }: ItineraryMapProps) 
   const mapRef = useRef<HTMLDivElement>(null);
   const googleMapRef = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<google.maps.Marker[]>([]);
+  const googleMapsCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [geocodedPlaces, setGeocodedPlaces] = useState<GeocodedPlace[]>([]);
@@ -57,9 +58,12 @@ export function ItineraryMap({ days, city, className = '' }: ItineraryMapProps) 
         // Check if script is already being loaded
         if (document.querySelector('script[src*="maps.googleapis.com"]')) {
           // Wait for it to load
-          const checkGoogle = setInterval(() => {
+          googleMapsCheckIntervalRef.current = setInterval(() => {
             if (window.google && window.google.maps) {
-              clearInterval(checkGoogle);
+              if (googleMapsCheckIntervalRef.current) {
+                clearInterval(googleMapsCheckIntervalRef.current);
+                googleMapsCheckIntervalRef.current = null;
+              }
               resolve();
             }
           }, 100);
@@ -187,6 +191,12 @@ export function ItineraryMap({ days, city, className = '' }: ItineraryMapProps) 
 
     return () => {
       isMounted = false;
+      
+      // Cleanup Google Maps check interval if still running
+      if (googleMapsCheckIntervalRef.current) {
+        clearInterval(googleMapsCheckIntervalRef.current);
+        googleMapsCheckIntervalRef.current = null;
+      }
       // Cleanup markers
       markersRef.current.forEach((marker) => marker.setMap(null));
       markersRef.current = [];

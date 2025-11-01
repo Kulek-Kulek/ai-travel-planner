@@ -8,7 +8,7 @@ import { Masthead } from "@/components/masthead";
 import { UpgradeModal } from "@/components/upgrade-modal";
 import { TravelPersonalityBanner } from "@/components/travel-personality-banner";
 import { generateItinerary } from "@/lib/actions/ai-actions";
-import { claimDraftItinerary } from "@/lib/actions/itinerary-actions";
+import { claimDraftItinerary, type Itinerary } from "@/lib/actions/itinerary-actions";
 import { getUserRole } from "@/lib/auth/admin";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -56,6 +56,7 @@ export default function Home() {
   const cancelledRef = useRef(false);
   const dayButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const claimedIdsRef = useRef<Set<string>>(new Set()); // Track claimed itineraries to prevent duplicates
+  const scrollTimeoutRefs = useRef<NodeJS.Timeout[]>([]); // Track all scroll timeouts for cleanup
 
   useEffect(() => {
     // Check if user is admin
@@ -210,7 +211,7 @@ export default function Home() {
                 const supabase = createClient();
                 supabase.auth.getSession().then(({ data: { session } }) => {
                   if (session?.user) {
-                      claimDraftItinerary(itineraryId!).then((result) => {
+                      claimDraftItinerary(itineraryId!).then(async (result) => {
                         if (result.success) {
                           
                           // Clean up sessionStorage after successful claim
@@ -231,11 +232,44 @@ export default function Home() {
                             },
                           });
                         
-                        // Refresh gallery to show the newly published itinerary
-                        queryClient.invalidateQueries({ 
-                          queryKey: ["public-itineraries-v2"],
-                          refetchType: 'all'
-                        });
+                        // Fetch the complete itinerary data and add it to the gallery cache
+                        // After claiming, the itinerary should now be published
+                        try {
+                          const itineraryResponse = await fetch(`/api/itineraries/${itineraryId}`);
+                          if (itineraryResponse.ok) {
+                            const itineraryData = await itineraryResponse.json();
+                            if (itineraryData.success && itineraryData.data) {
+                              const claimedItinerary = itineraryData.data;
+                              
+                              // Only add to gallery if the itinerary is published (not a draft)
+                              // After claiming, it should be published, but double-check
+                              if (claimedItinerary.status === 'published' && !claimedItinerary.is_private) {
+                                // Add the claimed itinerary to the top of the unfiltered gallery cache
+                                const allQueries = queryClient.getQueriesData({ queryKey: ['public-itineraries-v2'] });
+                                
+                                for (const [queryKey, queryData] of allQueries) {
+                                  const [, selectedTags, destinationSearch] = queryKey as [string, string[], string, string | number];
+                                  
+                                  if ((!selectedTags || selectedTags.length === 0) && !destinationSearch) {
+                                    if (queryData && typeof queryData === 'object' && 'itineraries' in queryData) {
+                                      const currentData = queryData as { itineraries: Itinerary[]; total: number };
+                                      queryClient.setQueryData(queryKey, {
+                                        itineraries: [claimedItinerary, ...currentData.itineraries],
+                                        total: currentData.total + 1,
+                                      });
+                                    }
+                                  } else {
+                                    queryClient.invalidateQueries({ queryKey: queryKey as unknown[] });
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        } catch (error) {
+                          console.error('Failed to fetch and cache claimed itinerary:', error);
+                        }
+                        
+                        // Invalidate other queries
                         queryClient.invalidateQueries({ 
                           queryKey: ["public-itineraries"],
                           refetchType: 'all'
@@ -248,13 +282,22 @@ export default function Home() {
                           queryKey: ["all-tags"],
                           refetchType: 'all'
                         });
+                        queryClient.invalidateQueries({ 
+                          queryKey: ["stats"],
+                          refetchType: 'all'
+                        });
+                        queryClient.invalidateQueries({ 
+                          queryKey: ["profile"],
+                          refetchType: 'all'
+                        });
                         
                         // Scroll to gallery
-                        setTimeout(() => {
+                        const scrollTimeout = setTimeout(() => {
                           if (galleryRef.current) {
                             galleryRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
                           }
                         }, 300);
+                        scrollTimeoutRefs.current.push(scrollTimeout);
                       } else {
                         // Check if this is a tier limit error
                         const isTierLimitError = 
@@ -297,17 +340,19 @@ export default function Home() {
   useEffect(() => {
     if (isAuthenticated && result?.aiPlan?.id && galleryRef.current) {
       // Scroll to gallery instead of showing preview
-      setTimeout(() => {
+      const scrollTimeout = setTimeout(() => {
         const galleryTop = galleryRef.current!.getBoundingClientRect().top + window.scrollY - 100;
         window.scrollTo({ top: galleryTop, behavior: "smooth" });
       }, 500);
+      
+      return () => clearTimeout(scrollTimeout);
     }
   }, [isAuthenticated, result]);
 
   // Use TanStack Query mutation for generating itinerary
   const mutation = useMutation({
     mutationFn: generateItinerary,
-    onSuccess: (response, variables) => {
+    onSuccess: async (response, variables) => {
       if (cancelledRef.current) {
         // Ignore success if the user cancelled while loading
         cancelledRef.current = false;
@@ -341,18 +386,59 @@ export default function Home() {
           aiPlan: response.data,
         } as ResultData);
 
-        // Invalidate queries to refresh gallery and tags
-        // Use refetchType: 'all' to refetch even inactive queries
-        queryClient.invalidateQueries({ 
-          queryKey: ["public-itineraries-v2"],
-          refetchType: 'all'
-        });
+        // Fetch the complete itinerary data and add it to the gallery cache
+        // ONLY if it's published (not a draft)
+        try {
+          const itineraryResponse = await fetch(`/api/itineraries/${response.data.id}`);
+          if (itineraryResponse.ok) {
+            const itineraryData = await itineraryResponse.json();
+            if (itineraryData.success && itineraryData.data) {
+              const newItinerary = itineraryData.data;
+              
+              // Only add to gallery if the itinerary is published (not a draft)
+              // Drafts should not appear in the public gallery
+              if (newItinerary.status === 'published' && !newItinerary.is_private) {
+                // Add the new itinerary to the top of the unfiltered gallery cache
+                // Find all unfiltered gallery query keys
+                const allQueries = queryClient.getQueriesData({ queryKey: ['public-itineraries-v2'] });
+                
+                for (const [queryKey, queryData] of allQueries) {
+                  // Only update unfiltered queries (selectedTags=[], destinationSearch='')
+                  // The query key structure is: ['public-itineraries-v2', selectedTags, destinationSearch, timestampKey]
+                  const [, selectedTags, destinationSearch] = queryKey as [string, string[], string, string | number];
+                  
+                  if ((!selectedTags || selectedTags.length === 0) && !destinationSearch) {
+                    // This is an unfiltered query, prepend the new itinerary
+                    if (queryData && typeof queryData === 'object' && 'itineraries' in queryData) {
+                      const currentData = queryData as { itineraries: Itinerary[]; total: number };
+                      queryClient.setQueryData(queryKey, {
+                        itineraries: [newItinerary, ...currentData.itineraries],
+                        total: currentData.total + 1,
+                      });
+                    }
+                  } else {
+                    // For filtered queries, invalidate them so they refetch if needed
+                    queryClient.invalidateQueries({ queryKey: queryKey as unknown[] });
+                  }
+                }
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Failed to fetch and cache new itinerary:', error);
+        }
+
+        // Invalidate other queries (but not the unfiltered gallery queries we just updated)
         queryClient.invalidateQueries({ 
           queryKey: ["public-itineraries"],
           refetchType: 'all'
         });
         queryClient.invalidateQueries({ 
           queryKey: ["all-tags"],
+          refetchType: 'all'
+        });
+        queryClient.invalidateQueries({ 
+          queryKey: ["stats"],
           refetchType: 'all'
         });
         
@@ -372,7 +458,7 @@ export default function Home() {
           setHasCreatedPlanWhileLoggedOut(true);
           
           // Scroll to auth banner
-          setTimeout(() => {
+          const authScrollTimeout = setTimeout(() => {
             if (authBannerRef.current) {
               authBannerRef.current.scrollIntoView({
                 behavior: "smooth",
@@ -380,6 +466,7 @@ export default function Home() {
               });
             }
           }, 500);
+          scrollTimeoutRefs.current.push(authScrollTimeout);
         }
 
         // NO auto-redirect - let user see preview first
@@ -469,6 +556,9 @@ export default function Home() {
     setProgressDirection(1);
   };
 
+  // Ref to track confetti interval for cleanup
+  const confettiIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   // Trigger subtle confetti effect
   const triggerConfetti = () => {
     const duration = 2500;
@@ -482,11 +572,19 @@ export default function Home() {
       colors: ['#4F46E5', '#06B6D4', '#10B981', '#F59E0B', '#EC4899']
     };
 
-    const interval = setInterval(() => {
+    // Clear any existing confetti interval
+    if (confettiIntervalRef.current) {
+      clearInterval(confettiIntervalRef.current);
+    }
+
+    confettiIntervalRef.current = setInterval(() => {
       const timeLeft = animationEnd - Date.now();
 
       if (timeLeft <= 0) {
-        clearInterval(interval);
+        if (confettiIntervalRef.current) {
+          clearInterval(confettiIntervalRef.current);
+          confettiIntervalRef.current = null;
+        }
         return;
       }
 
@@ -515,6 +613,23 @@ export default function Home() {
     }, 250);
   };
 
+  // Cleanup confetti interval on unmount
+  useEffect(() => {
+    return () => {
+      if (confettiIntervalRef.current) {
+        clearInterval(confettiIntervalRef.current);
+      }
+    };
+  }, []);
+
+  // Cleanup all scroll timeouts on unmount
+  useEffect(() => {
+    return () => {
+      scrollTimeoutRefs.current.forEach(timeout => clearTimeout(timeout));
+      scrollTimeoutRefs.current = [];
+    };
+  }, []);
+
   // Open first day by default once result arrives
   useEffect(() => {
     if (result?.aiPlan?.days && result.aiPlan.days.length > 0) {
@@ -538,7 +653,7 @@ export default function Home() {
     setUserCancelled(false);
     
     // Scroll to preview area immediately
-    setTimeout(() => {
+    const previewScrollTimeout = setTimeout(() => {
       if (previewRef.current) {
         previewRef.current.scrollIntoView({
           behavior: "smooth",
@@ -546,6 +661,7 @@ export default function Home() {
         });
       }
     }, 100);
+    scrollTimeoutRefs.current.push(previewScrollTimeout);
     
     mutation.mutate({
       destination: data.destination,
