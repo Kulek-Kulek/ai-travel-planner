@@ -259,13 +259,18 @@ export const ItineraryFormAIEnhanced = ({
   useEffect(() => {
     // Only scroll when extraction finishes (isExtracting becomes false), we have extracted info, and form is valid
     if (!isExtracting && extractedInfo && submitButtonRef.current && form.formState.isValid) {
-      // Wait a bit for the UI to update before scrolling
-      setTimeout(() => {
+      // Wait 4 seconds before auto-scrolling to give user time to review extracted info
+      const scrollTimeout = setTimeout(() => {
         submitButtonRef.current?.scrollIntoView({ 
           behavior: 'smooth', 
           block: 'center' 
         });
-      }, 300);
+      }, 4000);
+      
+      // Cleanup: clear timeout if component unmounts or dependencies change
+      return () => {
+        clearTimeout(scrollTimeout);
+      };
     }
   }, [isExtracting, extractedInfo, form.formState.isValid]);
 
@@ -972,7 +977,7 @@ export const ItineraryFormAIEnhanced = ({
             onExpire={() => setTurnstileToken(null)}
             options={{
               theme: "light",
-              size: "normal",
+              size: "flexible",
             }}
           />
  
