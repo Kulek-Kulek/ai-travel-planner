@@ -35,8 +35,7 @@ import {
   MoreVertical,
   RotateCcw,
   Hotel,
-  Sparkles,
-  MapPin
+  Sparkles
 } from 'lucide-react';
 
 interface ItineraryCardProps {
