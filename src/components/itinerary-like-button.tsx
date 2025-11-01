@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { likeItinerary, addToBucketList, removeFromBucketList, isInBucketList } from '@/lib/actions/itinerary-actions';
 import { Button } from './ui/button';
@@ -15,6 +15,7 @@ interface ItineraryLikeButtonProps {
 
 export function ItineraryLikeButton({ itineraryId, initialLikes }: ItineraryLikeButtonProps) {
   const router = useRouter();
+  const justLikedTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [currentLikes, setCurrentLikes] = useState(initialLikes || 0);
   const [isLiking, setIsLiking] = useState(false);
   const [hasLiked, setHasLiked] = useState(false); // Start with false to avoid hydration mismatch
@@ -43,6 +44,15 @@ export function ItineraryLikeButton({ itineraryId, initialLikes }: ItineraryLike
     checkBucketListStatus();
   }, [itineraryId]);
 
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (justLikedTimeoutRef.current) {
+        clearTimeout(justLikedTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const handleLike = async () => {
     if (hasLiked) {
       toast.info('You already liked this itinerary!');
@@ -55,7 +65,10 @@ export function ItineraryLikeButton({ itineraryId, initialLikes }: ItineraryLike
     setJustLiked(true);
     
     // Remove animation after it completes (500ms)
-    setTimeout(() => setJustLiked(false), 500);
+    if (justLikedTimeoutRef.current) {
+      clearTimeout(justLikedTimeoutRef.current);
+    }
+    justLikedTimeoutRef.current = setTimeout(() => setJustLiked(false), 500);
 
     // Optimistic update
     setCurrentLikes(prev => prev + 1);

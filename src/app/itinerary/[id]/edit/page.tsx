@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { getItinerary } from "@/lib/actions/itinerary-actions";
 import { getUserSubscription } from "@/lib/actions/subscription-actions";
@@ -111,6 +111,9 @@ export default function EditItineraryPage() {
     return () => clearInterval(interval);
   }, [isRegenerating]);
 
+  // Ref to track confetti interval for cleanup
+  const confettiIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   // Trigger confetti effect for successful edit
   const triggerConfetti = () => {
     const duration = 2500;
@@ -123,11 +126,19 @@ export default function EditItineraryPage() {
       colors: ['#4F46E5', '#06B6D4', '#8B5CF6', '#EC4899', '#F59E0B']
     };
 
-    const interval = setInterval(() => {
+    // Clear any existing confetti interval
+    if (confettiIntervalRef.current) {
+      clearInterval(confettiIntervalRef.current);
+    }
+
+    confettiIntervalRef.current = setInterval(() => {
       const timeLeft = animationEnd - Date.now();
 
       if (timeLeft <= 0) {
-        clearInterval(interval);
+        if (confettiIntervalRef.current) {
+          clearInterval(confettiIntervalRef.current);
+          confettiIntervalRef.current = null;
+        }
         return;
       }
 
@@ -155,6 +166,15 @@ export default function EditItineraryPage() {
       });
     }, 250);
   };
+
+  // Cleanup confetti interval on unmount
+  useEffect(() => {
+    return () => {
+      if (confettiIntervalRef.current) {
+        clearInterval(confettiIntervalRef.current);
+      }
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

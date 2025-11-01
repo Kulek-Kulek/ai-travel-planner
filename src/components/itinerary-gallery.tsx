@@ -32,7 +32,7 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
   });
   
   const [bucketListIds, setBucketListIds] = useState<Set<string>>(new Set());
-  const [visibleNatureTags, setVisibleNatureTags] = useState(12); // Show ~2 lines initially (~6 tags per line)
+  const [visibleNatureTags, setVisibleNatureTags] = useState(22); // Show ~2 lines initially (~6 tags per line)
   const [randomSeed] = useState(() => Date.now()); // Generate once on mount for random queries
   const queryClient = useQueryClient();
 
@@ -117,6 +117,22 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
   });
   
   const allTags = tagsData?.tags || [];
+  
+  // Fetch total statistics
+  const { data: statsData } = useQuery({
+    queryKey: ['stats'],
+    queryFn: async () => {
+      const response = await fetch('/api/stats');
+      if (!response.ok) {
+        console.error('❌ BROWSER: Failed to fetch stats');
+        return { totalItineraries: 0, uniqueDestinations: 0 };
+      }
+      return response.json();
+    },
+    staleTime: 2 * 60 * 1000, // Consider data fresh for 2 minutes
+  });
+  
+  const totalItinerariesInDatabase = statsData?.totalItineraries || 0;
   
   // Fetch bucket list IDs for authenticated users
   // Re-fetch whenever we navigate to this page or itineraries change
@@ -227,14 +243,14 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
   // Handle "Show More" for nature tags
   const displayedNatureTags = natureTags.slice(0, visibleNatureTags);
   const hasMoreNatureTags = natureTags.length > visibleNatureTags;
-  const showLessButton = visibleNatureTags > 12;
+  const showLessButton = visibleNatureTags > 22;
   
   const handleShowMoreTags = () => {
-    setVisibleNatureTags(prev => prev + 18); // Add ~3 lines (6 tags per line)
+    setVisibleNatureTags(prev => prev + 22); // Add ~3 lines (6 tags per line)
   };
   
   const handleShowLessTags = () => {
-    setVisibleNatureTags(12); // Reset to initial 2 lines
+    setVisibleNatureTags(22); // Reset to initial 2 lines
   };
 
   return (
@@ -256,11 +272,18 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
 
       {/* Results Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">
-          {selectedTags.length > 0 || destinationSearch
-            ? `Filtered Itineraries (${total})`
-            : `Explore Itineraries (${total})`}
-        </h2>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">
+            {selectedTags.length > 0 || destinationSearch
+              ? 'Filtered Itineraries'
+              : 'Explore Itineraries'}
+          </h2>
+          <p className="text-sm text-gray-600 mt-1">
+            {selectedTags.length > 0 || destinationSearch
+              ? `Showing ${total} ${total === 1 ? 'itinerary' : 'itineraries'} matching your filters`
+              : `Currently showing ${total} of ${totalItinerariesInDatabase.toLocaleString()} ${totalItinerariesInDatabase === 1 ? 'itinerary' : 'itineraries'} to search from.`}
+          </p>
+        </div>
         {(isLoading || isFetching) && (
           <span className="text-sm text-gray-500 animate-pulse">Loading…</span>
         )}
