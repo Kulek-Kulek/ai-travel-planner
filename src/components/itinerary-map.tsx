@@ -1,17 +1,10 @@
+/// <reference types="google.maps" />
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
 import { GOOGLE_MAPS_CONFIG } from '@/lib/config/google-maps';
 import { geocodeItineraryPlaces, calculateCenter, type GeocodedPlace } from '@/lib/utils/geocoding';
 import { MapPin, Loader2 } from 'lucide-react';
-
-// Declare global google namespace
-declare global {
-  interface Window {
-    google: typeof google;
-    initGoogleMaps: () => void;
-  }
-}
 
 interface ItineraryMapProps {
   days: Array<{
