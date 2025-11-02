@@ -143,6 +143,8 @@ export const ItineraryFormAIEnhanced = ({
   
   // Ref for the submit button to enable auto-scroll
   const submitButtonRef = useRef<HTMLButtonElement>(null);
+  // Track last time user typed to prevent scroll interruption
+  const lastTypedTimeRef = useRef<number>(Date.now());
 
   const defaultFormValues = {
     destination: "",
@@ -164,6 +166,12 @@ export const ItineraryFormAIEnhanced = ({
   const watchStartDate = form.watch("startDate");
   const watchEndDate = form.watch("endDate");
   const watchNotes = form.watch("notes");
+
+  // Track typing activity to prevent scroll interruption
+  useEffect(() => {
+    // Update timestamp whenever user types
+    lastTypedTimeRef.current = Date.now();
+  }, [watchNotes]);
 
   // AI-powered extraction with debouncing
   useEffect(() => {
@@ -259,13 +267,24 @@ export const ItineraryFormAIEnhanced = ({
   useEffect(() => {
     // Only scroll when extraction finishes (isExtracting becomes false), we have extracted info, and form is valid
     if (!isExtracting && extractedInfo && submitButtonRef.current && form.formState.isValid) {
-      // Wait 4 seconds before auto-scrolling to give user time to review extracted info
+      // Record when this effect starts (when extraction completes)
+      const extractionCompleteTime = Date.now();
+      
+      // Wait 3 seconds before auto-scrolling to give user time to review extracted info
       const scrollTimeout = setTimeout(() => {
-        submitButtonRef.current?.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'center' 
-        });
-      }, 4000);
+        // Before scrolling, check if user has typed since extraction completed
+        const timeSinceLastTyped = Date.now() - lastTypedTimeRef.current;
+        const timeSinceExtractionComplete = Date.now() - extractionCompleteTime;
+        
+        // Only scroll if user hasn't typed in the last 3 seconds
+        // This prevents interrupting the user if they resumed typing
+        if (timeSinceLastTyped >= 3000 || timeSinceLastTyped >= timeSinceExtractionComplete) {
+          submitButtonRef.current?.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center' 
+          });
+        }
+      }, 3000);
       
       // Cleanup: clear timeout if component unmounts or dependencies change
       return () => {
@@ -382,9 +401,20 @@ export const ItineraryFormAIEnhanced = ({
                       className="min-h-[130px] resize-y rounded-[26px] border-0 bg-white/90 px-5 py-4 text-base leading-7 text-slate-900 shadow-sm focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-0"
                       {...field}
                       disabled={isLoading || isFormDisabled}
+                      maxLength={500}
                     />
                   </div>
                 </FormControl>
+                <div className="flex items-center justify-between text-xs text-slate-500 mt-1">
+                  <span>Be specific about your destination, duration, and interests</span>
+                  <span className={cn(
+                    "font-medium",
+                    watchNotes.length > 450 && "text-amber-600",
+                    watchNotes.length === 500 && "text-red-600"
+                  )}>
+                    {watchNotes.length}/500
+                  </span>
+                </div>
                 {isFormDisabled && (
                   <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 mt-2 flex items-center gap-2">
                     <Info className="w-4 h-4 flex-shrink-0" />
