@@ -31,11 +31,22 @@ When introducing changes to the project, always follow the directory structure b
 - `./src/lib` - utility functions, shared logic, configurations
 - `./src/lib/supabase` - Supabase client and utilities
 - `./src/lib/openrouter` - OpenRouter AI client and utilities
-- `./src/hooks` - custom React hooks
+- `./src/lib/utils` - utility functions
+- `./src/lib/utils/__tests__` - co-located unit tests for utilities (alternative to centralized tests)
 - `./src/types` - TypeScript type definitions
-- `./src/stores` - state management (if needed)
+- `./src/providers` - React context providers (e.g., QueryClientProvider)
 - `./public` - static public assets
-- `./tests` - test files (e2e, unit, integration)
+- `./tests` - centralized test directory
+- `./tests/unit` - unit tests for utilities and pure functions
+- `./tests/integration` - integration tests for Server Actions and API routes
+- `./tests/components` - component tests using React Testing Library
+- `./tests/e2e` - end-to-end tests with Playwright (future)
+
+**Note:** Tests can be organized in two ways:
+1. **Centralized:** Place all tests in the `./tests` directory with subdirectories for different test types
+2. **Co-located:** Place tests in `__tests__` folders next to the code they test
+
+Both approaches are supported and can be used together.
 
 When modifying the directory structure, always update this section.
 
@@ -51,3 +62,24 @@ When modifying the directory structure, always update this section.
 - Use guard clauses to handle preconditions and invalid states early
 - Implement proper error logging and user-friendly error messages
 - Consider using custom error types or error factories for consistent error handling
+
+### Testing Guidelines
+
+- **Unit Tests:** Test pure functions, utilities, and business logic in isolation
+- **Integration Tests:** Test Server Actions with mocked Supabase client
+- **Component Tests:** Test React components using React Testing Library
+- **E2E Tests:** Test complete user flows with Playwright (planned for future)
+- Write tests that focus on behavior, not implementation details
+- Use descriptive test names that explain what is being tested
+- Follow the AAA pattern: Arrange, Act, Assert
+- Mock external dependencies (Supabase, APIs, etc.)
+- Aim for high coverage on critical business logic (80%+ for utilities and actions)
+
+### Test Commands
+
+```bash
+npm run test              # Run all tests in watch mode
+npm run test:run          # Run all tests once
+npm run test:coverage     # Run tests with coverage report
+npm run test:ui           # Run tests with Vitest UI
+```
