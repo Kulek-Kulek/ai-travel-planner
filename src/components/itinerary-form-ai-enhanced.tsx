@@ -994,7 +994,7 @@ export const ItineraryFormAIEnhanced = ({
         </section>
 
         {/* Cloudflare Turnstile - Bot Protection */}
-     
+        <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white/30">
           <Turnstile
             siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ''}
             onSuccess={(token) => setTurnstileToken(token)}
@@ -1010,6 +1010,7 @@ export const ItineraryFormAIEnhanced = ({
               size: "flexible",
             }}
           />
+        </div>
  
 
         <Button 

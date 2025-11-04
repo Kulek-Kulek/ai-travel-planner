@@ -6,6 +6,7 @@ import { getMyItineraries, updateItineraryPrivacy, updateItineraryStatus, delete
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { ItineraryCard } from '@/components/itinerary-card';
+import { ItineraryCardSkeleton } from '@/components/itinerary-card-skeleton';
 import { DeleteItineraryDialog } from '@/components/delete-itinerary-dialog';
 import { toast } from 'sonner';
 
@@ -129,11 +130,8 @@ export default function MyPlansPage() {
 
         {isLoading && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3].map(i => (
-              <div
-                key={i}
-                className="bg-white rounded-lg shadow h-64 animate-pulse"
-              />
+            {[1, 2, 3, 4, 5, 6].map(i => (
+              <ItineraryCardSkeleton key={i} />
             ))}
           </div>
         )}
