@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { QueryProvider } from "@/providers/query-provider";
 import { Toaster } from "@/components/ui/sonner";
-import { NavHeader } from "@/components/nav-header";
 import { RouteProgress } from "@/components/route-progress";
-import { BackToTop } from "@/components/back-to-top";
+import { ConditionalLayout } from "@/components/conditional-layout";
+import { NavHeader } from "@/components/nav-header";
 import { Footer } from "@/components/footer";
+import { BackToTop } from "@/components/back-to-top";
 import { Manrope, IBM_Plex_Mono } from "next/font/google";
 
 export const metadata: Metadata = {
@@ -37,10 +38,13 @@ export default function RootLayout({
       <body suppressHydrationWarning className="antialiased">
         <QueryProvider>
           <RouteProgress />
-          <NavHeader />
-          {children}
-          <Footer />
-          <BackToTop />
+          <ConditionalLayout
+            header={<NavHeader />}
+            footer={<Footer />}
+            backToTop={<BackToTop />}
+          >
+            {children}
+          </ConditionalLayout>
         </QueryProvider>
         <Toaster />
       </body>

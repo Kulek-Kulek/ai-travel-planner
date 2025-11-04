@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
-import { Check, Sparkles, Zap, Crown, ArrowRight } from 'lucide-react';
+import { Check, Sparkles, Zap, Crown, ArrowRight, ArrowLeft } from 'lucide-react';
 import { TIER_CONFIG, type SubscriptionTier } from '@/lib/config/pricing-models';
 import { updateSubscriptionTier } from '@/lib/actions/subscription-actions';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 export default function ChoosePlanPage() {
   const [selectedTier, setSelectedTier] = useState<SubscriptionTier>('free');
@@ -51,17 +52,34 @@ export default function ChoosePlanPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
-      <div className="container mx-auto px-4 py-12">
+    <div className="min-h-screen relative overflow-hidden bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600">
+      {/* Background blur effects */}
+      <div aria-hidden className="pointer-events-none absolute inset-0">
+        <div className="absolute -left-24 top-0 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
+        <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-white/10 blur-3xl" />
+      </div>
+      
+      <div className="container mx-auto px-4 py-12 relative z-10">
+        {/* Navigation */}
+        <div className="max-w-6xl mx-auto mb-6">
+          <Link 
+            href="/"
+            className="inline-flex items-center gap-2 text-white/90 hover:text-white transition-colors group"
+          >
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+            <span className="text-sm font-medium">Back to Home</span>
+          </Link>
+        </div>
+        
         {/* Header */}
         <div className="text-center mb-12 max-w-2xl mx-auto">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full mb-6">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full mb-6">
             <Sparkles className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+          <h1 className="text-4xl font-bold text-white mb-4">
             Choose Your Plan
           </h1>
-          <p className="text-lg text-gray-600">
+          <p className="text-lg text-white/90">
             Start planning your dream trips today. You can change your plan anytime.
           </p>
         </div>
@@ -143,7 +161,7 @@ export default function ChoosePlanPage() {
               const redirectUrl = itineraryId ? `/?itineraryId=${itineraryId}` : '/';
               router.push(redirectUrl);
             }}
-            className="text-sm text-gray-600 hover:text-gray-900 hover:underline"
+            className="text-sm text-white/90 hover:text-white hover:underline"
             disabled={isPending}
           >
             I&apos;ll choose later
@@ -151,19 +169,19 @@ export default function ChoosePlanPage() {
         </div>
 
         {/* Trust Indicators */}
-        <div className="mt-12 pt-8 border-t border-gray-200 max-w-4xl mx-auto">
+        <div className="mt-12 pt-8 border-t border-white/20 max-w-4xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
             <div>
-              <div className="text-2xl font-bold text-gray-900 mb-1">100+</div>
-              <div className="text-sm text-gray-600">Countries covered</div>
+              <div className="text-2xl font-bold text-white mb-1">100+</div>
+              <div className="text-sm text-white/90">Countries covered</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-gray-900 mb-1">4 AI Models</div>
-              <div className="text-sm text-gray-600">Latest technology</div>
+              <div className="text-2xl font-bold text-white mb-1">4 AI Models</div>
+              <div className="text-sm text-white/90">Latest technology</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-gray-900 mb-1">24/7</div>
-              <div className="text-sm text-gray-600">Create anytime</div>
+              <div className="text-2xl font-bold text-white mb-1">24/7</div>
+              <div className="text-sm text-white/90">Create anytime</div>
             </div>
           </div>
         </div>

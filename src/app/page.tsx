@@ -8,7 +8,7 @@ import { Masthead } from "@/components/masthead";
 import { UpgradeModal } from "@/components/upgrade-modal";
 import { TravelPersonalityBanner } from "@/components/travel-personality-banner";
 import { generateItinerary } from "@/lib/actions/ai-actions";
-import { claimDraftItinerary, type Itinerary } from "@/lib/actions/itinerary-actions";
+import { claimDraftItinerary } from "@/lib/actions/itinerary-actions";
 import { getUserRole } from "@/lib/auth/admin";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -252,7 +252,7 @@ export default function Home() {
                                   
                                   if ((!selectedTags || selectedTags.length === 0) && !destinationSearch) {
                                     if (queryData && typeof queryData === 'object' && 'itineraries' in queryData) {
-                                      const currentData = queryData as { itineraries: Itinerary[]; total: number };
+                                      const currentData = queryData as { itineraries: ResultData[]; total: number };
                                       queryClient.setQueryData(queryKey, {
                                         itineraries: [claimedItinerary, ...currentData.itineraries],
                                         total: currentData.total + 1,
@@ -410,7 +410,7 @@ export default function Home() {
                   if ((!selectedTags || selectedTags.length === 0) && !destinationSearch) {
                     // This is an unfiltered query, prepend the new itinerary
                     if (queryData && typeof queryData === 'object' && 'itineraries' in queryData) {
-                      const currentData = queryData as { itineraries: Itinerary[]; total: number };
+                      const currentData = queryData as { itineraries: ResultData[]; total: number };
                       queryClient.setQueryData(queryKey, {
                         itineraries: [newItinerary, ...currentData.itineraries],
                         total: currentData.total + 1,

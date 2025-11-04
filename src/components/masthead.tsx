@@ -14,6 +14,19 @@ export function Masthead({ onPlanTrip }: MastheadProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
 
+  // Fetch statistics
+  const { data: statsData } = useQuery({
+    queryKey: ['stats'],
+    queryFn: async () => {
+      const response = await fetch('/api/stats');
+      if (!response.ok) {
+        return { totalItineraries: 0, uniqueDestinations: 0 };
+      }
+      return response.json();
+    },
+    staleTime: 2 * 60 * 1000, // Consider data fresh for 2 minutes
+  });
+
   // Use TanStack Query with API route (same approach as gallery)
   const { data: itinerariesData, isLoading } = useQuery({
     queryKey: ['public-itineraries', [], ''], // Same key structure as gallery
@@ -32,20 +45,6 @@ export function Masthead({ onPlanTrip }: MastheadProps) {
       return data;
     },
     staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
-    retry: 2,
-  });
-
-  // Fetch real statistics
-  const { data: statsData } = useQuery({
-    queryKey: ['stats'],
-    queryFn: async () => {
-      const response = await fetch('/api/stats');
-      if (!response.ok) {
-        return { totalItineraries: 0, uniqueDestinations: 0 };
-      }
-      return response.json();
-    },
-    staleTime: 2 * 60 * 1000, // Consider data fresh for 2 minutes
     retry: 2,
   });
 
@@ -87,10 +86,10 @@ export function Masthead({ onPlanTrip }: MastheadProps) {
   };
 
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-indigo-900 via-indigo-800 to-violet-300 text-white">
+    <section className="relative overflow-hidden bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 text-white">
       <div aria-hidden className="pointer-events-none absolute inset-0">
-        <div className="absolute -left-24 -top-40 h-72 w-72 rounded-full bg-violet-400/50 blur-3xl" />
-        <div className="absolute bottom-[-6rem] right-[-4rem] h-80 w-80 rounded-full bg-purple-300/40 blur-3xl" />
+        <div className="absolute -left-24 -top-40 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
+        <div className="absolute bottom-[-6rem] right-[-4rem] h-80 w-80 rounded-full bg-white/10 blur-3xl" />
       </div>
 
       <div className="relative mx-auto flex max-w-7xl flex-col gap-12 px-4 pt-6 pb-20 sm:px-6 sm:py-20 lg:flex-row lg:items-center lg:gap-16 lg:px-8 lg:pb-24 lg:pt-8">
@@ -99,7 +98,7 @@ export function Masthead({ onPlanTrip }: MastheadProps) {
             <h1 className="text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl leading-tight">
               Personal itineraries curated by AI, tailored to your travelers
             </h1>
-            <p className="max-w-xl text-base sm:text-lg text-indigo-100/90 leading-relaxed">
+            <p className="max-w-xl text-base sm:text-lg text-white/90 leading-relaxed">
               Discover destinations, balance daily experiences, and delight customers with shareable plans in minutes—not hours of manual research.
             </p>
           </div>
@@ -124,22 +123,19 @@ export function Masthead({ onPlanTrip }: MastheadProps) {
             <dl className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               <div className="space-y-1">
                 <dt className="text-2xl font-bold text-white">
-                  {statsData?.totalItineraries 
-                    ? `${statsData.totalItineraries.toLocaleString()}+`
-                    : '2,300+'}
+                  {statsData?.totalItineraries ? `${statsData.totalItineraries.toLocaleString()}+` : '...'} 
                 </dt>
-                <dd className="text-sm text-indigo-100/80">
-                  Itineraries generated across{' '}
-                  {statsData?.uniqueDestinations || 84} destinations
+                <dd className="text-sm text-white/90">
+                  Itineraries generated across {statsData?.uniqueDestinations || '...'} destinations
                 </dd>
               </div>
               <div className="space-y-1">
                 <dt className="text-2xl font-bold text-white">&lt; 2 min</dt>
-                <dd className="text-sm text-indigo-100/80">Average time to a polished day-by-day plan</dd>
+                <dd className="text-sm text-white/90">Average time to a polished day-by-day plan</dd>
               </div>
               <div className="space-y-1">
                 <dt className="text-2xl font-bold text-white">100%</dt>
-                <dd className="text-sm text-indigo-100/80">Team-ready exports, shareable instantly</dd>
+                <dd className="text-sm text-white/90">Team-ready exports, shareable instantly</dd>
               </div>
             </dl>
           </div>
@@ -147,9 +143,9 @@ export function Masthead({ onPlanTrip }: MastheadProps) {
 
         <div className="flex-1">
           <div className="relative">
-            <div aria-hidden className="absolute inset-0 -translate-y-4 scale-95 rounded-[2.25rem] bg-indigo-500/40 blur-2xl" />
+            <div aria-hidden className="absolute inset-0 -translate-y-4 scale-95 rounded-[2.25rem] bg-white/20 blur-2xl" />
             <div 
-              className="relative overflow-hidden rounded-[2rem] border border-white/15 bg-white/10 p-8 shadow-2xl backdrop-blur h-[480px] flex flex-col transition-all hover:border-white/25"
+              className="relative overflow-hidden rounded-[2rem] border border-white/20 bg-white/10 p-8 shadow-2xl backdrop-blur h-[480px] flex flex-col transition-all hover:border-white/30"
               onMouseEnter={() => setIsPaused(true)}
               onMouseLeave={() => setIsPaused(false)}
             >
@@ -170,16 +166,16 @@ export function Masthead({ onPlanTrip }: MastheadProps) {
                 </div>
               ) : (
                 <>
-                  <div className="flex items-center justify-between text-xs font-medium uppercase tracking-wider text-indigo-100/70">
+                  <div className="flex items-center justify-between text-xs font-medium uppercase tracking-wider text-white/70">
                     <span>Live preview</span>
                     <span className="bg-white/10 px-2 py-1 rounded">{currentItinerary.days}d</span>
                   </div>
                   <h3 className="mt-5 text-2xl font-bold line-clamp-1">{currentItinerary.destination}</h3>
-                  <p className="mt-3 text-sm leading-6 text-indigo-100/80 line-clamp-2">
+                  <p className="mt-3 text-sm leading-6 text-white/90 line-clamp-2">
                     {currentItinerary.notes || `A curated ${currentItinerary.days}-day experience for ${currentItinerary.travelers} ${currentItinerary.travelers === 1 ? "traveler" : "travelers"}.`}
                   </p>
 
-                  <ul className="mt-4 space-y-2 text-sm text-indigo-100 flex-1 min-h-0 overflow-hidden">
+                  <ul className="mt-4 space-y-2 text-sm text-white flex-1 min-h-0 overflow-hidden">
                     {currentItinerary.ai_plan?.days?.slice(0, 3).map((day: Itinerary['ai_plan']['days'][0], idx: number) => {
                       const DayIcon = [Sunrise, Sun, Moon][idx] || Sparkles;
                       return (
@@ -189,7 +185,7 @@ export function Masthead({ onPlanTrip }: MastheadProps) {
                           </div>
                           <div className="min-w-0 flex-1 overflow-hidden">
                             <p className="font-semibold text-white line-clamp-1 mb-1">{day.title}</p>
-                            <p className="text-indigo-100/80 text-xs line-clamp-2 leading-relaxed">
+                            <p className="text-white/90 text-xs line-clamp-2 leading-relaxed">
                               {day.places?.[0]?.desc || "Explore this destination's highlights"}
                             </p>
                           </div>
@@ -212,7 +208,7 @@ export function Masthead({ onPlanTrip }: MastheadProps) {
                         )}
                       </div>
                       {currentItinerary.creator_name && (
-                        <div className="text-xs text-indigo-100/80 truncate max-w-[140px]">
+                        <div className="text-xs text-white/90 truncate max-w-[140px]">
                           <span className="font-medium text-white">{currentItinerary.creator_name}</span>
                         </div>
                       )}
