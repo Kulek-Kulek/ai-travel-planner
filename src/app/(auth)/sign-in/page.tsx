@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
 
 export default function SignInPage() {
   const [isPending, startTransition] = useTransition();
@@ -47,8 +48,25 @@ export default function SignInPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
-      <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
+    <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden px-4 py-8 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600">
+      {/* Background blur effects */}
+      <div aria-hidden className="pointer-events-none absolute inset-0">
+        <div className="absolute -left-24 top-0 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
+        <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-white/10 blur-3xl" />
+      </div>
+      
+      {/* Navigation */}
+      <div className="w-full max-w-md mb-6 relative z-10">
+        <Link 
+          href="/"
+          className="inline-flex items-center gap-2 text-white/90 hover:text-white transition-colors group"
+        >
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+          <span className="text-sm font-medium">Back to Home</span>
+        </Link>
+      </div>
+      
+      <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl p-8 relative z-10">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Welcome Back</h1>
           <p className="text-gray-600 mt-2">Sign in to access your itineraries</p>
