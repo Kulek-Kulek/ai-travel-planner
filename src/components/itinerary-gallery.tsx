@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { ItineraryCard } from './itinerary-card';
+import { ItineraryCardSkeleton } from './itinerary-card-skeleton';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { getBucketListIds, type Itinerary } from '@/lib/actions/itinerary-actions';
@@ -459,10 +460,7 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
       {isLoading && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3, 4, 5, 6].map(i => (
-            <div
-              key={i}
-              className="bg-gray-100 rounded-lg h-64 animate-pulse"
-            />
+            <ItineraryCardSkeleton key={i} />
           ))}
         </div>
       )}
