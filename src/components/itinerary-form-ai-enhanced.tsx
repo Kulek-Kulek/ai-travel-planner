@@ -1023,11 +1023,6 @@ export const ItineraryFormAIEnhanced = ({
             <>
               Generating Your Itinerary...
             </>
-          ) : isExtracting ? (
-            <>
-              <span className="mr-2 animate-pulse">✨</span>
-              Analyzing Your Description...
-            </>
           ) : (hasResult && !isAuthenticated) ? (
             <>
               <span className="mr-2">🔐</span>
