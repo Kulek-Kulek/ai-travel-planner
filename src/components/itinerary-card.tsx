@@ -410,16 +410,25 @@ export function ItineraryCard({
       <div className="p-5">
       {/* Header */}
       <div className="mb-3">
-        <div className="flex items-start justify-between gap-2 mb-1">
-          <h3 className="text-xl font-bold text-gray-900">
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <h3 className="text-xl font-bold text-gray-900 truncate">
             {ai_plan.city || destination}
           </h3>
-          {/* Admin viewing indicator */}
-          {showActions && !user_id && (
-            <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium shrink-0">
-              Anonymous
-            </span>
-          )}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Accessibility indicator - moved to title area for consistent height */}
+            {has_accessibility_needs && (
+              <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-600 font-medium">
+                <Accessibility className="w-3 h-3" />
+                Accessible
+              </span>
+            )}
+            {/* Admin viewing indicator */}
+            {showActions && !user_id && (
+              <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium">
+                Anonymous
+              </span>
+            )}
+          </div>
         </div>
         <div className="space-y-1 mb-2">
           {/* Date range if available */}
@@ -447,14 +456,6 @@ export function ItineraryCard({
               ) : null}
             </span>
           </div>
-          
-          {/* Accessibility indicator */}
-          {has_accessibility_needs && (
-            <div className="flex items-center gap-1.5 text-sm text-blue-600">
-              <Accessibility className="w-4 h-4" />
-              <span>Accessible</span>
-            </div>
-          )}
         </div>
         
         {/* Privacy and Status badges (only when showActions is true) */}
