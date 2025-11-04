@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ItineraryFormAIEnhanced, type ItineraryFormDataWithToken } from "@/components/itinerary-form-ai-enhanced";
 import { ItineraryGallery } from "@/components/itinerary-gallery";
+import { ItineraryCardSkeleton } from "@/components/itinerary-card-skeleton";
 import { Masthead } from "@/components/masthead";
 import { UpgradeModal } from "@/components/upgrade-modal";
 import { TravelPersonalityBanner } from "@/components/travel-personality-banner";
@@ -1122,7 +1123,23 @@ export default function Home() {
 
         {/* Public Itineraries Gallery */}
         <div id="public-itineraries" ref={galleryRef} className="mt-10">
-          <ItineraryGallery isAdmin={isAdmin} />
+          <Suspense fallback={
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-3xl font-bold text-slate-900">Explore Itineraries</h2>
+                  <p className="mt-1 text-sm text-slate-600">Loading itineraries...</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[1, 2, 3, 4, 5, 6].map(i => (
+                  <ItineraryCardSkeleton key={i} />
+                ))}
+              </div>
+            </div>
+          }>
+            <ItineraryGallery isAdmin={isAdmin} />
+          </Suspense>
         </div>
       </main>
 
