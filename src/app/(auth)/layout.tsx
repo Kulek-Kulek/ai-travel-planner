@@ -13,7 +13,8 @@ export default async function AuthLayout({
     redirect('/');
   }
 
-  return <>{children}</>;
+  // Wrapping with a marker class to hide header/footer via CSS
+  return <div className="auth-page-wrapper">{children}</div>;
 }
 
 
