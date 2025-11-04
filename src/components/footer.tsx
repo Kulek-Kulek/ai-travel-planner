@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Plane, Mail, Twitter, Github, Linkedin, MapPin, Instagram, Facebook } from 'lucide-react';
+import { Plane, Mail, Twitter, Github, Linkedin, MapPin, Instagram, Facebook, Heart } from 'lucide-react';
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
@@ -180,8 +180,8 @@ export function Footer() {
             <p className="text-sm text-white/70">
               © {currentYear} AI Travel Planner. All rights reserved.
             </p>
-            <p className="text-sm text-white/70">
-              Powered by AI • Built with ❤️ for travelers
+            <p className="text-sm text-white/70 flex items-center gap-1.5">
+              Powered by AI • Built with <Heart className="w-4 h-4 text-red-500 fill-red-500" /> for travelers
             </p>
           </div>
         </div>

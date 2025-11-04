@@ -130,7 +130,7 @@ export function Masthead({ onPlanTrip }: MastheadProps) {
                 </dd>
               </div>
               <div className="space-y-1">
-                <dt className="text-2xl font-bold text-white">&lt; 2 min</dt>
+                <dt className="text-2xl font-bold text-white">&lt; 20 seconds</dt>
                 <dd className="text-sm text-white/90">Average time to a polished day-by-day plan</dd>
               </div>
               <div className="space-y-1">
