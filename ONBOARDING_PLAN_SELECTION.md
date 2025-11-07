@@ -484,3 +484,69 @@ This feature captures revenue opportunities at the perfect moment - right when u
 
 The key is making it **easy and appealing** to choose a paid plan while **never forcing** users into it.
 
+# Project Onboarding & Analysis
+
+*This section provides a broader overview of the AI Travel Planner project, based on an analysis of its core modules, key files, and development history. It is intended to supplement the feature-specific documentation above and help new developers get up to speed quickly.*
+
+## 1. Core Modules
+
+Based on a review of the codebase, the project is structured around several core modules:
+
+*   **Authentication & Onboarding (New Insight):** This module, centered in `src/app/(auth)/` and `src/lib/actions/auth-actions.ts`, handles user sign-up, sign-in, and the critical post-registration flow.
+    *   **Original Document Insight:** The original document accurately details the plan selection flow (`/choose-plan`) which is a key part of this module.
+    *   **Enhanced Analysis:** This module's primary responsibility is to convert anonymous users to registered users and immediately present them with subscription options to drive monetization. It's tightly integrated with the **Itinerary Management** module, as it needs to handle claiming "draft" itineraries created by users before they sign up.
+
+*   **Itinerary Generation (AI Core) (New Insight):** This is the application's core value proposition, driven by `src/lib/actions/ai-actions.ts` and the `itinerary-form-ai-enhanced.tsx` component.
+    *   **Enhanced Analysis:** This module is more complex than just a simple form submission. It uses a sophisticated "agentic" multi-pass system for paid users to generate, validate, and refine itineraries for higher quality. For free users, it uses a simpler, single-pass generation. This module has a direct dependency on the **Pricing & Subscriptions** module to determine which AI models and generation logic to use for a given user.
+
+*   **Itinerary Management (New Insight):** This module, primarily located in `src/lib/actions/itinerary-actions.ts`, handles all CRUD operations for itineraries.
+    *   **Enhanced Analysis:** It's responsible for fetching public itineraries for the homepage gallery, fetching a user's private plans, managing privacy settings, and handling social features like "likes" and the "bucket list." It distinguishes between `draft` itineraries (for anonymous users) and `published` itineraries (for registered users).
+
+*   **Payment & Subscriptions (New Insight):** This module integrates Stripe for handling payments and is configured in `src/lib/config/pricing-models.ts` and implemented in API routes under `src/app/api/stripe/`.
+    *   **Original Document Insight:** The original document correctly identifies that payment integration is a necessary next step for the onboarding flow.
+    *   **Enhanced Analysis:** This module is now fully implemented. It supports both recurring subscriptions ("Pro") and one-time credit purchases ("PAYG"). It's deeply connected to the **Authentication** module (for associating customers with users) and the **AI Core** (for checking usage limits and enabling premium features).
+
+## 2. Key Contributors
+
+**Note:** Due to limitations in the environment, I was unable to reliably access the `git log` to extract detailed contributor information. A new developer should run `git log --all --since="3 months ago" --stat` and `git shortlog -sn --since="3 months ago"` within the `travel-planner` directory to get a sense of key contributors and their areas of focus.
+
+Based on file analysis, we can infer areas of expertise, but this should be verified with the git history.
+
+## 3. Overall Takeaways & Recent Focus
+
+*   **Preserved Insight:** The project's goal is to provide a high-quality, AI-powered travel planning experience.
+*   **New Insight from Analysis:** The recent development focus has been heavily skewed towards **monetization and user conversion**. There is a clear pattern of activity around:
+    1.  **Implementing Payments:** Integrating Stripe for subscriptions and one-time payments.
+    2.  **Enhancing Onboarding:** Building the `/choose-plan` flow to convert users to paid plans earlier.
+    3.  **Tiered AI Service:** Differentiating the AI generation quality between free and paid users (e.g., the "agentic" system for paid users).
+    4.  **Improving User Engagement:** Adding features like "likes", "bucket list", and sharing to increase the stickiness of the platform.
+
+This represents a shift from building the core AI functionality to building a sustainable business around it.
+
+## 4. Potential Complexity/Areas to Note
+
+*   **`ai-actions.ts` (High Complexity):** This file has a very high change rate and is central to the application's core feature. The "agentic" multi-pass generation logic, prompt engineering, and dynamic model selection based on user tier make it a complex area for new developers.
+*   **`itinerary-form-ai-enhanced.tsx` (High Complexity):** This large component manages a significant amount of state, including form data, AI extraction results, and UI visibility logic. The interplay between user input, debounced AI calls, and progressive disclosure of form fields can be difficult to debug.
+*   **Interaction between Anonymous and Registered Users:** The system for handling `draft` itineraries for anonymous users and then "claiming" them upon sign-up (`claimDraftItinerary` action) is a critical but complex flow. It touches authentication, itinerary management, and subscription limits, making it a potential source of bugs.
+
+## 5. Questions for the Team
+
+1.  The `ai-actions.ts` file implements a multi-pass "agentic" system for paid users. What was the reasoning behind this approach versus simply using a more powerful model? Are there plans to make this system even more sophisticated (e.g., with tool use)?
+2.  The project contains multiple versions of the itinerary form (`-smart` with regex, `-ai-enhanced`). What is the long-term strategy here? Will one be deprecated, or will they be used for different user tiers (e.g., regex for free, AI for paid)?
+3.  The onboarding flow now funnels users to a plan selection page. What has been the impact of this on conversion rates since it was implemented? Are there any A/B tests running or planned for this flow?
+4.  How are the AI prompts and model choices managed and versioned? Is there a separate process for updating and testing prompts outside of the main application code?
+
+## 6. Next Steps for New Developers
+
+1.  **Start with the Core User Flow:** A new developer should begin by tracing the main user journey:
+    *   Start on the **homepage (`src/app/page.tsx`)**.
+    *   Interact with the **`ItineraryFormAIEnhanced` component** (`src/components/itinerary-form-ai-enhanced.tsx`).
+    *   Follow the `generateItinerary` call into **`ai-actions.ts`** (`src/lib/actions/ai-actions.ts`) to understand how the AI prompt is built and the itinerary is generated.
+    *   See how the result is saved to the database and then displayed on the **itinerary page (`src/app/itinerary/[id]/page.tsx`)**.
+
+2.  **Review the Data Models:** Understand the main data structures in `itinerary-actions.ts` (the `Itinerary` type) and how they map to the Supabase database schema.
+
+3.  **Explore the Pricing Logic:** Read through `src/lib/config/pricing-models.ts` to understand how subscription tiers control access to features and AI models. This is critical for understanding many of the business logic decisions in the code.
+
+4.  **Documentation Improvement:** The current `ONBOARDING_PLAN_SELECTION.md` is excellent for its specific feature but the project would benefit from a higher-level `README.md` or `ONBOARDING.md` in the root that contains this kind of project-wide analysis. A new developer could be tasked with creating this document.
+
