@@ -287,6 +287,7 @@ export async function canGeneratePlan(
 
 /**
  * Record plan generation and update usage/credits
+ * CRIT-2 fix: Uses atomic database operation to prevent race conditions
  */
 export async function recordPlanGeneration(
   planId: string,
@@ -302,134 +303,26 @@ export async function recordPlanGeneration(
     return { success: false, error: 'User not authenticated' };
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single();
-
-  if (!profile) {
-    return { success: false, error: 'Profile not found' };
-  }
-
-  const tier = (profile.subscription_tier as SubscriptionTier) || 'free';
   const modelInfo = AI_MODELS[model];
   const cost = modelInfo.cost;
 
-  // Calculate updates based on tier
-  const updates: Record<string, string | number> = {
-    last_generation_at: new Date().toISOString(),
-  };
+  // CRIT-2 fix: Call database function for atomic credit deduction
+  // This prevents race conditions by using row-level locking (FOR UPDATE)
+  const { data, error } = await supabase
+    .rpc('deduct_credits_atomic', {
+      p_user_id: user.id,
+      p_cost: cost,
+      p_plan_id: planId,
+      p_model: model,
+      p_operation: operation,
+    });
 
-  switch (tier) {
-    case 'free':
-      if (operation === 'create') {
-        updates.plans_created_count = (profile.plans_created_count || 0) + 1;
-      }
-      break;
-
-    case 'payg':
-      // Deduct credits
-      const newBalance = (Number(profile.credits_balance) || 0) - cost;
-      if (newBalance < 0) {
-        return { success: false, error: 'Insufficient credits' };
-      }
-      updates.credits_balance = newBalance;
-      break;
-
-    case 'pro':
-      if (modelInfo.tier === 'economy') {
-        updates.monthly_economy_used =
-          (profile.monthly_economy_used || 0) + 1;
-      } else {
-        const premiumUsed = profile.monthly_premium_used || 0;
-        const rollover = profile.premium_rollover || 0;
-        const limit = 20 + rollover;
-
-        if (premiumUsed >= limit) {
-          // Use credits
-          const newBalance = (Number(profile.credits_balance) || 0) - 0.2;
-          if (newBalance < 0) {
-            return { success: false, error: 'Insufficient credits' };
-          }
-          updates.credits_balance = newBalance;
-        } else {
-          updates.monthly_premium_used = premiumUsed + 1;
-        }
-      }
-      break;
-  }
-
-  // Update profile
-  const { error: updateError } = await supabase
-    .from('profiles')
-    .update(updates)
-    .eq('id', user.id);
-
-  if (updateError) {
-    console.error('Error updating profile:', updateError);
-    return { success: false, error: 'Failed to update profile' };
-  }
-
-  // Update itinerary record
-  // For edit/regenerate operations, increment the edit_count
-  if (operation === 'edit' || operation === 'regenerate') {
-    // First, get the current edit_count
-    const { data: currentItinerary } = await supabase
-      .from('itineraries')
-      .select('edit_count')
-      .eq('id', planId)
-      .single();
-
-    const oldEditCount = currentItinerary?.edit_count || 0;
-    const newEditCount = oldEditCount + 1;
-
-    const { error: itineraryError } = await supabase
-      .from('itineraries')
-      .update({
-        ai_model_used: model,
-        generation_cost: cost,
-        edit_count: newEditCount,
-      })
-      .eq('id', planId);
-
-    if (itineraryError) {
-      console.error('Error updating itinerary edit_count:', itineraryError);
-    }
-  } else {
-    // For create operations, just set edit_count to 0
-    const { error: itineraryError } = await supabase
-      .from('itineraries')
-      .update({
-        ai_model_used: model,
-        generation_cost: cost,
-        edit_count: 0,
-      })
-      .eq('id', planId);
-
-    if (itineraryError) {
-      console.error('Error updating itinerary:', itineraryError);
-    }
-  }
-
-  // Log usage
-  const { error: logError } = await supabase.from('ai_usage_logs').insert({
-    user_id: user.id,
-    plan_id: planId,
-    ai_model: model,
-    operation,
-    estimated_cost: cost,
-    actual_cost: cost,
-    subscription_tier: tier,
-    credits_deducted:
-      tier === 'payg' || (tier === 'pro' && updates.credits_balance)
-        ? cost
-        : null,
-    success: true,
-  });
-
-  if (logError) {
-    console.error('Error logging usage:', logError);
+  if (error || !data?.success) {
+    console.error('Credit deduction failed:', error || data?.error);
+    return {
+      success: false,
+      error: data?.error || 'Failed to deduct credits',
+    };
   }
 
   return { success: true };

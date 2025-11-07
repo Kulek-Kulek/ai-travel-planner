@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import type { ModelKey } from '@/lib/config/pricing-models';
+import { escapeLikePattern } from '@/lib/utils/validation';
 
 // AI Plan structure
 export type AIPlan = {
@@ -85,8 +86,10 @@ export async function getPublicItineraries(
     }
     
     // Filter by destination if provided (case-insensitive partial match)
+    // CRIT-4 fix: Escape special characters to prevent pattern injection
     if (destination && destination.trim() !== '') {
-      query = query.ilike('destination', `%${destination.trim()}%`);
+      const escaped = escapeLikePattern(destination.trim());
+      query = query.ilike('destination', `%${escaped}%`);
     }
     
     query = query.range(offset, offset + limit - 1);
@@ -520,37 +523,22 @@ export async function deleteItinerary(id: string): Promise<ActionResult<void>> {
 /**
  * Increment the likes count for an itinerary
  * Can be called by anyone (authenticated or anonymous)
+ * Uses atomic increment to prevent race conditions (CRIT-1 fix)
  */
 export async function likeItinerary(id: string): Promise<ActionResult<number>> {
   try {
     const supabase = await createClient();
     
-    // Get current likes count
-    const { data: currentData, error: fetchError } = await supabase
-      .from('itineraries')
-      .select('likes')
-      .eq('id', id)
-      .single();
+    // Use Supabase RPC for atomic increment (prevents race conditions)
+    const { data, error } = await supabase
+      .rpc('increment_likes', { itinerary_id: id });
     
-    if (fetchError) {
-      console.error('Error fetching itinerary:', fetchError);
-      return { success: false, error: 'Itinerary not found' };
+    if (error) {
+      console.error('Error incrementing likes:', error);
+      return { success: false, error: 'Failed to like itinerary' };
     }
     
-    const newLikes = (currentData.likes || 0) + 1;
-    
-    // Increment likes
-    const { error: updateError } = await supabase
-      .from('itineraries')
-      .update({ likes: newLikes })
-      .eq('id', id);
-    
-    if (updateError) {
-      console.error('Error updating likes:', updateError);
-      return { success: false, error: 'Failed to update likes' };
-    }
-    
-    return { success: true, data: newLikes };
+    return { success: true, data: data };
   } catch (error) {
     console.error('Error in likeItinerary:', error);
     return { success: false, error: 'An unexpected error occurred' };
