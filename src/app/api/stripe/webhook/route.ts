@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
     }
 
     // CRIT-5 fix: Mark event as processed AFTER successful handling
-    const supabase = createServiceClient();
+    // Reuse the supabase client from above
     await supabase
       .from('processed_webhook_events')
       .insert({
