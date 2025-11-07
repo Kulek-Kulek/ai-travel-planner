@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { z } from 'zod';
+import { isValidUUID } from '@/lib/utils/validation';
 
 // Validation schemas
 const signUpSchema = z
@@ -66,17 +67,23 @@ export async function signUp(formData: FormData) {
   
   // Check if email confirmation is required
   // If the session is null, it means email confirmation is enabled
+  // CRIT-3 fix: Validate itineraryId before using in redirect
   const itineraryId = formData.get('itineraryId');
+  const validItineraryId = isValidUUID(itineraryId) ? itineraryId : null;
   
   if (data.session === null) {
     // Email confirmation required - redirect to confirmation page
-    const confirmUrl = `/confirm-email?email=${encodeURIComponent(email)}${itineraryId ? `&itineraryId=${itineraryId}` : ''}`;
+    const confirmUrl = validItineraryId
+      ? `/confirm-email?email=${encodeURIComponent(email)}&itineraryId=${validItineraryId}`
+      : `/confirm-email?email=${encodeURIComponent(email)}`;
     redirect(confirmUrl);
   }
   
   // User is logged in immediately (email confirmation disabled)
   // Redirect to plan selection page for new users
-  const planSelectionUrl = `/choose-plan${itineraryId ? `?itineraryId=${itineraryId}` : ''}`;
+  const planSelectionUrl = validItineraryId
+    ? `/choose-plan?itineraryId=${validItineraryId}`
+    : `/choose-plan`;
   redirect(planSelectionUrl);
 }
 
@@ -111,10 +118,11 @@ export async function signIn(formData: FormData) {
 
   revalidatePath('/', 'layout');
   
-  // Preserve itineraryId in redirect if present
+  // CRIT-3 fix: Validate itineraryId before using in redirect
   const itineraryId = formData.get('itineraryId');
-  if (itineraryId) {
-    redirect(`/?itineraryId=${itineraryId}`);
+  const validItineraryId = isValidUUID(itineraryId) ? itineraryId : null;
+  if (validItineraryId) {
+    redirect(`/?itineraryId=${validItineraryId}`);
   }
   redirect('/');
 }
@@ -128,9 +136,12 @@ export async function signInWithGoogle(itineraryId?: string) {
       ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
       : 'http://localhost:3000';
   
+  // CRIT-3 fix: Validate itineraryId before using in redirect
+  const validItineraryId = isValidUUID(itineraryId) ? itineraryId : null;
+  
   // Build redirect URL with itineraryId if present
-  const redirectTo = itineraryId 
-    ? `${origin}/api/auth/callback?itineraryId=${itineraryId}`
+  const redirectTo = validItineraryId 
+    ? `${origin}/api/auth/callback?itineraryId=${validItineraryId}`
     : `${origin}/api/auth/callback`;
   
   const { data, error } = await supabase.auth.signInWithOAuth({

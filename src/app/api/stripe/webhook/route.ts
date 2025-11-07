@@ -3,6 +3,7 @@
  * POST /api/stripe/webhook
  * 
  * Handles Stripe webhook events for payments and subscriptions
+ * CRIT-5 fix: Implements idempotency protection to prevent duplicate processing
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -14,6 +15,7 @@ import {
   getUserByStripeCustomerId,
   getUserByStripeSubscriptionId,
 } from '@/lib/stripe/utils';
+import { createServiceClient } from '@/lib/supabase/server';
 import Stripe from 'stripe';
 
 export async function POST(request: NextRequest) {
@@ -38,6 +40,25 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    // CRIT-5 fix: Check if event was already processed (idempotency)
+    const supabase = createServiceClient();
+    
+    const { data: existing } = await supabase
+      .from('processed_webhook_events')
+      .select('id, processed_at')
+      .eq('stripe_event_id', event.id)
+      .single();
+
+    if (existing) {
+      console.log(`Webhook ${event.id} already processed at ${existing.processed_at}`);
+      return NextResponse.json({ 
+        received: true, 
+        status: 'already_processed',
+        processed_at: existing.processed_at 
+      });
+    }
+
+    // Process the event
     switch (event.type) {
       // Checkout session completed - one-time payment or subscription start
       case 'checkout.session.completed': {
@@ -92,9 +113,21 @@ export async function POST(request: NextRequest) {
         console.log(`Unhandled event type: ${event.type}`);
     }
 
-    return NextResponse.json({ received: true });
+    // CRIT-5 fix: Mark event as processed AFTER successful handling
+    const supabase = createServiceClient();
+    await supabase
+      .from('processed_webhook_events')
+      .insert({
+        stripe_event_id: event.id,
+        event_type: event.type,
+        processed_at: new Date().toISOString(),
+        api_version: event.api_version,
+      });
+
+    return NextResponse.json({ received: true, status: 'processed' });
   } catch (error) {
     console.error('Error processing webhook:', error);
+    // Don't mark as processed if error occurred - allow Stripe to retry
     return NextResponse.json(
       { error: 'Webhook processing failed' },
       { status: 500 }
