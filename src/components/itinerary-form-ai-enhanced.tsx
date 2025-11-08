@@ -139,7 +139,12 @@ export const ItineraryFormAIEnhanced = ({
   const [extractedInfo, setExtractedInfo] = useState<ExtractedTravelInfo | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractionTimeout, setExtractionTimeout] = useState<NodeJS.Timeout | null>(null);
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  
+  // Turnstile configuration - bypass if not configured (e.g., in preview deployments)
+  const isTurnstileEnabled = !!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(
+    isTurnstileEnabled ? null : 'bypass-dev' // Auto-bypass if Turnstile not configured
+  );
   
   // Ref for the submit button to enable auto-scroll
   const submitButtonRef = useRef<HTMLButtonElement>(null);
@@ -994,23 +999,25 @@ export const ItineraryFormAIEnhanced = ({
         </section>
 
         {/* Cloudflare Turnstile - Bot Protection */}
-        <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white/30">
-          <Turnstile
-            siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ''}
-            onSuccess={(token) => setTurnstileToken(token)}
-            onError={() => {
-              setTurnstileToken(null);
-              toast.error("Security verification failed", {
-                description: "Please refresh the page and try again",
-              });
-            }}
-            onExpire={() => setTurnstileToken(null)}
-            options={{
-              theme: "light",
-              size: "flexible",
-            }}
-          />
-        </div>
+        {isTurnstileEnabled && (
+          <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white/30">
+            <Turnstile
+              siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ''}
+              onSuccess={(token) => setTurnstileToken(token)}
+              onError={() => {
+                setTurnstileToken(null);
+                toast.error("Security verification failed", {
+                  description: "Please refresh the page and try again",
+                });
+              }}
+              onExpire={() => setTurnstileToken(null)}
+              options={{
+                theme: "light",
+                size: "flexible",
+              }}
+            />
+          </div>
+        )}
  
 
         <Button 
