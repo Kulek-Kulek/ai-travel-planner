@@ -11,7 +11,6 @@ import {
 } from "@/lib/openrouter/models";
 import { 
   canGeneratePlan, 
-  recordPlanGeneration,
   getUserSubscription,
   checkRateLimit
 } from "@/lib/actions/subscription-actions";
@@ -167,7 +166,7 @@ async function mapOpenRouterModelToKey(openRouterModel: string): Promise<ModelKe
       return fallbackKey;
     }
     
-    return (modelConfig as any).pricing_key as ModelKey;
+    return (modelConfig as { pricing_key: string }).pricing_key as ModelKey;
   } catch (err) {
     console.error('Error fetching model config from database:', err);
     // Ultimate fallback
@@ -409,22 +408,7 @@ export async function generateItinerary(
     // Note: supabase and user are already fetched at the beginning
     // For edit/regenerate operations, update the existing itinerary
     // For create operations, insert a new one
-    const isAnonymous = !user?.id;
     const isEditOperation = (validated.operation === 'edit' || validated.operation === 'regenerate') && validated.existingItineraryId;
-
-    // For edit operations, fetch existing privacy settings to preserve them
-    let existingPrivacy = false;
-    if (isEditOperation) {
-      const { data: existingItinerary } = await supabase
-        .from("itineraries")
-        .select("is_private")
-        .eq("id", validated.existingItineraryId)
-        .single();
-      
-      if (existingItinerary) {
-        existingPrivacy = existingItinerary.is_private;
-      }
-    }
 
     // HIGH-1: Use atomic transaction functions for authenticated users
     // For anonymous users, use simple insert (no credits involved)
