@@ -222,6 +222,7 @@ export const ItineraryFormAIEnhanced = ({
           // CRITICAL FIX: Remove securityError from the extracted object before saving
           // This allows the extracted fields to be used for prefilling while keeping
           // the security flag separate for blocking generation
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const { securityError: _securityError, ...extractedWithoutError } = extracted;
           extractedData = extractedWithoutError;
           // NOTE: We do NOT return here - continue with field filling logic below
