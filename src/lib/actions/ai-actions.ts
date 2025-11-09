@@ -12,7 +12,8 @@ import {
 import { 
   canGeneratePlan, 
   recordPlanGeneration,
-  getUserSubscription 
+  getUserSubscription,
+  checkRateLimit
 } from "@/lib/actions/subscription-actions";
 import { getUserTravelProfile } from "@/lib/actions/profile-ai-actions";
 import { type ModelKey } from "@/lib/config/pricing-models";
@@ -157,7 +158,18 @@ export async function generateItinerary(
     // Get the model key for usage tracking
     const modelKey = mapOpenRouterModelToKey(validated.model);
 
-    // Only check limits for authenticated users
+    // 2.5. Check rate limits for ALL users (authenticated and anonymous)
+    // This prevents abuse even with valid Turnstile tokens
+    const rateLimitCheck = await checkRateLimit();
+    if (!rateLimitCheck.allowed) {
+      console.warn('⚠️ Rate limit exceeded for user:', user?.id || 'anonymous');
+      return {
+        success: false,
+        error: rateLimitCheck.reason || 'Rate limit exceeded. Please try again later.',
+      };
+    }
+
+    // Only check tier limits for authenticated users
     if (user?.id) {
       const canGenerate = await canGeneratePlan(modelKey, {
         operation: validated.operation,

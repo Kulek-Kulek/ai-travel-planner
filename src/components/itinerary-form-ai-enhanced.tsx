@@ -141,11 +141,9 @@ export const ItineraryFormAIEnhanced = ({
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractionTimeout, setExtractionTimeout] = useState<NodeJS.Timeout | null>(null);
   
-  // Turnstile configuration - bypass if not configured (e.g., in preview deployments)
+  // Turnstile token state - required for bot protection
   const isTurnstileEnabled = !!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(
-    isTurnstileEnabled ? null : 'bypass-dev' // Auto-bypass if Turnstile not configured
-  );
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   
   // Security alert state (from main branch)
   const [showSecurityAlert, setShowSecurityAlert] = useState(false);
