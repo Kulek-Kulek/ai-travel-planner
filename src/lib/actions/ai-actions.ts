@@ -19,7 +19,6 @@ import { type ModelKey } from "@/lib/config/pricing-models";
 import { type TravelProfile } from "@/types/travel-profile";
 import { verifyTurnstileToken } from "@/lib/cloudflare/verify-turnstile";
 import { 
-  validateItineraryContent,
   logSecurityIncident,
   getSecuritySystemInstructions 
 } from "@/lib/security/prompt-injection-defense";
@@ -262,21 +261,6 @@ export async function generateItinerary(
         return {
           success: false,
           error: "❌ Unable to generate itinerary. This request may violate our content policy. Our platform is for legitimate travel planning only.",
-        };
-      }
-
-      // SECURITY: Even for free users, validate output for security issues
-      const contentValidation = validateItineraryContent(itinerary, validated.destination);
-      if (!contentValidation.isValid) {
-        logSecurityIncident('validation_failure', 'hard_block', {
-          userId: user?.id,
-          destination: validated.destination,
-          detectedPatterns: contentValidation.issues,
-        });
-        
-        return {
-          success: false,
-          error: `Security validation failed: ${contentValidation.userMessage || 'Invalid content detected'}`,
         };
       }
 
@@ -1064,30 +1048,6 @@ async function validateItineraryQuality(
   model: string
 ): Promise<{ score: number; needsRefinement: boolean; issues: string[] }> {
   try {
-    // ========================================
-    // LAYER 3: SECURITY VALIDATION OF OUTPUT
-    // ========================================
-    
-    const contentValidation = validateItineraryContent(itinerary, params.destination);
-    
-    if (!contentValidation.isValid) {
-      logSecurityIncident('validation_failure', 'hard_block', {
-        destination: params.destination,
-        detectedPatterns: contentValidation.issues,
-      });
-      
-      // Return score = 0 to trigger rejection
-      return {
-        score: 0,
-        needsRefinement: false, // Don't refine, reject completely
-        issues: contentValidation.issues,
-      };
-    }
-    
-    // ========================================
-    // STANDARD QUALITY VALIDATION
-    // ========================================
-    
     const validationPrompt = `You are a quality assurance expert reviewing a travel itinerary.
 
 ## 🔒 SECURITY CHECK
@@ -1175,7 +1135,6 @@ Return JSON:
     }
 
     const result = JSON.parse(content);
-    console.log(`📊 Quality Report: ${result.reasoning}`);
     
     // If AI detected security issues (score = 0), log it
     if (result.score === 0) {
