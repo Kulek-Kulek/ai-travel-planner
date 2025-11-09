@@ -2,6 +2,9 @@
  * Environment variable validation (MED-3)
  * Validates all required environment variables at startup
  * This prevents runtime errors from missing configuration
+ * 
+ * Note: Validation is skipped during build process since not all environment
+ * variables are needed at build time (e.g., webhook secrets, API keys)
  */
 
 const requiredEnvVars = [
@@ -25,20 +28,27 @@ const optionalEnvVars = [
   'NEXT_PUBLIC_TURNSTILE_SITE_KEY',
 ] as const;
 
-// Validate on import (startup)
+// Skip validation during build process (Vercel, etc.)
+// Environment variables are only needed at runtime, not during static build
+const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build' || 
+                    process.env.NEXT_PHASE === 'phase-export';
+
+// Validate on import (startup), but skip during build
 const missingVars: string[] = [];
 
-for (const varName of requiredEnvVars) {
-  if (!process.env[varName]) {
-    missingVars.push(varName);
+if (!isBuildTime) {
+  for (const varName of requiredEnvVars) {
+    if (!process.env[varName]) {
+      missingVars.push(varName);
+    }
   }
-}
 
-if (missingVars.length > 0) {
-  throw new Error(
-    `Missing required environment variables:\n${missingVars.map(v => `  - ${v}`).join('\n')}\n\n` +
-    'Please check your .env.local file or environment configuration.'
-  );
+  if (missingVars.length > 0) {
+    throw new Error(
+      `Missing required environment variables:\n${missingVars.map(v => `  - ${v}`).join('\n')}\n\n` +
+      'Please check your .env.local file or environment configuration.'
+    );
+  }
 }
 
 // Validate formats
@@ -104,14 +114,18 @@ export const ENV = {
   VERCEL_ENV: process.env.VERCEL_ENV,
 } as const;
 
-console.log('✅ Environment variables validated successfully');
+if (!isBuildTime) {
+  console.log('✅ Environment variables validated successfully');
 
-// Log optional variables status (for debugging)
-if (process.env.NODE_ENV === 'development') {
-  console.log('📋 Optional environment variables:');
-  for (const varName of optionalEnvVars) {
-    const isSet = !!process.env[varName];
-    console.log(`  ${isSet ? '✅' : '❌'} ${varName}`);
+  // Log optional variables status (for debugging)
+  if (process.env.NODE_ENV === 'development') {
+    console.log('📋 Optional environment variables:');
+    for (const varName of optionalEnvVars) {
+      const isSet = !!process.env[varName];
+      console.log(`  ${isSet ? '✅' : '❌'} ${varName}`);
+    }
   }
+} else {
+  console.log('⏭️ Skipping environment validation during build');
 }
 
