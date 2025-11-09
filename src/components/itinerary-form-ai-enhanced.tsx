@@ -140,7 +140,12 @@ export const ItineraryFormAIEnhanced = ({
   const [extractedInfo, setExtractedInfo] = useState<ExtractedTravelInfo | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractionTimeout, setExtractionTimeout] = useState<NodeJS.Timeout | null>(null);
+  
+  // Turnstile token state - required for bot protection
+  const isTurnstileEnabled = !!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  
+  // Security alert state (from main branch)
   const [showSecurityAlert, setShowSecurityAlert] = useState(false);
   const [securityAlertMessage, setSecurityAlertMessage] = useState<string>("");
   const [hasSecurityViolation, setHasSecurityViolation] = useState(false);
