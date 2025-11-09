@@ -26,30 +26,89 @@ import {
 import { extractJSON } from "@/lib/utils/json-extraction";
 import { z } from "zod";
 
-// Input schema
-const generateItinerarySchema = z.object({
-  destination: z.string().min(1, "Destination is required"),
-  days: z.number().int().positive().max(30),
-  travelers: z.number().int().positive().max(20),
-  startDate: z.date().optional(),
-  endDate: z.date().optional(),
-  children: z.number().int().min(0).max(10).optional(),
-  childAges: z.array(z.number().int().min(0).max(17)).optional(),
-  hasAccessibilityNeeds: z.boolean().optional(),
-  notes: z.string().optional(),
-  keepExistingPhoto: z.boolean().optional(),
-  existingPhotoData: z
-    .object({
-      image_url: z.string().nullable().optional(),
-      image_photographer: z.string().nullable().optional(),
-      image_photographer_url: z.string().nullable().optional(),
-    })
-    .optional(),
-  model: z.enum(OPENROUTER_MODEL_VALUES).default(DEFAULT_OPENROUTER_MODEL),
-  turnstileToken: z.string().optional(), // Optional for authenticated users editing their own itineraries
-  existingItineraryId: z.string().optional(), // ID of itinerary being edited/regenerated
-  operation: z.enum(['create', 'edit', 'regenerate']).default('create'), // Operation type
-});
+// Input schema with enhanced validation (HIGH-3)
+const generateItinerarySchema = z
+  .object({
+    destination: z
+      .string()
+      .min(1, "Destination is required")
+      .max(100, "Destination must be less than 100 characters")
+      .regex(
+        /^[a-zA-Z0-9\s,.\-()''áéíóúñüÁÉÍÓÚÑÜàèìòùÀÈÌÒÙâêîôûÂÊÎÔÛäëïöüÄËÏÖÜçÇ]+$/,
+        "Destination contains invalid characters"
+      )
+      .trim(),
+    days: z.number().int().positive().min(1).max(30),
+    travelers: z.number().int().positive().min(1).max(20),
+    startDate: z.date().optional(),
+    endDate: z.date().optional(),
+    children: z.number().int().min(0).max(10).optional(),
+    childAges: z
+      .array(z.number().int().min(0).max(17))
+      .max(10)
+      .optional(),
+    hasAccessibilityNeeds: z.boolean().optional(),
+    notes: z
+      .string()
+      .max(2000, "Notes must be less than 2000 characters")
+      .optional()
+      .transform(val => val?.trim()),
+    keepExistingPhoto: z.boolean().optional(),
+    existingPhotoData: z
+      .object({
+        image_url: z.string().url().nullable().optional(),
+        image_photographer: z.string().max(100).nullable().optional(),
+        image_photographer_url: z.string().url().nullable().optional(),
+      })
+      .optional(),
+    model: z.enum(OPENROUTER_MODEL_VALUES).default(DEFAULT_OPENROUTER_MODEL),
+    turnstileToken: z.string().optional(),
+    existingItineraryId: z.string().uuid().optional(),
+    operation: z.enum(['create', 'edit', 'regenerate']).default('create'),
+  })
+  // Cross-field validations
+  .refine(
+    (data) => {
+      // Validate childAges matches children count
+      if (data.children && data.childAges) {
+        return data.childAges.length === data.children;
+      }
+      return true;
+    },
+    {
+      message: "Number of child ages must match number of children",
+      path: ["childAges"],
+    }
+  )
+  .refine(
+    (data) => {
+      // Validate date order
+      if (data.startDate && data.endDate) {
+        return data.startDate < data.endDate;
+      }
+      return true;
+    },
+    {
+      message: "End date must be after start date",
+      path: ["endDate"],
+    }
+  )
+  .refine(
+    (data) => {
+      // Validate days matches date range (allow 1 day tolerance)
+      if (data.startDate && data.endDate) {
+        const daysDiff = Math.ceil(
+          (data.endDate.getTime() - data.startDate.getTime()) / (1000 * 60 * 60 * 24)
+        );
+        return Math.abs(daysDiff - data.days) <= 1;
+      }
+      return true;
+    },
+    {
+      message: "Number of days must match the date range",
+      path: ["days"],
+    }
+  );
 
 // AI response schema matching your PRD
 const aiResponseSchema = z.object({
@@ -78,20 +137,42 @@ type SavedItinerary = z.infer<typeof aiResponseSchema> & {
   tags: string[];
 };
 
-// Helper function to map OpenRouter model ID to ModelKey for pricing
-function mapOpenRouterModelToKey(openRouterModel: string): ModelKey {
-  // Map OpenRouter model IDs to pricing model keys
-  // NOTE: Must match the keys in the database function can_generate_plan
-  const mapping: Record<string, ModelKey> = {
-    'google/gemini-2.0-flash-lite-001': 'gemini-flash',
-    'openai/gpt-4o-mini': 'gpt-4o-mini',
-    'google/gemini-2.5-pro': 'gemini-flash', // Use gemini-flash for now
-    'anthropic/claude-3-haiku': 'claude-haiku',
-    'google/gemini-2.5-flash': 'gemini-flash', // Use gemini-flash for now
-  };
-  
-  // Return mapped key or default to gemini-flash
-  return mapping[openRouterModel] || 'gemini-flash';
+// MED-2: Helper function to map OpenRouter model ID to ModelKey for pricing
+// Now uses database configuration instead of hardcoded mapping
+async function mapOpenRouterModelToKey(openRouterModel: string): Promise<ModelKey> {
+  try {
+    const supabase = await createClient();
+    
+    // Query database for model configuration
+    const { data: modelConfig, error } = await supabase
+      .rpc('get_model_config_by_openrouter_id', { 
+        p_openrouter_id: openRouterModel 
+      })
+      .single();
+    
+    if (error || !modelConfig) {
+      console.error(`Unknown or inactive AI model: ${openRouterModel}`, error);
+      
+      // Fallback to hardcoded mapping for backward compatibility
+      const fallbackMapping: Record<string, ModelKey> = {
+        'google/gemini-2.0-flash-lite-001': 'gemini-flash',
+        'openai/gpt-4o-mini': 'gpt-4o-mini',
+        'google/gemini-2.5-pro': 'gemini-flash',
+        'anthropic/claude-3-haiku': 'claude-haiku',
+        'google/gemini-2.5-flash': 'gemini-flash',
+      };
+      
+      const fallbackKey = fallbackMapping[openRouterModel] || 'gemini-flash';
+      console.warn(`Using fallback mapping for ${openRouterModel} -> ${fallbackKey}`);
+      return fallbackKey;
+    }
+    
+    return modelConfig.pricing_key as ModelKey;
+  } catch (err) {
+    console.error('Error fetching model config from database:', err);
+    // Ultimate fallback
+    return 'gemini-flash';
+  }
 }
 
 // Helper function to reverse map ModelKey back to OpenRouter model ID
@@ -155,8 +236,8 @@ export async function generateItinerary(
       }
     }
 
-    // Get the model key for usage tracking
-    const modelKey = mapOpenRouterModelToKey(validated.model);
+    // Get the model key for usage tracking (MED-2: now fetched from database)
+    const modelKey = await mapOpenRouterModelToKey(validated.model);
 
     // 2.5. Check rate limits for ALL users (authenticated and anonymous)
     // This prevents abuse even with valid Turnstile tokens
