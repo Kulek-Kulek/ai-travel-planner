@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "@/lib/config/env"; // MED-3: Validate environment variables at startup
 import { QueryProvider } from "@/providers/query-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { RouteProgress } from "@/components/route-progress";
