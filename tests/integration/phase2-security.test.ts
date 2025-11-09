@@ -104,12 +104,16 @@ describe('Security Phase 2 - Integration Tests', () => {
         destination: 'A'.repeat(150), // Over 100 char limit
         days: 3,
         travelers: 2,
+        notes: undefined,
+        operation: 'create',
         model: 'google/gemini-2.0-flash-lite-001',
         turnstileToken: 'test-token',
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('less than 100 characters');
+      if (!result.success) {
+        expect(result.error).toContain('less than 100 characters');
+      }
     });
 
     it('should reject destination with invalid characters', async () => {
@@ -117,12 +121,16 @@ describe('Security Phase 2 - Integration Tests', () => {
         destination: 'Paris<script>alert(1)</script>',
         days: 3,
         travelers: 2,
+        notes: undefined,
+        operation: 'create',
         model: 'google/gemini-2.0-flash-lite-001',
         turnstileToken: 'test-token',
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('invalid characters');
+      if (!result.success) {
+        expect(result.error).toContain('invalid characters');
+      }
     });
 
     it('should reject oversized notes', async () => {
@@ -131,12 +139,15 @@ describe('Security Phase 2 - Integration Tests', () => {
         days: 3,
         travelers: 2,
         notes: 'A'.repeat(2500), // Over 2000 char limit
+        operation: 'create',
         model: 'google/gemini-2.0-flash-lite-001',
         turnstileToken: 'test-token',
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('less than 2000 characters');
+      if (!result.success) {
+        expect(result.error).toContain('less than 2000 characters');
+      }
     });
 
     it('should reject mismatched child ages', async () => {
@@ -146,12 +157,16 @@ describe('Security Phase 2 - Integration Tests', () => {
         travelers: 2,
         children: 3,
         childAges: [5, 8], // Only 2 ages for 3 children
+        notes: undefined,
+        operation: 'create',
         model: 'google/gemini-2.0-flash-lite-001',
         turnstileToken: 'test-token',
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('child ages must match');
+      if (!result.success) {
+        expect(result.error).toContain('child ages must match');
+      }
     });
 
     it('should reject invalid date range', async () => {
@@ -161,12 +176,16 @@ describe('Security Phase 2 - Integration Tests', () => {
         travelers: 2,
         startDate: new Date('2025-12-31'),
         endDate: new Date('2025-12-01'), // End before start
+        notes: undefined,
+        operation: 'create',
         model: 'google/gemini-2.0-flash-lite-001',
         turnstileToken: 'test-token',
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('End date must be after start date');
+      if (!result.success) {
+        expect(result.error).toContain('End date must be after start date');
+      }
     });
 
     it('should reject days not matching date range', async () => {
@@ -176,12 +195,16 @@ describe('Security Phase 2 - Integration Tests', () => {
         travelers: 2,
         startDate: new Date('2025-12-01'),
         endDate: new Date('2025-12-10'), // 9 days, not 3
+        notes: undefined,
+        operation: 'create',
         model: 'google/gemini-2.0-flash-lite-001',
         turnstileToken: 'test-token',
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('days must match the date range');
+      if (!result.success) {
+        expect(result.error).toContain('days must match the date range');
+      }
     });
 
     it('should accept valid input with international characters', async () => {
@@ -189,12 +212,16 @@ describe('Security Phase 2 - Integration Tests', () => {
         destination: 'París, España', // Spanish accents
         days: 3,
         travelers: 2,
+        notes: undefined,
+        operation: 'create',
         model: 'google/gemini-2.0-flash-lite-001',
         turnstileToken: 'test-token',
       });
 
       // Should not fail validation (will fail on other mocked dependencies)
-      expect(result.error).not.toContain('invalid characters');
+      if (!result.success) {
+        expect(result.error).not.toContain('invalid characters');
+      }
     });
 
     it('should trim whitespace from destination and notes', async () => {
@@ -203,13 +230,16 @@ describe('Security Phase 2 - Integration Tests', () => {
         days: 3,
         travelers: 2,
         notes: '  Some notes  ',
+        operation: 'create',
         model: 'google/gemini-2.0-flash-lite-001',
         turnstileToken: 'test-token',
       });
 
       // Validation should pass (trimmed internally)
       // Actual functionality depends on mocked services
-      expect(result.error).not.toContain('invalid characters');
+      if (!result.success) {
+        expect(result.error).not.toContain('invalid characters');
+      }
     });
   });
 
@@ -243,7 +273,9 @@ describe('Security Phase 2 - Integration Tests', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('Unauthorized');
+      if (!result.success) {
+        expect(result.error).toContain('Unauthorized');
+      }
     });
 
     it('should reject delete from non-owner', async () => {
@@ -272,7 +304,9 @@ describe('Security Phase 2 - Integration Tests', () => {
       const result = await deleteItinerary('itinerary-1');
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('Unauthorized');
+      if (!result.success) {
+        expect(result.error).toContain('Unauthorized');
+      }
     });
 
     it('should allow update from owner', async () => {
@@ -339,7 +373,9 @@ describe('Security Phase 2 - Integration Tests', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('not found');
+      if (!result.success) {
+        expect(result.error).toContain('not found');
+      }
     });
   });
 
@@ -404,7 +440,9 @@ describe('Security Phase 2 - Integration Tests', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain('Invalid itinerary ID');
+      if (!result.success) {
+        expect(result.error).toContain('Invalid itinerary ID');
+      }
     });
 
     it('should reject malicious UUID attempts', async () => {
@@ -422,7 +460,9 @@ describe('Security Phase 2 - Integration Tests', () => {
         });
 
         expect(result.success).toBe(false);
-        expect(result.error).toContain('Invalid itinerary ID');
+        if (!result.success) {
+          expect(result.error).toContain('Invalid itinerary ID');
+        }
       }
     });
 
