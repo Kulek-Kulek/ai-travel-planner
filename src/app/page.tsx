@@ -7,6 +7,7 @@ import { ItineraryGallery } from "@/components/itinerary-gallery";
 import { ItineraryCardSkeleton } from "@/components/itinerary-card-skeleton";
 import { Masthead } from "@/components/masthead";
 import { UpgradeModal } from "@/components/upgrade-modal";
+import { SecurityAlertDialog } from "@/components/security-alert-dialog";
 import { TravelPersonalityBanner } from "@/components/travel-personality-banner";
 import { generateItinerary } from "@/lib/actions/ai-actions";
 import { claimDraftItinerary } from "@/lib/actions/itinerary-actions";
@@ -43,6 +44,12 @@ export default function Home() {
   const [loadingMessage, setLoadingMessage] = useState("");
   const [progress, setProgress] = useState(0);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showSecurityAlert, setShowSecurityAlert] = useState(false);
+  const [securityError, setSecurityError] = useState<{
+    message: string;
+    issues?: string[];
+    severity?: 'error' | 'warning' | 'block';
+  } | null>(null);
   const [progressDirection, setProgressDirection] = useState<1 | -1>(1);
   const [currentStep, setCurrentStep] = useState(0);
   const [userCancelled, setUserCancelled] = useState(false);
@@ -473,14 +480,78 @@ export default function Home() {
         // NO auto-redirect - let user see preview first
         // They can click the banner buttons to sign in if needed
       } else {
-        // Check if this is a tier limit error
+        // Check error type and show appropriate UI
         const errorMessage = response.error || "";
+        
+        // Check if this is a security error (comprehensive detection for ALL violation types)
+        const isSecurityError = 
+          errorMessage.includes("❌") ||  // Our security errors start with this
+          errorMessage.includes("🚨") ||
+          errorMessage.includes("Security Alert") ||
+          errorMessage.includes("Security validation") ||
+          errorMessage.includes("Content Policy Violation") ||  // Key phrase!
+          errorMessage.includes("content policy") ||  // Lowercase too
+          errorMessage.includes("violates our content policy") ||  // Full phrase
+          errorMessage.includes("prompt injection") ||
+          errorMessage.includes("manipulate the AI") ||
+          errorMessage.includes("Invalid Destination") ||
+          errorMessage.toLowerCase().includes("inappropriate content") ||
+          // All 7 violation types:
+          errorMessage.toLowerCase().includes("sexual") ||
+          errorMessage.toLowerCase().includes("illegal activit") ||
+          errorMessage.toLowerCase().includes("illegal drug") ||
+          errorMessage.toLowerCase().includes("illegal substances") ||
+          errorMessage.toLowerCase().includes("weapons") ||
+          errorMessage.toLowerCase().includes("violence") ||
+          errorMessage.toLowerCase().includes("terrorism") ||
+          errorMessage.toLowerCase().includes("terrorist") ||
+          errorMessage.toLowerCase().includes("hate speech") ||
+          errorMessage.toLowerCase().includes("discriminatory") ||
+          errorMessage.toLowerCase().includes("human trafficking") ||
+          errorMessage.toLowerCase().includes("exploitation") ||
+          errorMessage.toLowerCase().includes("financial crime") ||
+          errorMessage.toLowerCase().includes("money laundering") ||
+          errorMessage.toLowerCase().includes("dangerous activit") ||
+          errorMessage.toLowerCase().includes("self-harm") ||
+          errorMessage.toLowerCase().includes("security");
+        
+        // Check if this is a tier limit error
         const isTierLimitError = 
           errorMessage.toLowerCase().includes("limit reached") ||
           errorMessage.toLowerCase().includes("tier limit") ||
           errorMessage.toLowerCase().includes("upgrade");
         
-        if (isTierLimitError) {
+        if (isSecurityError) {
+          console.log('🚨 Security error detected in generation:', errorMessage);
+          
+          // Parse detected issues from error message
+          let detectedIssues: string[] = [];
+          let severity: 'error' | 'warning' | 'block' = 'block';
+          
+          // Extract issues from error message
+          const issuesMatch = errorMessage.match(/(?:found:|detected:|Issues detected:)\s*([^.]+)/i);
+          if (issuesMatch) {
+            detectedIssues = issuesMatch[1]
+              .split(',')
+              .map(s => s.trim())
+              .filter(s => s.length > 0);
+          }
+          
+          // Determine severity
+          if (errorMessage.includes("⚠️") || errorMessage.includes("Warning")) {
+            severity = 'warning';
+          } else if (errorMessage.includes("🚨") || errorMessage.includes("❌")) {
+            severity = 'block';
+          }
+          
+          // Show security alert modal
+          setSecurityError({
+            message: errorMessage,
+            issues: detectedIssues.length > 0 ? detectedIssues : undefined,
+            severity,
+          });
+          setShowSecurityAlert(true);
+        } else if (isTierLimitError) {
           // Show upgrade modal instead of toast for limit errors
           setShowUpgradeModal(true);
         } else {
@@ -1147,6 +1218,14 @@ export default function Home() {
       <UpgradeModal 
         open={showUpgradeModal} 
         onOpenChange={setShowUpgradeModal}
+      />
+      
+      <SecurityAlertDialog
+        open={showSecurityAlert}
+        onOpenChange={setShowSecurityAlert}
+        description={securityError?.message || "A security issue was detected with your request."}
+        severity={securityError?.severity}
+        detectedIssues={securityError?.issues}
       />
     </div>
   );
