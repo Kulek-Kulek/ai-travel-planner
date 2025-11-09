@@ -410,8 +410,8 @@ export async function generateItinerary(
     // For create operations, insert a new one
     const isEditOperation = (validated.operation === 'edit' || validated.operation === 'regenerate') && validated.existingItineraryId;
 
-    // HIGH-1: Use atomic transaction functions for authenticated users
-    // For anonymous users, use simple insert (no credits involved)
+    // HIGH-1: Use atomic transaction functions for ALL users (authenticated & anonymous)
+    // Ensures atomicity: database writes + logging happen together or not at all
     let savedItinerary: { id: string };
     
     if (user?.id) {
@@ -509,43 +509,38 @@ export async function generateItinerary(
       }
       
     } else {
-      // ❌ ANONYMOUS USER: Simple insert (no transaction needed, no credits)
-      const itineraryData = {
-        user_id: null,
-        destination: validated.destination,
-        days: validated.days,
-        travelers: validated.travelers,
-        start_date: validated.startDate?.toISOString().split("T")[0] || null,
-        end_date: validated.endDate?.toISOString().split("T")[0] || null,
-        children: validated.children || 0,
-        child_ages: validated.childAges || [],
-        has_accessibility_needs: validated.hasAccessibilityNeeds || false,
-        notes: validated.notes || null,
-        ai_plan: validatedResponse,
-        tags,
-        is_private: false,
-        image_url: photo?.url || null,
-        image_photographer: photo?.photographer || null,
-        image_photographer_url: photo?.photographerUrl || null,
-        status: "draft", // Drafts for anonymous users
-        ai_model_used: modelKey,
-      };
+      // ✅ ANONYMOUS USER: Use atomic transaction function (HIGH-1)
+      // This ensures consistency and proper usage logging even for anonymous users
+      const { data, error } = await supabase.rpc(
+        'create_anonymous_itinerary_with_transaction',
+        {
+          p_destination: validated.destination,
+          p_days: validated.days,
+          p_travelers: validated.travelers,
+          p_start_date: validated.startDate?.toISOString().split("T")[0] || null,
+          p_end_date: validated.endDate?.toISOString().split("T")[0] || null,
+          p_children: validated.children || 0,
+          p_child_ages: validated.childAges || [],
+          p_has_accessibility_needs: validated.hasAccessibilityNeeds || false,
+          p_notes: validated.notes || null,
+          p_ai_plan: validatedResponse,
+          p_tags: tags,
+          p_image_url: photo?.url || null,
+          p_image_photographer: photo?.photographer || null,
+          p_image_photographer_url: photo?.photographerUrl || null,
+          p_model_key: modelKey,
+        }
+      );
       
-      const { data, error } = await supabase
-        .from("itineraries")
-        .insert(itineraryData)
-        .select("id")
-        .single();
-      
-      if (error || !data) {
-        console.error("Database save error:", error);
+      if (error || !data?.success) {
+        console.error("Transaction failed:", error || data?.error);
         return {
           success: false,
-          error: "Failed to save itinerary. Please try again or sign in.",
+          error: data?.error || error?.message || "Failed to save itinerary. Please try again or sign in.",
         };
       }
       
-      savedItinerary = data;
+      savedItinerary = { id: data.itinerary_id };
     }
 
     return {
