@@ -2,20 +2,34 @@
 
 **Status:** ✅ ALL CODE COMPLETE - Ready for Deployment  
 **Branch:** `security/critical-vulnerabilities`  
-**Date:** 2025-11-07
+**Date:** 2025-11-09 (Updated)
 
 ---
 
 ## Quick Summary
 
-All **5 critical security vulnerabilities** have been implemented in code and are ready for deployment. This guide walks you through the deployment process.
+All **13 security enhancements** (7 Critical, 3 High, 3 Low) have been implemented in code and are ready for deployment. This guide walks you through the deployment process.
 
 ### What's Fixed
-1. ✅ **Race condition in like system** - Atomic database operation
-2. ✅ **Credit deduction race condition** - Atomic with row-level locking
-3. ✅ **Open redirect vulnerability** - UUID validation
-4. ✅ **SQL injection in search** - LIKE pattern escaping
-5. ✅ **Webhook replay attacks** - Idempotency table
+
+#### Critical Issues (7)
+1. ✅ **CRIT-1: Race condition in like system** - Atomic database operation
+2. ✅ **CRIT-2: Credit deduction race condition** - Atomic with row-level locking
+3. ✅ **CRIT-3: Open redirect vulnerability** - UUID validation in auth flows
+4. ✅ **CRIT-4: SQL injection in search** - LIKE pattern escaping
+5. ✅ **CRIT-5: Webhook replay attacks** - Idempotency table
+6. ✅ **NEW-CRIT-6: Turnstile bypass** - Only bypasses in true local dev
+7. ✅ **NEW-HIGH-4: Prompt injection** - AI-based defense (from main branch)
+
+#### High Priority Issues (3)
+8. ✅ **NEW-HIGH-5: Rate limiting not enforced** - Now called in AI generation
+9. ✅ **NEW-MED-4: UUID validation incomplete** - Added to 6 itinerary functions
+10. ✅ **NEW-MED-5: Webhook error recovery** - Enhanced error handling
+
+#### Low Priority Enhancements (3)
+11. ✅ **LOW-1: Request timeout** - 60s timeout on AI requests
+12. ✅ **LOW-2: IP-based rate limiting** - Combined with user-based limits
+13. ✅ **LOW-3: Security headers** - HTTP security headers added
 
 ---
 
@@ -29,8 +43,11 @@ All **5 critical security vulnerabilities** have been implemented in code and ar
 
 ## Deployment Steps
 
-### Step 1: Deploy Database Migration (Required) ⚠️
+### Step 1: Deploy Database Migrations (Required) ⚠️
 
+**TWO migrations need to be run:**
+
+#### Migration 1: Core Security Fixes
 **Option A: Using Supabase Dashboard (Recommended)**
 1. Go to your Supabase project
 2. Navigate to **SQL Editor**
@@ -39,31 +56,49 @@ All **5 critical security vulnerabilities** have been implemented in code and ar
 5. Click **Run** to execute the migration
 6. Verify success (you should see no errors)
 
-**Option B: Using Supabase CLI**
+**What this creates:**
+- `increment_likes()` function for atomic like counting (CRIT-1)
+- `deduct_credits_atomic()` function for safe credit deduction (CRIT-2)
+- `processed_webhook_events` table for webhook idempotency (CRIT-5)
+- All necessary indexes and RLS policies
+
+#### Migration 2: IP Rate Limiting
+**Using Supabase Dashboard:**
+1. In the same SQL Editor
+2. Create another new query
+3. Copy and paste the entire contents of `supabase/migrations/002_ip_rate_limiting.sql`
+4. Click **Run** to execute the migration
+5. Verify success
+
+**What this creates:**
+- `ip_rate_limits` table for IP-based rate tracking (LOW-2)
+- Indexes for fast IP lookups
+- `cleanup_old_ip_rate_limits()` function for maintenance
+- RLS policies for security
+
+**Option B: Using Supabase CLI (runs both migrations)**
 ```bash
 cd travel-planner
 npx supabase db push
 ```
 
-**What this creates:**
-- `increment_likes()` function for atomic like counting
-- `deduct_credits_atomic()` function for safe credit deduction
-- `processed_webhook_events` table for webhook idempotency
-- All necessary indexes and RLS policies
-
 **Verification:**
 ```sql
 -- Run these queries in Supabase SQL Editor to verify:
 
--- Check if functions exist
+-- Check if all functions exist (should return 3 rows)
 SELECT routine_name 
 FROM information_schema.routines 
-WHERE routine_name IN ('increment_likes', 'deduct_credits_atomic');
+WHERE routine_name IN (
+  'increment_likes', 
+  'deduct_credits_atomic',
+  'cleanup_old_ip_rate_limits'
+);
 
--- Check if table exists
+-- Check if all tables exist (should return 2 rows)
 SELECT table_name 
 FROM information_schema.tables 
-WHERE table_name = 'processed_webhook_events';
+WHERE table_name IN ('processed_webhook_events', 'ip_rate_limits');
 ```
 
 ---
@@ -135,11 +170,13 @@ After deployment, run these verification tests:
 4. Check your credit balance
 5. **Expected:** Balance should be exactly 0.00 (never negative)
 
-#### Test 3: UUID Validation (CRIT-3)
+#### Test 3: UUID Validation (CRIT-3 + NEW-MED-4)
 1. Try to sign up with URL: `/auth/callback?itineraryId=<script>alert(1)</script>`
 2. **Expected:** Script should not execute, itineraryId should be ignored
 3. Try with: `/auth/callback?itineraryId=../../etc/passwd`
 4. **Expected:** Path traversal attempt should be blocked
+5. Try accessing: `/api/itineraries/not-a-uuid`
+6. **Expected:** Should return "Invalid itinerary ID" error
 
 #### Test 4: Search Pattern (CRIT-4)
 1. Search for destinations with input: `%`
@@ -147,12 +184,42 @@ After deployment, run these verification tests:
 3. Search with input: `Paris%`
 4. **Expected:** Should treat `%` as literal character, not wildcard
 
-#### Test 5: Webhook Idempotency (CRIT-5)
+#### Test 5: Webhook Idempotency (CRIT-5 + NEW-MED-5)
 1. Use Stripe CLI to send a test webhook
 2. Send the same webhook again
 3. **Expected:** Second webhook should return `already_processed`
 4. Check database: `SELECT * FROM processed_webhook_events`
 5. **Expected:** Event should appear only once
+
+#### Test 6: Turnstile Bypass (NEW-CRIT-6)
+1. Deploy to a Vercel preview environment
+2. Try to generate an itinerary
+3. **Expected:** Should require Turnstile verification (not bypass)
+4. On localhost, should still bypass for development
+
+#### Test 7: Rate Limiting (NEW-HIGH-5 + LOW-2)
+1. Try to generate 10 AI itineraries rapidly (within 1 minute)
+2. **Expected:** Should be rate limited based on your tier
+3. From a different IP, try 15 rapid requests
+4. **Expected:** IP should be rate limited (10/hour max for anonymous)
+5. After 3 violations, IP should be temporarily banned
+
+#### Test 8: Request Timeout (LOW-1)
+1. Monitor network tab while generating an itinerary
+2. If AI request takes > 60 seconds
+3. **Expected:** Should timeout and return error (not hang indefinitely)
+
+#### Test 9: Security Headers (LOW-3)
+1. Open DevTools → Network tab
+2. Generate an itinerary
+3. Check response headers
+4. **Expected:** Should see headers like `X-Frame-Options`, `X-Content-Type-Options`, `Strict-Transport-Security`, etc.
+
+#### Test 10: Prompt Injection Defense (NEW-HIGH-4)
+1. Try to generate an itinerary with destination: "kuchnia w Warszawie" (kitchen in Polish)
+2. **Expected:** Should be blocked with security violation message
+3. Try with destination: "Paris for brothels"
+4. **Expected:** Should be blocked with content policy violation
 
 ---
 
@@ -228,16 +295,30 @@ DROP TABLE IF EXISTS processed_webhook_events;
 
 ## Post-Deployment Checklist
 
-- [ ] Database migration executed successfully
+### Database & Environment
+- [ ] Migration 001_security_fixes.sql executed successfully
+- [ ] Migration 002_ip_rate_limiting.sql executed successfully
 - [ ] `SUPABASE_SERVICE_ROLE_KEY` set in all environments
 - [ ] Code deployed to production
-- [ ] Test 1 (Likes) passed
-- [ ] Test 2 (Credits) passed
-- [ ] Test 3 (UUID validation) passed
-- [ ] Test 4 (Search patterns) passed
-- [ ] Test 5 (Webhooks) passed
+
+### Critical Tests (Must Pass)
+- [ ] Test 1 (Likes - CRIT-1) passed
+- [ ] Test 2 (Credits - CRIT-2) passed
+- [ ] Test 3 (UUID validation - CRIT-3 + MED-4) passed
+- [ ] Test 4 (Search patterns - CRIT-4) passed
+- [ ] Test 5 (Webhooks - CRIT-5 + MED-5) passed
+- [ ] Test 6 (Turnstile - NEW-CRIT-6) passed
+- [ ] Test 7 (Rate limiting - HIGH-5 + LOW-2) passed
+- [ ] Test 8 (Timeout - LOW-1) passed
+- [ ] Test 9 (Security headers - LOW-3) passed
+- [ ] Test 10 (Prompt injection - HIGH-4) passed
+
+### Monitoring
 - [ ] No error rate increase detected
 - [ ] No negative credit balances found
+- [ ] No IP bans on legitimate users
+- [ ] Webhook processing working correctly
+- [ ] Security headers delivering on all routes
 - [ ] Monitoring alerts configured
 - [ ] Team notified of changes
 - [ ] Documentation updated
@@ -282,21 +363,45 @@ If you encounter issues during deployment:
 
 ## Summary
 
-✅ **What you did:**
-- Deployed atomic database operations to prevent race conditions
-- Added UUID validation to prevent injection attacks
-- Added LIKE pattern escaping to prevent SQL injection
-- Added webhook idempotency to prevent duplicate processing
+✅ **What you did (13 security enhancements):**
+
+**Critical Vulnerabilities Fixed:**
+- Deployed atomic database operations to prevent race conditions (CRIT-1, CRIT-2)
+- Added UUID validation to prevent injection attacks (CRIT-3, MED-4)
+- Added LIKE pattern escaping to prevent SQL injection (CRIT-4)
+- Added webhook idempotency to prevent duplicate processing (CRIT-5)
+- Fixed Turnstile bypass in preview environments (NEW-CRIT-6)
+- Implemented AI-based prompt injection defense (NEW-HIGH-4)
+
+**Security Enhancements:**
+- Enforced rate limiting on AI generation (NEW-HIGH-5)
+- Enhanced webhook error recovery (NEW-MED-5)
+- Added request timeout protection (LOW-1)
+- Implemented IP-based rate limiting with progressive bans (LOW-2)
+- Added HTTP security headers (LOW-3)
 
 ✅ **Why it matters:**
 - Users can no longer bypass payment through race conditions
-- Auth system is protected from malicious redirects
-- Search is protected from pattern injection
-- Payment webhooks are protected from duplicate processing
+- Bot attacks are prevented with Turnstile + IP rate limiting
+- Prompt injection blocked in any language (AI-based detection)
+- Auth system protected from malicious redirects
+- Search protected from pattern injection
+- Payment webhooks protected from duplicate processing
+- System resources protected from hanging requests
+- Application secured with HTTP security headers
+
+✅ **Security Layers Active:**
+1. Bot Protection (Turnstile + IP rate limiting)
+2. Prompt Injection Defense (AI-based, multi-language)
+3. Payment Protection (atomic operations, webhook idempotency)
+4. Race Condition Prevention (database-level locking)
+5. Input Validation (UUID, LIKE patterns, Zod schemas)
+6. Security Headers (XSS, clickjacking, MIME sniffing)
+7. Request Timeout Protection (resource management)
 
 ✅ **What's next:**
 - Monitor the system for 24-48 hours
-- Address remaining HIGH priority items (see SECURITY_IMPROVEMENTS.md)
+- Address remaining optional enhancements (HIGH-1, MED-1, MED-2, MED-3)
 - Implement comprehensive integration tests
 
 ---
