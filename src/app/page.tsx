@@ -56,6 +56,7 @@ export default function Home() {
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [openDayIndex, setOpenDayIndex] = useState<number | null>(null);
   const [hasCreatedPlanWhileLoggedOut, setHasCreatedPlanWhileLoggedOut] = useState(false);
+  const [formResetKey, setFormResetKey] = useState(0);
   const queryClient = useQueryClient();
   const galleryRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLDivElement>(null);
@@ -476,6 +477,10 @@ export default function Home() {
           }, 500);
           scrollTimeoutRefs.current.push(authScrollTimeout);
         }
+        
+        // Reset the form to allow creating another itinerary
+        // Increment the key to force form remount and clear all fields
+        setFormResetKey(prev => prev + 1);
 
         // NO auto-redirect - let user see preview first
         // They can click the banner buttons to sign in if needed
@@ -799,7 +804,7 @@ export default function Home() {
 
             <div className="mt-5">
               <ItineraryFormAIEnhanced
-                key={`form-${isAuthenticated}`}
+                key={`form-${isAuthenticated}-${formResetKey}`}
                 onSubmit={handleSubmit}
                 isLoading={mutation.isPending}
                 modelOverride="anthropic/claude-3.5-haiku"
