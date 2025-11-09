@@ -58,32 +58,6 @@ export async function extractTravelInfoWithAI(
   }
 
   try {
-    // ========================================
-    // NO REGEX VALIDATION - 100% AI-BASED SECURITY
-    // ========================================
-    // We rely ENTIRELY on AI security instructions to detect:
-    // - Prompt injection attempts (in ANY language)
-    // - Inappropriate content (sexual, drugs, violence, hate speech)
-    // - Invalid destinations (household items, fictional places)
-    // 
-    // Why no regex?
-    // 1. Attacks can be in any language: "ignore instructions", "ignoruj instrukcje", "ignorar instrucciones"
-    // 2. Creative bypasses: "i-g-n-o-r-e", "ıgnore" (Turkish i), etc.
-    // 3. AI understands context and intent far better than patterns
-    // 4. Simpler, more maintainable system
-    //
-    // Security is enforced through:
-    // - Hardened AI prompts with explicit security instructions
-    // - AI destination validation after extraction
-    // - AI content policy enforcement during generation
-
-    // ========================================
-    // EXTRACTION + CONTENT POLICY CHECK
-    // ========================================
-    // 1. Extract information (translate to English)
-    // 2. Check for inappropriate content in the FULL text
-    // 3. Destination validation happens separately via validateDestinationWithAI()
-    
     const securityInstructions = getSecuritySystemInstructions();
     
     const prompt = `You are a multilingual travel planning assistant. Your task is to:
@@ -301,16 +275,8 @@ Return JSON in this EXACT format (all fields required):
       };
     }
     
-    // Validate with Zod schema
     const validated = extractionSchema.parse(parsed);
     
-    // ========================================
-    // LAYER 2: POST-EXTRACTION DESTINATION VALIDATION
-    // ========================================
-    
-    // If we extracted a destination, ALWAYS validate it with AI
-    // We rely ENTIRELY on AI validation (language-agnostic, understands context)
-    // NO regex patterns - they can't predict all languages and cases
     if (validated.destination) {
       const aiDestinationValidation = await validateDestinationWithAI(
         validated.destination,
@@ -336,17 +302,11 @@ Return JSON in this EXACT format (all fields required):
     
     return validated;
   } catch (error) {
-    console.error("=== AI EXTRACTION ERROR ===");
-    console.error("Model used:", model);
-    console.error("Description:", description);
-    console.error("Error details:", error);
-    if (error instanceof Error) {
-      console.error("Error message:", error.message);
-      console.error("Error stack:", error.stack);
-    }
-    console.error("==========================");
-    
-    // Return empty extraction on error (fallback to regex extraction)
+    console.error("AI extraction error:", {
+      model,
+      description: description.substring(0, 100),
+      error: error instanceof Error ? error.message : error
+    });
     return {
       destination: null,
       days: null,
