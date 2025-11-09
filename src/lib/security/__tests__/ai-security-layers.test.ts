@@ -14,8 +14,7 @@ import { describe, it, expect } from 'vitest';
 import { 
   buildDestinationValidationPrompt,
   getSecuritySystemInstructions,
-  logSecurityIncident,
-  type DestinationValidationResult 
+  logSecurityIncident
 } from '../prompt-injection-defense';
 
 // ============================================================================
