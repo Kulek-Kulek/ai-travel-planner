@@ -1,10 +1,19 @@
 /**
- * Unit Tests for Security System
- * Tests all 7 security categories with multilingual support
+ * @deprecated This test file is DEPRECATED and will be removed.
+ * 
+ * These tests were for the old regex-based validateUserInput() function
+ * which has been removed in favor of 100% AI-based security.
+ * 
+ * NEW TESTS ARE IN:
+ * - ai-security-layers.test.ts (Unit tests for all 3 layers)
+ * - ai-security-integration.test.ts (Integration tests)
+ * 
+ * This file is kept temporarily for reference only.
+ * The validateUserInput() function no longer exists.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
-import { validateUserInput, getSecuritySystemInstructions } from '../prompt-injection-defense';
+import { describe, it, expect } from 'vitest';
+import { getSecuritySystemInstructions } from '../prompt-injection-defense';
 
 describe('Security System - Comprehensive Tests', () => {
   
