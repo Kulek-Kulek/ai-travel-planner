@@ -177,6 +177,9 @@ export const ItineraryFormAIEnhanced = ({
   const watchStartDate = form.watch("startDate");
   const watchEndDate = form.watch("endDate");
   const watchNotes = form.watch("notes");
+  const watchDestination = form.watch("destination");
+  const watchDays = form.watch("days");
+  const watchTravelers = form.watch("travelers");
 
   // Track typing activity to prevent scroll interruption
   useEffect(() => {
@@ -185,6 +188,7 @@ export const ItineraryFormAIEnhanced = ({
   }, [watchNotes]);
 
   // AI-powered extraction with debouncing
+  // Re-analyzes when notes OR any manual input changes
   useEffect(() => {
     // Clear existing timeout
     if (extractionTimeout) {
@@ -315,7 +319,7 @@ export const ItineraryFormAIEnhanced = ({
       if (timeout) clearTimeout(timeout);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watchNotes]); // Only depend on watchNotes to trigger extraction
+  }, [watchNotes, watchDestination, watchDays, watchTravelers, watchChildren, watchStartDate, watchEndDate]); // Re-analyze when any input changes
 
   // Auto-scroll to submit button when AI extraction completes and form is valid
   useEffect(() => {
