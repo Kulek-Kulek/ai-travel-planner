@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
 
     // CRIT-5 fix: Mark event as processed AFTER successful handling
     // Reuse the supabase client from above
-    await supabase
+    const { error: insertError } = await supabase
       .from('processed_webhook_events')
       .insert({
         stripe_event_id: event.id,
@@ -123,6 +123,25 @@ export async function POST(request: NextRequest) {
         processed_at: new Date().toISOString(),
         api_version: event.api_version,
       });
+
+    if (insertError) {
+      // CRITICAL: Event was processed but couldn't mark as complete
+      // This could lead to duplicate processing on retry
+      console.error('⚠️ CRITICAL: Webhook processed but failed to mark as complete:', {
+        eventId: event.id,
+        eventType: event.type,
+        error: insertError.message,
+        code: insertError.code,
+      });
+      
+      // Return success to prevent Stripe retry (which would cause duplicates)
+      // Manual intervention may be needed to check if credit was added
+      return NextResponse.json({ 
+        received: true, 
+        status: 'processed_but_not_recorded',
+        warning: 'Processing succeeded but recording failed - manual verification recommended'
+      });
+    }
 
     return NextResponse.json({ received: true, status: 'processed' });
   } catch (error) {

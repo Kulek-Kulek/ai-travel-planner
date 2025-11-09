@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import type { ModelKey } from '@/lib/config/pricing-models';
-import { escapeLikePattern } from '@/lib/utils/validation';
+import { escapeLikePattern, isValidUUID } from '@/lib/utils/validation';
 
 // AI Plan structure
 export type AIPlan = {
@@ -362,6 +362,11 @@ export async function getMyItineraries(): Promise<ActionResult<Itinerary[]>> {
  */
 export async function getItinerary(id: string): Promise<ActionResult<Itinerary>> {
   try {
+    // Validate UUID format
+    if (!isValidUUID(id)) {
+      return { success: false, error: 'Invalid itinerary ID' };
+    }
+    
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     
@@ -396,6 +401,11 @@ export async function updateItineraryPrivacy(
   isPrivate: boolean
 ): Promise<ActionResult<void>> {
   try {
+    // Validate UUID format
+    if (!isValidUUID(id)) {
+      return { success: false, error: 'Invalid itinerary ID' };
+    }
+    
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     
@@ -429,6 +439,11 @@ export async function updateItineraryStatus(
   status: 'draft' | 'published' | 'active' | 'completed'
 ): Promise<ActionResult<void>> {
   try {
+    // Validate UUID format
+    if (!isValidUUID(id)) {
+      return { success: false, error: 'Invalid itinerary ID' };
+    }
+    
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     
@@ -465,6 +480,11 @@ export async function updateItinerary(
   }
 ): Promise<ActionResult<void>> {
   try {
+    // Validate UUID format
+    if (!isValidUUID(id)) {
+      return { success: false, error: 'Invalid itinerary ID' };
+    }
+    
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     
@@ -495,6 +515,11 @@ export async function updateItinerary(
  */
 export async function deleteItinerary(id: string): Promise<ActionResult<void>> {
   try {
+    // Validate UUID format
+    if (!isValidUUID(id)) {
+      return { success: false, error: 'Invalid itinerary ID' };
+    }
+    
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     
@@ -527,6 +552,11 @@ export async function deleteItinerary(id: string): Promise<ActionResult<void>> {
  */
 export async function likeItinerary(id: string): Promise<ActionResult<number>> {
   try {
+    // Validate UUID format
+    if (!isValidUUID(id)) {
+      return { success: false, error: 'Invalid itinerary ID' };
+    }
+    
     const supabase = await createClient();
     
     // Use Supabase RPC for atomic increment (prevents race conditions)

@@ -9,12 +9,14 @@ export async function verifyTurnstileToken(token: string, ip?: string): Promise<
 
   if (!secretKey) {
     console.error('❌ TURNSTILE_SECRET_KEY is not configured');
-    // Allow bypass in development/preview environments when not configured
-    const isDevelopment = process.env.NODE_ENV === 'development' || process.env.VERCEL_ENV === 'preview';
-    if (isDevelopment) {
-      console.warn('⚠️ Turnstile bypassed for development/preview environment');
+    // ONLY bypass in true local development (not preview, not production)
+    const isLocalDevelopment = process.env.NODE_ENV === 'development' && !process.env.VERCEL_ENV;
+    if (isLocalDevelopment) {
+      console.warn('⚠️ Turnstile bypassed for LOCAL development only');
       return true;
     }
+    // Fail closed for all deployed environments (preview and production)
+    console.error('🚫 Turnstile verification FAILED - missing secret key in deployed environment');
     return false;
   }
 
