@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Sparkles, ArrowRight, X, Compass, RefreshCw, LogIn } from "lucide-react";
+import { Sparkles, ArrowRight, Compass, RefreshCw, LogIn } from "lucide-react";
 import Link from "next/link";
 import { getUserTravelProfile } from "@/lib/actions/profile-ai-actions";
 import { getUser } from "@/lib/actions/auth-actions";
@@ -64,13 +64,6 @@ export function TravelPersonalityBanner() {
   if (bannerState === 'not-authenticated') {
     return (
       <div className="mb-8 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 rounded-2xl shadow-xl overflow-hidden">
-        <button
-          onClick={handleDismiss}
-          className="absolute top-4 right-4 text-white/70 hover:text-white transition-colors z-10"
-          aria-label="Dismiss"
-        >
-          <X className="w-5 h-5" />
-        </button>
         <div className="p-6 sm:p-8 relative">
           <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
             <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
@@ -121,13 +114,6 @@ export function TravelPersonalityBanner() {
   if (bannerState === 'no-profile') {
     return (
       <div className="mb-8 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 rounded-2xl shadow-xl overflow-hidden pr-0 lg:pr-20 relative">
-        <button
-          onClick={handleDismiss}
-          className="absolute top-4 right-4 text-white/70 hover:text-white transition-colors z-10"
-          aria-label="Dismiss"
-        >
-          <X className="w-5 h-5" />
-        </button>
         <div className="p-6 sm:p-8">
           <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
             <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
@@ -178,13 +164,7 @@ export function TravelPersonalityBanner() {
   if (bannerState === 'has-profile' && profile) {
     return (
       <div className="mb-8 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 rounded-2xl shadow-xl overflow-hidden pr-0 lg:pr-20 relative">
-        <button
-          onClick={handleDismiss}
-          className="absolute top-4 right-4 text-white/70 hover:text-white transition-colors z-10"
-          aria-label="Dismiss"
-        >
-          <X className="w-5 h-5" />
-        </button>
+
         <div className="p-6 sm:p-8">
           <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
             <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0">

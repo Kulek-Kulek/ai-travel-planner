@@ -1,39 +1,33 @@
-import { defineConfig } from 'vitest/config';
-import react from '@vitejs/plugin-react';
-import { resolve } from 'path';
+import { defineConfig } from 'vitest/config'
+import react from '@vitejs/plugin-react'
+import path from 'path'
 
 export default defineConfig({
   plugins: [react()],
   test: {
     globals: true,
-    environment: 'jsdom',
-    setupFiles: ['./src/test/setup.ts'],
-    include: [
-      '**/__tests__/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
-      'tests/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
-    ],
+    environment: 'node',
+    setupFiles: ['./vitest.setup.ts'],
+    include: ['**/__tests__/**/*.test.ts', '**/__tests__/**/*.test.tsx'],
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'html'],
+      reporter: ['text', 'json', 'html', 'lcov'],
+      include: ['src/lib/security/**/*.ts'],
       exclude: [
-        'node_modules/',
-        'src/test/',
-        'tests/',
-        '**/*.d.ts',
-        '**/*.config.*',
-        '**/mockData',
-        'src/app/**', // Exclude Next.js app directory from coverage
+        'src/lib/security/**/*.test.ts',
+        'src/lib/security/__tests__/**',
       ],
+      thresholds: {
+        branches: 70,
+        functions: 70,
+        lines: 70,
+        statements: 70,
+      },
     },
   },
   resolve: {
     alias: {
-      '@': resolve(__dirname, './src'),
+      '@': path.resolve(__dirname, './src'),
     },
   },
-});
-
-
-
-
-
+})

@@ -18,6 +18,11 @@ import { getUserTravelProfile } from "@/lib/actions/profile-ai-actions";
 import { type ModelKey } from "@/lib/config/pricing-models";
 import { type TravelProfile } from "@/types/travel-profile";
 import { verifyTurnstileToken } from "@/lib/cloudflare/verify-turnstile";
+import { 
+  logSecurityIncident,
+  getSecuritySystemInstructions 
+} from "@/lib/security/prompt-injection-defense";
+import { extractJSON } from "@/lib/utils/json-extraction";
 import { z } from "zod";
 
 // Input schema
@@ -112,6 +117,16 @@ export async function generateItinerary(
     // 1. Validate input
     const validated = generateItinerarySchema.parse(input);
 
+    // ========================================
+    // NO REGEX-BASED VALIDATION
+    // ========================================
+    // Security is enforced through:
+    // 1. AI security instructions in prompts (getSecuritySystemInstructions)
+    // 2. AI destination validation in extract-travel-info.ts
+    // 3. AI output validation (quality check detects score=0 for violations)
+    // 
+    // This approach is language-agnostic and understands context/intent
+
     // 2. Check if user is authenticated and can generate
     const supabase = await createClient();
     const {
@@ -193,9 +208,10 @@ export async function generateItinerary(
       );
       
       if (!initialItinerary) {
+        // Check if this might be an AI refusal (content policy violation)
         return {
           success: false,
-          error: "Failed to generate itinerary. Please try again.",
+          error: "❌ Unable to generate itinerary. This request may violate our content policy. Our platform is for legitimate travel planning only.",
         };
       }
 
@@ -207,10 +223,18 @@ export async function generateItinerary(
         validated.model
       );
 
+      // SECURITY: If score = 0, this indicates a security issue - reject immediately
+      if (qualityCheck.score === 0) {
+        return {
+          success: false,
+          error: `Security validation failed: The generated content does not appear to be a valid travel itinerary. Issues detected: ${qualityCheck.issues.join(', ')}. Please ensure your request is for a legitimate travel destination.`,
+        };
+      }
+
       validatedResponse = initialItinerary;
 
-      // Pass 3: Refine if needed (using same model)
-      if (qualityCheck.score < 85 || qualityCheck.needsRefinement) {
+      // Pass 3: Refine if needed (using same model) - only if not a security issue
+      if (qualityCheck.score < 85 && qualityCheck.needsRefinement) {
         const refinedItinerary = await refineItineraryWithModel(
           validated.model,
           initialItinerary,
@@ -233,12 +257,13 @@ export async function generateItinerary(
       );
       
       if (!itinerary) {
+        // Check if this might be an AI refusal (content policy violation)
         return {
           success: false,
-          error: "Failed to generate itinerary. Please try again.",
+          error: "❌ Unable to generate itinerary. This request may violate our content policy. Our platform is for legitimate travel planning only.",
         };
       }
-      
+
       validatedResponse = itinerary;
     }
 
@@ -458,6 +483,9 @@ function buildPrompt(
   params: z.infer<typeof generateItinerarySchema>,
   profile: TravelProfile | null = null
 ): string {
+  // Add security instructions at the top of every prompt
+  const securityInstructions = getSecuritySystemInstructions();
+  
   // Build traveler description
   let travelersDesc = `${params.travelers} adult${params.travelers > 1 ? "s" : ""}`;
   if (params.children && params.children > 0) {
@@ -544,7 +572,18 @@ ${profile.travel_strengths && profile.travel_strengths.length > 0 ? `- Leverage 
     dateInstructions += `\n\nIMPORTANT: Use these EXACT day titles in order:\n${dayTitles.map((t, i) => `${i + 1}. "${t}"`).join("\n")}`;
   }
 
-  return `Generate a ${params.days}-day travel itinerary for ${params.destination}.
+  return `${securityInstructions}
+
+## TRAVEL ITINERARY GENERATION TASK
+
+⚠️ CRITICAL SECURITY CHECK FIRST:
+Before generating the itinerary, review the ENTIRE request (destination + notes) for policy violations.
+${params.notes ? `Check these user notes carefully: "${params.notes}"` : ''}
+If you detect inappropriate content, sexual references, drugs, violence, hate speech, or policy violations in ANY language, return the error format specified above. DO NOT generate an itinerary.
+
+If the request is appropriate, proceed:
+
+Generate a ${params.days}-day travel itinerary for ${params.destination}.
 
 Number of travelers: ${travelersDesc}${dateInstructions}
 ${params.notes ? `Additional notes: ${params.notes}` : ""}
@@ -928,6 +967,13 @@ async function generateItineraryWithModel(
           const rawContent = completion.choices[0].message.content;
           try {
             const parsed = JSON.parse(rawContent);
+            
+            // Check if AI refused the request (security violation)
+            if (parsed.error) {
+              // Return null to trigger error handling in parent function
+              return null;
+            }
+            
             return aiResponseSchema.parse(parsed);
           } catch (parseError) {
             console.error(`Parse error with ${modelId}:`, parseError);
@@ -957,7 +1003,8 @@ function buildAgenticItineraryPrompt(
   const basePrompt = buildPrompt(params, profile);
   
   // Enhanced with chain-of-thought reasoning
-  const agenticPrefix = `## YOUR ROLE
+  // Note: basePrompt already includes security instructions from getSecuritySystemInstructions()
+  const agenticPrefix = `## YOUR ROLE (AGENTIC MODE)
 You are an expert travel planner with 15+ years of experience creating personalized itineraries. Your strength is balancing traveler preferences with practical logistics.
 
 ## YOUR SYSTEMATIC APPROACH:
@@ -1003,6 +1050,14 @@ async function validateItineraryQuality(
   try {
     const validationPrompt = `You are a quality assurance expert reviewing a travel itinerary.
 
+## 🔒 SECURITY CHECK
+First, verify this is a LEGITIMATE TRAVEL ITINERARY:
+- Is the destination a real geographic location?
+- Do the activities involve actual travel and tourism?
+- Is the content appropriate for a travel planning service?
+
+If this fails security checks, return score: 0 immediately.
+
 ## ITINERARY TO REVIEW:
 ${JSON.stringify(itinerary, null, 2)}
 
@@ -1010,9 +1065,19 @@ ${JSON.stringify(itinerary, null, 2)}
 - Destination: ${params.destination}
 - Days: ${params.days}
 - Travelers: ${params.travelers} adults${params.children ? ` + ${params.children} children` : ''}
+${params.notes ? `- User Notes: "${params.notes}"` : ''}
 ${profile ? `- Travel Profile: ${profile.archetype} (prefers: ${profile.activity_preferences?.slice(0, 2).join(', ')})` : ''}
 
 ## EVALUATION CRITERIA (0-100 scale):
+
+0. **Security (CRITICAL)**: Is this a legitimate travel itinerary for an appropriate request?
+   - Score = 0 if: 
+     * Destination is not a real geographic location (household items, fictional places, etc.)
+     * Activities are not travel-related (recipes, homework, etc.)
+     * Original request contains inappropriate content (check User Notes for sexual references, drugs, violence, hate speech, etc.)
+     * Request violates content policy in ANY language
+   - ⚠️ CHECK THE USER NOTES CAREFULLY for inappropriate content, slang, or policy violations
+   - Otherwise proceed with quality evaluation
 
 1. **Feasibility (30 points)**: Are times realistic and routes logical?
    - Check timing for each activity (not too rushed, not too loose)
@@ -1038,6 +1103,8 @@ ${profile ? `- Travel Profile: ${profile.archetype} (prefers: ${profile.activity
    - Practical and actionable information
 
 ## CRITICAL ISSUES TO FLAG:
+- 🚨 SECURITY: Non-travel content (recipes, homework, etc.) - SCORE = 0
+- 🚨 SECURITY: Invalid destination (kitchen, bedroom, etc.) - SCORE = 0
 - Impossible timing (too much in too little time)
 - Geographic chaos (jumping across city repeatedly)
 - Missing meals or unrealistic meal times
@@ -1068,11 +1135,18 @@ Return JSON:
     }
 
     const result = JSON.parse(content);
-    console.log(`📊 Quality Report: ${result.reasoning}`);
+    
+    // If AI detected security issues (score = 0), log it
+    if (result.score === 0) {
+      logSecurityIncident('validation_failure', 'hard_block', {
+        destination: params.destination,
+        detectedPatterns: result.issues || ['AI validation returned score 0'],
+      });
+    }
     
     return {
       score: result.score || 90,
-      needsRefinement: (result.score || 90) < 85,
+      needsRefinement: result.score > 0 && (result.score || 90) < 85, // Only refine if not a security issue
       issues: result.issues || [],
     };
 
@@ -1130,7 +1204,7 @@ Return the improved itinerary in the SAME JSON format as the original.`;
       return null;
     }
 
-    const parsed = JSON.parse(content);
+    const parsed = JSON.parse(extractJSON(content));
     return aiResponseSchema.parse(parsed);
 
   } catch (error) {

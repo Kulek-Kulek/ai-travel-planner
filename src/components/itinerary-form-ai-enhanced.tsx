@@ -18,6 +18,7 @@ import { format, differenceInDays, isBefore, startOfDay } from "date-fns";
 import Link from "next/link";
 import { Calendar as CalendarIcon, CheckCircle2, AlertCircle, Sparkles, Lock, Info } from "lucide-react";
 import { Turnstile } from "@marsidev/react-turnstile";
+import { SecurityAlertDialog } from "@/components/security-alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -140,6 +141,9 @@ export const ItineraryFormAIEnhanced = ({
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractionTimeout, setExtractionTimeout] = useState<NodeJS.Timeout | null>(null);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [showSecurityAlert, setShowSecurityAlert] = useState(false);
+  const [securityAlertMessage, setSecurityAlertMessage] = useState<string>("");
+  const [hasSecurityViolation, setHasSecurityViolation] = useState(false);
   
   // Ref for the submit button to enable auto-scroll
   const submitButtonRef = useRef<HTMLButtonElement>(null);
@@ -160,6 +164,8 @@ export const ItineraryFormAIEnhanced = ({
   const form = useForm<ItineraryFormData>({
     resolver: zodResolver(itineraryFormSchema),
     defaultValues: defaultFormValues,
+    mode: "onChange", // Validate on every change
+    reValidateMode: "onChange", // Re-validate on every change
   });
 
   const watchChildren = form.watch("children");
@@ -183,6 +189,7 @@ export const ItineraryFormAIEnhanced = ({
     // Don't extract if too short
     if (!watchNotes || watchNotes.trim().length < 10) {
       setExtractedInfo(null);
+      setHasSecurityViolation(false); // Reset security flag when notes are cleared/too short
       return;
     }
 
@@ -195,56 +202,97 @@ export const ItineraryFormAIEnhanced = ({
         const extracted = modelOverride 
           ? await extractTravelInfoWithAI(watchNotes, modelOverride)
           : await extractTravelInfoWithAI(watchNotes);
-        setExtractedInfo(extracted);
+        
+        // Check if there's a security error
+        // IMPORTANT: Security detection and field extraction are SEPARATE features
+        // We ALWAYS prefill fields even if security issues are detected
+        // Security only blocks itinerary generation, NOT field prefilling
+        let extractedData = extracted;
+        if ('securityError' in extracted && extracted.securityError) {
+          // Show security alert modal
+          setSecurityAlertMessage(extracted.securityError);
+          setShowSecurityAlert(true);
+          setHasSecurityViolation(true); // Flag that this request has security issues
+          
+          // CRITICAL FIX: Remove securityError from the extracted object before saving
+          // This allows the extracted fields to be used for prefilling while keeping
+          // the security flag separate for blocking generation
+          const { securityError: _securityError, ...extractedWithoutError } = extracted;
+          extractedData = extractedWithoutError;
+          // NOTE: We do NOT return here - continue with field filling logic below
+        } else {
+          // Clear security violation flag if extraction succeeded without errors
+          setHasSecurityViolation(false);
+        }
+        
+        setExtractedInfo(extractedData);
 
         // Auto-fill fields if they're empty
-        if (extracted.destination && !form.getValues("destination")) {
-          form.setValue("destination", extracted.destination, { shouldValidate: false });
+        if (extractedData.destination && !form.getValues("destination")) {
+          form.setValue("destination", extractedData.destination, { shouldValidate: true });
         }
-        if (extracted.days && !form.getValues("days")) {
-          form.setValue("days", extracted.days, { shouldValidate: false });
+        if (extractedData.days && !form.getValues("days")) {
+          form.setValue("days", extractedData.days, { shouldValidate: true });
         }
-        if (extracted.travelers && form.getValues("travelers") === 1) {
-          form.setValue("travelers", extracted.travelers, { shouldValidate: false });
+        if (extractedData.travelers && form.getValues("travelers") === 1) {
+          form.setValue("travelers", extractedData.travelers, { shouldValidate: true });
         }
-        if (extracted.children && !form.getValues("children")) {
-          form.setValue("children", extracted.children, { shouldValidate: false });
+        if (extractedData.children && !form.getValues("children")) {
+          form.setValue("children", extractedData.children, { shouldValidate: true });
         }
         
         // Pre-fill child ages if extracted
-        if (extracted.childAges && extracted.childAges.length > 0 && !form.getValues("childAges")?.length) {
-          form.setValue("childAges", extracted.childAges, { shouldValidate: false });
-          setChildAgesInput(extracted.childAges.map(age => age.toString()));
+        if (extractedData.childAges && extractedData.childAges.length > 0 && !form.getValues("childAges")?.length) {
+          form.setValue("childAges", extractedData.childAges, { shouldValidate: true });
+          setChildAgesInput(extractedData.childAges.map(age => age.toString()));
         }
         
-        if (extracted.hasAccessibilityNeeds) {
-          form.setValue("hasAccessibilityNeeds", true, { shouldValidate: false });
+        if (extractedData.hasAccessibilityNeeds) {
+          form.setValue("hasAccessibilityNeeds", true, { shouldValidate: true });
         }
 
         // Parse and set dates if provided
-        if (extracted.startDate && !form.getValues("startDate")) {
+        if (extractedData.startDate && !form.getValues("startDate")) {
           try {
-            const startDate = new Date(extracted.startDate);
+            const startDate = new Date(extractedData.startDate);
             if (!isNaN(startDate.getTime())) {
-              form.setValue("startDate", startDate, { shouldValidate: false });
+              form.setValue("startDate", startDate, { shouldValidate: true });
             }
           } catch (error) {
-            console.error("Failed to parse startDate:", extracted.startDate, error);
+            console.error("Failed to parse startDate:", extractedData.startDate, error);
           }
         }
-        if (extracted.endDate && !form.getValues("endDate")) {
+        if (extractedData.endDate && !form.getValues("endDate")) {
           try {
-            const endDate = new Date(extracted.endDate);
+            const endDate = new Date(extractedData.endDate);
             if (!isNaN(endDate.getTime())) {
-              form.setValue("endDate", endDate, { shouldValidate: false });
+              form.setValue("endDate", endDate, { shouldValidate: true });
             }
           } catch (error) {
-            console.error("Failed to parse endDate:", extracted.endDate, error);
+            console.error("Failed to parse endDate:", extractedData.endDate, error);
           }
         }
         
-        // Trigger validation after all fields are set to update isValid state
-        await form.trigger();
+        // Check if critical fields are missing after extraction
+        const hasDestination = extractedData.destination || form.getValues("destination");
+        const hasDays = extractedData.days || (form.getValues("days") && form.getValues("days") > 0);
+        const missingCriticalFields = !hasDestination || !hasDays;
+        
+        // Auto-open detailed fields if critical information is missing
+        if (missingCriticalFields && !showDetailedFields) {
+          setShowDetailedFields(true);
+          
+          // Show helpful message
+          toast.info("Please complete the missing information", {
+            description: "We need a bit more detail about your destination and trip length",
+          });
+        }
+        
+        // Force validation refresh after extraction
+        // This ensures error messages clear when fields become valid
+        setTimeout(() => {
+          form.trigger();
+        }, 100);
       } catch (error) {
         console.error("Extraction error:", error);
         toast.error("Failed to analyze your description", {
@@ -265,8 +313,8 @@ export const ItineraryFormAIEnhanced = ({
 
   // Auto-scroll to submit button when AI extraction completes and form is valid
   useEffect(() => {
-    // Only scroll when extraction finishes (isExtracting becomes false), we have extracted info, and form is valid
-    if (!isExtracting && extractedInfo && submitButtonRef.current && form.formState.isValid) {
+    // Only scroll when extraction finishes (isExtracting becomes false), we have extracted info, form is valid, and NO security violations
+    if (!isExtracting && extractedInfo && submitButtonRef.current && form.formState.isValid && !hasSecurityViolation) {
       // Record when this effect starts (when extraction completes)
       const extractionCompleteTime = Date.now();
       
@@ -291,7 +339,7 @@ export const ItineraryFormAIEnhanced = ({
         clearTimeout(scrollTimeout);
       };
     }
-  }, [isExtracting, extractedInfo, form.formState.isValid]);
+  }, [isExtracting, extractedInfo, form.formState.isValid, hasSecurityViolation]);
 
   // Auto-calculate days when dates are selected, BUT only if days weren't already extracted from description
   useEffect(() => {
@@ -329,6 +377,17 @@ export const ItineraryFormAIEnhanced = ({
   }, [watchChildren, form]);
 
   const handleFormSubmit = (data: ItineraryFormData) => {
+    // CRITICAL SECURITY CHECK: Block if security violation was detected during extraction
+    // We trust the AI to detect inappropriate content in any language
+    // No hardcoded word lists - AI understands context and intent
+    if (hasSecurityViolation) {
+      setSecurityAlertMessage(
+        "❌ Security Violation: The description you provided contains inappropriate content that violates our content policy. Please revise your travel request to use appropriate language."
+      );
+      setShowSecurityAlert(true);
+      return;
+    }
+
     // Check for Turnstile token (bot protection)
     if (!turnstileToken) {
       toast.error("Security verification required", {
@@ -575,17 +634,19 @@ export const ItineraryFormAIEnhanced = ({
               </p>
             </div>
 
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-3 md:items-start">
               <FormField
                 control={form.control}
                 name="destination"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="flex flex-col">
                     <FormLabel>Destination <span className="text-red-500">*</span></FormLabel>
                     <FormControl>
                       <Input placeholder="e.g., Paris, France" {...field} disabled={isLoading} />
                     </FormControl>
-                    <FormMessage />
+                    <div className="min-h-[20px]">
+                      <FormMessage />
+                    </div>
                   </FormItem>
                 )}
               />
@@ -594,7 +655,7 @@ export const ItineraryFormAIEnhanced = ({
                 control={form.control}
                 name="days"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="flex flex-col">
                     <FormLabel>Number of Days <span className="text-red-500">*</span></FormLabel>
                     <FormControl>
                       <Input
@@ -609,7 +670,9 @@ export const ItineraryFormAIEnhanced = ({
                         disabled={isLoading}
                       />
                     </FormControl>
-                    <FormMessage />
+                    <div className="min-h-[20px]">
+                      <FormMessage />
+                    </div>
                   </FormItem>
                 )}
               />
@@ -618,7 +681,7 @@ export const ItineraryFormAIEnhanced = ({
                 control={form.control}
                 name="travelers"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="flex flex-col">
                     <FormLabel>Number of adults <span className="text-red-500">*</span></FormLabel>
                     <FormControl>
                       <Input
@@ -630,14 +693,16 @@ export const ItineraryFormAIEnhanced = ({
                         disabled={isLoading}
                       />
                     </FormControl>
-                    <FormMessage />
+                    <div className="min-h-[20px]">
+                      <FormMessage />
+                    </div>
                   </FormItem>
                 )}
               />
             </div>
 
             {/* Date pickers (optional but encouraged) */}
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:items-start">
               <FormField
                 control={form.control}
                 name="startDate"
@@ -679,7 +744,9 @@ export const ItineraryFormAIEnhanced = ({
                         />
                       </PopoverContent>
                     </Popover>
-                    <FormMessage />
+                    <div className="min-h-[20px]">
+                      <FormMessage />
+                    </div>
                   </FormItem>
                 )}
               />
@@ -728,7 +795,9 @@ export const ItineraryFormAIEnhanced = ({
                         />
                       </PopoverContent>
                     </Popover>
-                    <FormMessage />
+                    <div className="min-h-[20px]">
+                      <FormMessage />
+                    </div>
                   </FormItem>
                 )}
               />
@@ -1017,12 +1086,17 @@ export const ItineraryFormAIEnhanced = ({
           ref={submitButtonRef}
           type="submit" 
           className="w-full h-12 text-base" 
-          disabled={isLoading || isExtracting || (hasResult && !isAuthenticated) || !turnstileToken} 
+          disabled={isLoading || isExtracting || (hasResult && !isAuthenticated) || !turnstileToken || hasSecurityViolation} 
           size="lg"
         >
           {isLoading ? (
             <>
               Generating Your Itinerary...
+            </>
+          ) : hasSecurityViolation ? (
+            <>
+              <span className="mr-2">🚫</span>
+              Security Violation Detected
             </>
           ) : (hasResult && !isAuthenticated) ? (
             <>
@@ -1037,6 +1111,14 @@ export const ItineraryFormAIEnhanced = ({
           )}
         </Button>
       </form>
+      
+      {/* Security Alert Modal */}
+      <SecurityAlertDialog
+        open={showSecurityAlert}
+        onOpenChange={setShowSecurityAlert}
+        description={securityAlertMessage}
+        severity="block"
+      />
     </Form>
   );
 };
