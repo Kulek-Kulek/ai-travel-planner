@@ -16,7 +16,7 @@ import {
   checkRateLimit
 } from "@/lib/actions/subscription-actions";
 import { getUserTravelProfile } from "@/lib/actions/profile-ai-actions";
-import { type ModelKey } from "@/lib/config/pricing-models";
+import { type ModelKey, AI_MODELS } from "@/lib/config/pricing-models";
 import { type TravelProfile } from "@/types/travel-profile";
 import { verifyTurnstileToken } from "@/lib/cloudflare/verify-turnstile";
 import { 
@@ -167,7 +167,7 @@ async function mapOpenRouterModelToKey(openRouterModel: string): Promise<ModelKe
       return fallbackKey;
     }
     
-    return modelConfig.pricing_key as ModelKey;
+    return (modelConfig as any).pricing_key as ModelKey;
   } catch (err) {
     console.error('Error fetching model config from database:', err);
     // Ultimate fallback
@@ -426,104 +426,142 @@ export async function generateItinerary(
       }
     }
 
-    const itineraryData = {
-      user_id: user?.id || null, // NULL for anonymous users
-      destination: validated.destination,
-      days: validated.days,
-      travelers: validated.travelers,
-      start_date: validated.startDate?.toISOString().split("T")[0] || null,
-      end_date: validated.endDate?.toISOString().split("T")[0] || null,
-      children: validated.children || 0,
-      child_ages: validated.childAges || [],
-      has_accessibility_needs: validated.hasAccessibilityNeeds || false,
-      notes: validated.notes || null,
-      ai_plan: validatedResponse,
-      tags,
-      is_private: isEditOperation ? existingPrivacy : false, // Preserve privacy on edit, default to public on create
-      image_url: photo?.url || null,
-      image_photographer: photo?.photographer || null,
-      image_photographer_url: photo?.photographerUrl || null,
-      status: isAnonymous ? "draft" : "published", // Drafts for anonymous users
-      ai_model_used: modelKey, // Track which model was used
-    };
-
+    // HIGH-1: Use atomic transaction functions for authenticated users
+    // For anonymous users, use simple insert (no credits involved)
     let savedItinerary: { id: string };
-    let dbError: Error | null = null;
-
-    if (isEditOperation) {
-      // Update existing itinerary
-      const { data, error } = await supabase
-        .from("itineraries")
-        .update(itineraryData)
-        .eq("id", validated.existingItineraryId)
-        .select("id")
-        .single();
+    
+    if (user?.id) {
+      // ✅ AUTHENTICATED USER: Use atomic transaction function
+      // This ensures atomicity: create/update itinerary + deduct credits + log usage
+      // If any step fails, everything rolls back automatically
       
-      savedItinerary = data as { id: string };
-      dbError = error;
+      const modelInfo = AI_MODELS[modelKey];
+      const modelCost = modelInfo.cost;
+      
+      if (isEditOperation) {
+        // Update existing itinerary with transaction
+        const { data, error } = await supabase.rpc(
+          'update_itinerary_with_transaction',
+          {
+            p_user_id: user.id,
+            p_itinerary_id: validated.existingItineraryId!,
+            p_destination: validated.destination,
+            p_days: validated.days,
+            p_travelers: validated.travelers,
+            p_start_date: validated.startDate?.toISOString().split("T")[0] || null,
+            p_end_date: validated.endDate?.toISOString().split("T")[0] || null,
+            p_children: validated.children || 0,
+            p_child_ages: validated.childAges || [],
+            p_has_accessibility_needs: validated.hasAccessibilityNeeds || false,
+            p_notes: validated.notes || null,
+            p_ai_plan: validatedResponse,
+            p_tags: tags,
+            p_image_url: photo?.url || null,
+            p_image_photographer: photo?.photographer || null,
+            p_image_photographer_url: photo?.photographerUrl || null,
+            p_model_key: modelKey,
+            p_model_cost: modelCost,
+            p_operation: validated.operation,
+          }
+        );
+        
+        if (error || !data?.success) {
+          console.error("Transaction failed:", error || data?.error);
+          return {
+            success: false,
+            error: data?.error || error?.message || "Failed to update itinerary",
+          };
+        }
+        
+        savedItinerary = { id: validated.existingItineraryId! };
+        
+      } else {
+        // Create new itinerary with transaction
+        const { data, error } = await supabase.rpc(
+          'create_itinerary_with_transaction',
+          {
+            p_user_id: user.id,
+            p_destination: validated.destination,
+            p_days: validated.days,
+            p_travelers: validated.travelers,
+            p_start_date: validated.startDate?.toISOString().split("T")[0] || null,
+            p_end_date: validated.endDate?.toISOString().split("T")[0] || null,
+            p_children: validated.children || 0,
+            p_child_ages: validated.childAges || [],
+            p_has_accessibility_needs: validated.hasAccessibilityNeeds || false,
+            p_notes: validated.notes || null,
+            p_ai_plan: validatedResponse,
+            p_tags: tags,
+            p_is_private: false, // Default to public for new itineraries
+            p_image_url: photo?.url || null,
+            p_image_photographer: photo?.photographer || null,
+            p_image_photographer_url: photo?.photographerUrl || null,
+            p_status: "published",
+            p_model_key: modelKey,
+            p_model_cost: modelCost,
+            p_operation: validated.operation,
+          }
+        );
+        
+        if (error || !data?.success) {
+          console.error("Transaction failed:", error || data?.error);
+          
+          // Provide user-friendly error messages
+          const errorMsg = data?.error || error?.message || "Failed to create itinerary";
+          if (errorMsg.includes("Insufficient credits")) {
+            return {
+              success: false,
+              error: "Insufficient credits. Please purchase more credits to continue.",
+            };
+          }
+          
+          return {
+            success: false,
+            error: errorMsg,
+          };
+        }
+        
+        savedItinerary = { id: data.itinerary_id };
+      }
+      
     } else {
-      // Insert new itinerary
+      // ❌ ANONYMOUS USER: Simple insert (no transaction needed, no credits)
+      const itineraryData = {
+        user_id: null,
+        destination: validated.destination,
+        days: validated.days,
+        travelers: validated.travelers,
+        start_date: validated.startDate?.toISOString().split("T")[0] || null,
+        end_date: validated.endDate?.toISOString().split("T")[0] || null,
+        children: validated.children || 0,
+        child_ages: validated.childAges || [],
+        has_accessibility_needs: validated.hasAccessibilityNeeds || false,
+        notes: validated.notes || null,
+        ai_plan: validatedResponse,
+        tags,
+        is_private: false,
+        image_url: photo?.url || null,
+        image_photographer: photo?.photographer || null,
+        image_photographer_url: photo?.photographerUrl || null,
+        status: "draft", // Drafts for anonymous users
+        ai_model_used: modelKey,
+      };
+      
       const { data, error } = await supabase
         .from("itineraries")
         .insert(itineraryData)
         .select("id")
         .single();
       
-      savedItinerary = data as { id: string };
-      dbError = error;
-    }
-
-    if (dbError || !savedItinerary) {
-      console.error("Database save error:", dbError);
-      console.error("Error details:", JSON.stringify(dbError, null, 2));
-      console.error("Saved itinerary:", savedItinerary);
-
-      // Provide more specific error messages
-      if (dbError) {
-        const errorMessage = dbError.message || "Unknown database error";
-        console.error("Supabase error message:", errorMessage);
-
-        // Check for common issues
-        if (
-          errorMessage.includes("permission") ||
-          errorMessage.includes("policy")
-        ) {
-          return {
-            success: false,
-            error:
-              "Database permission error. Please check RLS policies or try signing in.",
-          };
-        }
-
-        if (errorMessage.includes("violates")) {
-          return {
-            success: false,
-            error:
-              "Database constraint violation. Please check your input data.",
-          };
-        }
+      if (error || !data) {
+        console.error("Database save error:", error);
+        return {
+          success: false,
+          error: "Failed to save itinerary. Please try again or sign in.",
+        };
       }
-
-      return {
-        success: false,
-        error:
-          "Generated itinerary but failed to save. Please try again or contact support.",
-      };
-    }
-
-    // 8. Record plan generation for authenticated users (tracks usage and credits)
-    if (user?.id) {
-      const recordResult = await recordPlanGeneration(
-        savedItinerary.id,
-        modelKey,
-        validated.operation
-      );
       
-      if (!recordResult.success) {
-        console.error('Failed to record plan generation:', recordResult.error);
-        // Don't fail the whole operation, but log the error
-        // The itinerary is already created, just the tracking failed
-      }
+      savedItinerary = data;
     }
 
     return {
