@@ -287,6 +287,7 @@ export async function canGeneratePlan(
 
 /**
  * Record plan generation and update usage/credits
+ * CRIT-2 fix: Uses atomic database operation to prevent race conditions
  */
 export async function recordPlanGeneration(
   planId: string,
@@ -302,134 +303,26 @@ export async function recordPlanGeneration(
     return { success: false, error: 'User not authenticated' };
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single();
-
-  if (!profile) {
-    return { success: false, error: 'Profile not found' };
-  }
-
-  const tier = (profile.subscription_tier as SubscriptionTier) || 'free';
   const modelInfo = AI_MODELS[model];
   const cost = modelInfo.cost;
 
-  // Calculate updates based on tier
-  const updates: Record<string, string | number> = {
-    last_generation_at: new Date().toISOString(),
-  };
+  // CRIT-2 fix: Call database function for atomic credit deduction
+  // This prevents race conditions by using row-level locking (FOR UPDATE)
+  const { data, error } = await supabase
+    .rpc('deduct_credits_atomic', {
+      p_user_id: user.id,
+      p_cost: cost,
+      p_plan_id: planId,
+      p_model: model,
+      p_operation: operation,
+    });
 
-  switch (tier) {
-    case 'free':
-      if (operation === 'create') {
-        updates.plans_created_count = (profile.plans_created_count || 0) + 1;
-      }
-      break;
-
-    case 'payg':
-      // Deduct credits
-      const newBalance = (Number(profile.credits_balance) || 0) - cost;
-      if (newBalance < 0) {
-        return { success: false, error: 'Insufficient credits' };
-      }
-      updates.credits_balance = newBalance;
-      break;
-
-    case 'pro':
-      if (modelInfo.tier === 'economy') {
-        updates.monthly_economy_used =
-          (profile.monthly_economy_used || 0) + 1;
-      } else {
-        const premiumUsed = profile.monthly_premium_used || 0;
-        const rollover = profile.premium_rollover || 0;
-        const limit = 20 + rollover;
-
-        if (premiumUsed >= limit) {
-          // Use credits
-          const newBalance = (Number(profile.credits_balance) || 0) - 0.2;
-          if (newBalance < 0) {
-            return { success: false, error: 'Insufficient credits' };
-          }
-          updates.credits_balance = newBalance;
-        } else {
-          updates.monthly_premium_used = premiumUsed + 1;
-        }
-      }
-      break;
-  }
-
-  // Update profile
-  const { error: updateError } = await supabase
-    .from('profiles')
-    .update(updates)
-    .eq('id', user.id);
-
-  if (updateError) {
-    console.error('Error updating profile:', updateError);
-    return { success: false, error: 'Failed to update profile' };
-  }
-
-  // Update itinerary record
-  // For edit/regenerate operations, increment the edit_count
-  if (operation === 'edit' || operation === 'regenerate') {
-    // First, get the current edit_count
-    const { data: currentItinerary } = await supabase
-      .from('itineraries')
-      .select('edit_count')
-      .eq('id', planId)
-      .single();
-
-    const oldEditCount = currentItinerary?.edit_count || 0;
-    const newEditCount = oldEditCount + 1;
-
-    const { error: itineraryError } = await supabase
-      .from('itineraries')
-      .update({
-        ai_model_used: model,
-        generation_cost: cost,
-        edit_count: newEditCount,
-      })
-      .eq('id', planId);
-
-    if (itineraryError) {
-      console.error('Error updating itinerary edit_count:', itineraryError);
-    }
-  } else {
-    // For create operations, just set edit_count to 0
-    const { error: itineraryError } = await supabase
-      .from('itineraries')
-      .update({
-        ai_model_used: model,
-        generation_cost: cost,
-        edit_count: 0,
-      })
-      .eq('id', planId);
-
-    if (itineraryError) {
-      console.error('Error updating itinerary:', itineraryError);
-    }
-  }
-
-  // Log usage
-  const { error: logError } = await supabase.from('ai_usage_logs').insert({
-    user_id: user.id,
-    plan_id: planId,
-    ai_model: model,
-    operation,
-    estimated_cost: cost,
-    actual_cost: cost,
-    subscription_tier: tier,
-    credits_deducted:
-      tier === 'payg' || (tier === 'pro' && updates.credits_balance)
-        ? cost
-        : null,
-    success: true,
-  });
-
-  if (logError) {
-    console.error('Error logging usage:', logError);
+  if (error || !data?.success) {
+    console.error('Credit deduction failed:', error || data?.error);
+    return {
+      success: false,
+      error: data?.error || 'Failed to deduct credits',
+    };
   }
 
   return { success: true };
@@ -600,7 +493,169 @@ export async function getUserUsageStats(): Promise<{
 }
 
 /**
- * Check rate limits
+ * Check IP-based rate limit (LOW-2)
+ * Applies to ALL users (anonymous and authenticated) for bot protection
+ * 
+ * Limits:
+ * - 10 requests per hour
+ * - 20 requests per day
+ * 
+ * Progressive penalties for repeated violations:
+ * - 3+ violations: 1 hour ban
+ * - 5+ violations: 24 hour ban
+ */
+async function checkIPRateLimit(): Promise<{
+  allowed: boolean;
+  reason?: string;
+  resetIn?: number;
+}> {
+  const { getClientIP, isPrivateIP } = await import('@/lib/utils/get-client-ip');
+  const clientIP = await getClientIP();
+  
+  // Skip IP limiting for private IPs (local development)
+  if (isPrivateIP(clientIP)) {
+    return { allowed: true };
+  }
+  
+  const supabase = await createClient();
+  
+  // Get or create IP rate limit record
+  const { data: ipLimit } = await supabase
+    .from('ip_rate_limits')
+    .select('*')
+    .eq('ip_address', clientIP)
+    .single();
+  
+  // Check if IP is temporarily banned
+  if (ipLimit?.blocked_until) {
+    const blockedUntil = new Date(ipLimit.blocked_until);
+    if (blockedUntil > new Date()) {
+      const resetIn = Math.ceil((blockedUntil.getTime() - Date.now()) / 1000 / 60);
+      return {
+        allowed: false,
+        reason: `IP temporarily blocked due to repeated violations. Try again in ${resetIn} minutes.`,
+        resetIn,
+      };
+    }
+    // Ban expired, clear it
+    await supabase
+      .from('ip_rate_limits')
+      .update({ blocked_until: null })
+      .eq('ip_address', clientIP);
+  }
+  
+  if (!ipLimit) {
+    // Create new record for this IP
+    await supabase.from('ip_rate_limits').insert({
+      ip_address: clientIP,
+      generations_last_hour: 1,
+      generations_today: 1,
+      window_start: new Date().toISOString(),
+      day_start: new Date().toISOString(),
+      last_request_at: new Date().toISOString(),
+    });
+    return { allowed: true };
+  }
+  
+  // IP rate limits (stricter than authenticated users)
+  const IP_HOURLY_LIMIT = 10;
+  const IP_DAILY_LIMIT = 20;
+  
+  // Check hourly limit
+  const hourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  const windowStart = new Date(ipLimit.window_start);
+  
+  if (windowStart < hourAgo) {
+    // Reset hourly counter
+    await supabase
+      .from('ip_rate_limits')
+      .update({
+        generations_last_hour: 1,
+        window_start: new Date().toISOString(),
+        last_request_at: new Date().toISOString(),
+      })
+      .eq('ip_address', clientIP);
+    return { allowed: true };
+  }
+  
+  if (ipLimit.generations_last_hour >= IP_HOURLY_LIMIT) {
+    const resetIn = Math.ceil(
+      (windowStart.getTime() + 60 * 60 * 1000 - Date.now()) / 1000 / 60
+    );
+    
+    // Increment violation count
+    const newViolationCount = (ipLimit.violation_count || 0) + 1;
+    
+    // Progressive penalties
+    let blockedUntil: string | null = null;
+    if (newViolationCount >= 5) {
+      // 5+ violations: 24 hour ban
+      blockedUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    } else if (newViolationCount >= 3) {
+      // 3-4 violations: 1 hour ban
+      blockedUntil = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    }
+    
+    await supabase
+      .from('ip_rate_limits')
+      .update({
+        violation_count: newViolationCount,
+        blocked_until: blockedUntil,
+      })
+      .eq('ip_address', clientIP);
+    
+    return {
+      allowed: false,
+      reason: blockedUntil 
+        ? `Too many rate limit violations. IP temporarily blocked.`
+        : `IP rate limit exceeded (${IP_HOURLY_LIMIT}/hour). Try again in ${resetIn} minutes.`,
+      resetIn,
+    };
+  }
+  
+  // Check daily limit
+  const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const dayStart = new Date(ipLimit.day_start);
+  
+  if (dayStart < dayAgo) {
+    // Reset daily counter
+    await supabase
+      .from('ip_rate_limits')
+      .update({
+        generations_today: 1,
+        day_start: new Date().toISOString(),
+        last_request_at: new Date().toISOString(),
+      })
+      .eq('ip_address', clientIP);
+  } else if (ipLimit.generations_today >= IP_DAILY_LIMIT) {
+    return {
+      allowed: false,
+      reason: `IP daily limit exceeded (${IP_DAILY_LIMIT}/day). Try again tomorrow.`,
+    };
+  }
+  
+  // Increment counters
+  await supabase
+    .from('ip_rate_limits')
+    .update({
+      generations_last_hour: ipLimit.generations_last_hour + 1,
+      generations_today: ipLimit.generations_today + 1,
+      last_request_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('ip_address', clientIP);
+  
+  return { allowed: true };
+}
+
+/**
+ * Check rate limits (LOW-2: Combined user + IP-based)
+ * 
+ * Defense-in-depth approach:
+ * - Authenticated users: Check user-based limits (tier-specific)
+ * - All users: Check IP-based limits (anonymous protection + bot prevention)
+ * 
+ * If EITHER limit is exceeded, block the request
  */
 export async function checkRateLimit(): Promise<{
   allowed: boolean;
@@ -612,10 +667,18 @@ export async function checkRateLimit(): Promise<{
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    return { allowed: false, reason: 'Not authenticated' };
+  // 1. Check IP-based rate limit (applies to ALL users)
+  const ipCheckResult = await checkIPRateLimit();
+  if (!ipCheckResult.allowed) {
+    return ipCheckResult; // IP limit exceeded
   }
 
+  // 2. If not authenticated, IP check is sufficient
+  if (!user) {
+    return { allowed: true }; // Anonymous users rely on IP limits
+  }
+
+  // 3. Check user-based rate limit (authenticated users only)
   const { data: profile } = await supabase
     .from('profiles')
     .select('subscription_tier')

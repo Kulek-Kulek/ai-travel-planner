@@ -140,7 +140,12 @@ export const ItineraryFormAIEnhanced = ({
   const [extractedInfo, setExtractedInfo] = useState<ExtractedTravelInfo | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractionTimeout, setExtractionTimeout] = useState<NodeJS.Timeout | null>(null);
+  
+  // Turnstile token state - required for bot protection
+  const isTurnstileEnabled = !!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  
+  // Security alert state (from main branch)
   const [showSecurityAlert, setShowSecurityAlert] = useState(false);
   const [securityAlertMessage, setSecurityAlertMessage] = useState<string>("");
   const [hasSecurityViolation, setHasSecurityViolation] = useState(false);
@@ -1063,23 +1068,25 @@ export const ItineraryFormAIEnhanced = ({
         </section>
 
         {/* Cloudflare Turnstile - Bot Protection */}
-        <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white/30">
-          <Turnstile
-            siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ''}
-            onSuccess={(token) => setTurnstileToken(token)}
-            onError={() => {
-              setTurnstileToken(null);
-              toast.error("Security verification failed", {
-                description: "Please refresh the page and try again",
-              });
-            }}
-            onExpire={() => setTurnstileToken(null)}
-            options={{
-              theme: "light",
-              size: "flexible",
-            }}
-          />
-        </div>
+        {isTurnstileEnabled && (
+          <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white/30">
+            <Turnstile
+              siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ''}
+              onSuccess={(token) => setTurnstileToken(token)}
+              onError={() => {
+                setTurnstileToken(null);
+                toast.error("Security verification failed", {
+                  description: "Please refresh the page and try again",
+                });
+              }}
+              onExpire={() => setTurnstileToken(null)}
+              options={{
+                theme: "light",
+                size: "flexible",
+              }}
+            />
+          </div>
+        )}
  
 
         <Button 
