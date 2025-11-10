@@ -115,17 +115,9 @@ export const ENV = {
 } as const;
 
 if (!isBuildTime) {
-  console.log('✅ Environment variables validated successfully');
-
-  // Log optional variables status (for debugging)
-  if (process.env.NODE_ENV === 'development') {
-    console.log('📋 Optional environment variables:');
-    for (const varName of optionalEnvVars) {
-      const isSet = !!process.env[varName];
-      console.log(`  ${isSet ? '✅' : '❌'} ${varName}`);
-    }
-  }
+  // Environment variables validated successfully
+  // Logs removed for cleaner console output
 } else {
-  console.log('⏭️ Skipping environment validation during build');
+  // Skipping environment validation during build
 }
 
