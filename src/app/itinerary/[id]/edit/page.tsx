@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { getItinerary } from "@/lib/actions/itinerary-actions";
 import { getUserSubscription } from "@/lib/actions/subscription-actions";
+import { getUserTravelProfile } from "@/lib/actions/profile-ai-actions";
 import { generateItinerary } from "@/lib/actions/ai-actions";
 import type { Itinerary } from "@/lib/actions/itinerary-actions";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Lock } from "lucide-react";
+import { Lock, Compass, Sparkles, ArrowRight, Lightbulb } from "lucide-react";
 import confetti from "canvas-confetti";
 import {
   OPENROUTER_MODEL_OPTIONS,
@@ -32,6 +33,14 @@ import {
   type SubscriptionTier,
   formatCurrency,
 } from "@/lib/config/pricing-models";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+import { MessageSquareWarning } from 'lucide-react';
 
 export default function EditItineraryPage() {
   const router = useRouter();
@@ -48,6 +57,7 @@ export default function EditItineraryPage() {
   const [notes, setNotes] = useState("");
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_OPENROUTER_MODEL);
   const [userTier, setUserTier] = useState<SubscriptionTier>('free');
+  const [hasTravelProfile, setHasTravelProfile] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -78,6 +88,10 @@ export default function EditItineraryPage() {
       if (subscriptionInfo) {
         setUserTier(subscriptionInfo.tier);
       }
+
+      // Load travel profile
+      const travelProfileResult = await getUserTravelProfile();
+      setHasTravelProfile(travelProfileResult.success && !!travelProfileResult.data);
 
       setIsLoading(false);
     }
@@ -268,8 +282,8 @@ export default function EditItineraryPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12">
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="min-h-screen bg-slate-50 py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="bg-white rounded-lg shadow-lg p-8 text-center">
             <p className="text-gray-600">Loading itinerary...</p>
           </div>
@@ -283,18 +297,86 @@ export default function EditItineraryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12">
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-white rounded-lg shadow-lg p-8">
-          <div className="mb-6">
-            <Link
-              href="/my-plans"
-              className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-            >
-              ← Back to My Plans
-            </Link>
-          </div>
+    <div className="min-h-screen bg-slate-50 py-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Breadcrumb Navigation */}
+        <div className="mb-6">
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <Link href="/" className="transition-colors text-slate-600 hover:text-slate-900">
+                  Home
+                </Link>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <Link href="/my-plans" className="transition-colors text-slate-600 hover:text-slate-900">
+                  My Plans
+                </Link>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <Link href={`/itinerary/${id}`} className="transition-colors text-slate-600 hover:text-slate-900">
+                  {itinerary.ai_plan.city || itinerary.destination}
+                </Link>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>Edit</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+        </div>
 
+        {/* Travel Personality Quiz Banner */}
+        {!hasTravelProfile && (
+          <div className="mb-8 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 rounded-lg shadow-lg overflow-hidden sm:pr-0 lg:pr-20">
+            <div className="p-6 sm:p-8">
+              <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
+                  <Compass className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">
+                    Unlock Personalized Travel Experiences
+                  </h2>
+                  <p className="text-white/90 mb-4 text-base sm:text-lg">
+                    Take our fun 2-minute quiz to discover your unique travel personality and get AI-powered recommendations tailored just for you!
+                  </p>
+                  <div className="flex flex-wrap gap-2 sm:gap-3 mb-4">
+                    <div className="flex items-center gap-2 text-white/90 text-xs sm:text-sm">
+                      <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <span>AI-Powered Insights</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-white/90 text-xs sm:text-sm">
+                      <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <span>Personalized Itineraries</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-white/90 text-xs sm:text-sm">
+                      <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <span>Expert Travel Tips</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:flex-row sm:gap-3 sm:mt-0 gap-4 lg:mt-8">
+                    <Button size="lg" variant="secondary" asChild className="shadow-lg w-full sm:w-auto">
+                      <Link href="/profile/travel-personality/quiz">
+                        Take the Quiz Now
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                      </Link>
+                    </Button>
+                    <Button size="lg" variant="outline" asChild className="bg-white/10 hover:bg-white/20 text-white border-white/30 w-full sm:w-auto">
+                      <Link href="/profile/travel-personality">
+                        Learn More
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="bg-white rounded-lg shadow-lg p-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
             Edit & Regenerate Itinerary
           </h1>
@@ -318,8 +400,8 @@ export default function EditItineraryPage() {
                 disabled
                 className="w-full bg-gray-100 cursor-not-allowed"
               />
-              <p className="text-sm text-gray-500 mt-1">
-                💡 Destination cannot be changed. Want a different destination?
+              <p className="flex items-center text-sm text-gray-500 mt-1">
+                <Lightbulb className="w-4 h-4 inline-block mr-1 text-blue-600" /> Destination cannot be changed. Want a different destination?
                 Create a new itinerary instead.
               </p>
             </div>
@@ -527,7 +609,7 @@ export default function EditItineraryPage() {
             {/* Warning Box */}
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
               <p className="text-sm text-yellow-800">
-                <strong>⚠️ Important:</strong> Clicking &quot;Regenerate with
+                <strong><MessageSquareWarning className="w-4 h-4 inline-block mr-1 text-blue-600" /> Important:</strong> Clicking &quot;Regenerate with
                 AI&quot; will replace this itinerary with completely new
                 AI-generated content. This action cannot be undone.
               </p>
@@ -568,7 +650,7 @@ export default function EditItineraryPage() {
 
           <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-sm text-blue-800 mb-2">
-              <strong>💡 How it works:</strong>
+              <strong><Lightbulb className="w-4 h-4 inline-block mr-1 text-blue-600" /> How it works:</strong>
             </p>
             <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
               <li>Update days, travelers, notes, or AI model above</li>

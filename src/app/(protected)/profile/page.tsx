@@ -63,7 +63,7 @@ export default async function ProfilePage() {
                   ? 'bg-gradient-to-r from-blue-600 to-blue-700'
                   : isPaygTier
                   ? 'bg-gradient-to-r from-indigo-600 to-indigo-700'
-                  : 'bg-gradient-to-r from-gray-600 to-gray-700'
+                  : 'bg-gradient-to-r from-slate-800 to-slate-900'
               }`}
             >
               <div className="flex items-start justify-between">

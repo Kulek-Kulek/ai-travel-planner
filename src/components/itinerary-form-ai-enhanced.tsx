@@ -152,6 +152,8 @@ export const ItineraryFormAIEnhanced = ({
   
   // Ref for the submit button to enable auto-scroll
   const submitButtonRef = useRef<HTMLButtonElement>(null);
+  // Ref for the AI analyzing indicator to enable auto-scroll
+  const aiAnalyzingRef = useRef<HTMLDivElement>(null);
   // Track last time user typed to prevent scroll interruption
   const lastTypedTimeRef = useRef<number>(Date.now());
   // Track when AI is programmatically setting values to prevent re-extraction
@@ -225,8 +227,17 @@ export const ItineraryFormAIEnhanced = ({
         // Security only blocks itinerary generation, NOT field prefilling
         let extractedData = extracted;
         if ('securityError' in extracted && extracted.securityError) {
+          // Clean the error message by removing security markers
+          let cleanedMessage = extracted.securityError
+            .replace(/\[SECURITY_ERROR\]/gi, '')
+            .replace(/\[SECURITY_WARNING\]/gi, '')
+            .replace(/\[SECURITY_ALERT\]/gi, '')
+            .replace(/^Content Policy Violation\s*:?\s*/i, '')
+            .replace(/^Security Alert\s*:?\s*/i, '')
+            .trim();
+          
           // Show security alert modal
-          setSecurityAlertMessage(extracted.securityError);
+          setSecurityAlertMessage(cleanedMessage || "A security issue was detected with your request.");
           setShowSecurityAlert(true);
           setHasSecurityViolation(true); // Flag that this request has security issues
           
@@ -366,6 +377,23 @@ export const ItineraryFormAIEnhanced = ({
     }
   }, [isExtracting, extractedInfo, form.formState.isValid, hasSecurityViolation]);
 
+  // Auto-scroll to AI analyzing indicator when user opens detailed fields while AI is analyzing
+  useEffect(() => {
+    if (showDetailedFields && isExtracting && aiAnalyzingRef.current) {
+      // Small delay to ensure the DOM has updated
+      const scrollTimeout = setTimeout(() => {
+        if (aiAnalyzingRef.current) {
+          aiAnalyzingRef.current.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+        }
+      }, 100);
+      
+      return () => clearTimeout(scrollTimeout);
+    }
+  }, [showDetailedFields, isExtracting]);
+
   // Auto-calculate days when dates are selected, BUT only if days weren't already extracted from description
   useEffect(() => {
     if (watchStartDate && watchEndDate) {
@@ -407,7 +435,7 @@ export const ItineraryFormAIEnhanced = ({
     // No hardcoded word lists - AI understands context and intent
     if (hasSecurityViolation) {
       setSecurityAlertMessage(
-        "❌ Security Violation: The description you provided contains inappropriate content that violates our content policy. Please revise your travel request to use appropriate language."
+        "[SECURITY_ERROR] Security Violation: The description you provided contains inappropriate content that violates our content policy. Please revise your travel request to use appropriate language."
       );
       setShowSecurityAlert(true);
       return;
@@ -509,9 +537,19 @@ export const ItineraryFormAIEnhanced = ({
 
                 {/* AI Analysis Status */}
                 {isExtracting && (
-                  <div className="mt-3 flex items-center gap-2.5 rounded-xl border-2 border-indigo-200 bg-indigo-50 px-4 py-3 text-base font-medium text-indigo-700">
+                  <div 
+                    ref={aiAnalyzingRef}
+                    className="mt-3 flex items-center gap-2.5 rounded-xl border-2 border-indigo-200 bg-indigo-50 px-4 py-3 text-base font-medium text-indigo-700"
+                  >
                     <Sparkles className="h-5 w-5 animate-pulse" />
-                    <span>AI is analyzing your description...</span>
+                    <span className="flex items-center">
+                      AI is analyzing your description
+                      <span className="inline-flex ml-1 items-end">
+                        <span className="animate-bounce" style={{ animationDelay: '0s', animationDuration: '1s' }}>.</span>
+                        <span className="animate-bounce" style={{ animationDelay: '0.15s', animationDuration: '1s' }}>.</span>
+                        <span className="animate-bounce" style={{ animationDelay: '0.3s', animationDuration: '1s' }}>.</span>
+                      </span>
+                    </span>
                   </div>
                 )}
 

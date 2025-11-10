@@ -12,9 +12,14 @@ import { GoogleMapsButton } from '@/components/google-maps-button';
 import { ScrollToTop } from '@/components/scroll-to-top';
 import { isGoogleMapsEnabled } from '@/lib/config/google-maps';
 import { createClient } from '@/lib/supabase/server';
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
 import { 
-  ArrowLeft, 
-  ClipboardList, 
   Calendar, 
   Users, 
   Accessibility, 
@@ -22,7 +27,6 @@ import {
   FileText, 
   Tag, 
   Clock,
-  ListCheck,
   Map,
   Hotel,
   ExternalLink
@@ -70,31 +74,32 @@ export default async function ItineraryPage({
     <>
       <ScrollToTop />
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12">
-        <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Back button */}
-        <div className="flex gap-4 mb-6">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800"
-          >
-            <ArrowLeft className="w-4 h-4" /> Back to Home
-          </Link>
-          {isOwner && (
-            <Link
-              href="/my-plans"
-              className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800"
-            >
-              <ClipboardList className="w-4 h-4" /> My Plans
-            </Link>
-          )}
-          {isOwner && (
-            <Link
-              href="/bucket-list"
-              className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800"
-            >
-              <ListCheck className="w-4 h-4" /> Bucket List
-            </Link>
-          )}
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Breadcrumb Navigation */}
+        <div className="mb-6">
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <Link href="/" className="transition-colors text-slate-600 hover:text-slate-900">
+                  Home
+                </Link>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              {isOwner && (
+                <>
+                  <BreadcrumbItem>
+                    <Link href="/my-plans" className="transition-colors text-slate-600 hover:text-slate-900">
+                      My Plans
+                    </Link>
+                  </BreadcrumbItem>
+                  <BreadcrumbSeparator />
+                </>
+              )}
+              <BreadcrumbItem>
+                <BreadcrumbPage>{ai_plan.city || destination}</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
         </div>
 
         {/* Destination Image */}
@@ -132,7 +137,11 @@ export default async function ItineraryPage({
               {ai_plan.city || destination}
             </h1>
             <div className="flex flex-wrap gap-2 shrink-0">
-              <ItineraryLikeButton itineraryId={id} initialLikes={likes} />
+              <ItineraryLikeButton 
+                itineraryId={id} 
+                initialLikes={likes}
+                destination={ai_plan.city || destination}
+              />
               <ItineraryShareButton 
                 itineraryId={id} 
                 title={ai_plan.city || destination}
