@@ -2,11 +2,13 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import type { Itinerary } from '@/lib/actions/itinerary-actions';
 import { likeItinerary, addToBucketList, removeFromBucketList, isInBucketList } from '@/lib/actions/itinerary-actions';
 import { canEditItinerary } from '@/lib/actions/subscription-actions';
 import { Button } from './ui/button';
 import { UpgradeModal } from './upgrade-modal';
+import { RemoveFromBucketDialog } from './remove-from-bucket-dialog';
 import { createClient } from '@/lib/supabase/client';
 import { GoogleMapsButton } from './google-maps-button';
 import {
@@ -59,6 +61,7 @@ export function ItineraryCard({
   onDelete,
   onRemoveFromBucketList
 }: ItineraryCardProps) {
+  const [showRemoveDialog, setShowRemoveDialog] = useState(false);
   const { 
     id, 
     destination, 
@@ -81,7 +84,9 @@ export function ItineraryCard({
   } = itinerary;
   
   const router = useRouter();
+  const queryClient = useQueryClient();
   const justLikedTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const bucketListMessageTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [currentLikes, setCurrentLikes] = useState(likes || 0);
   const [isLiking, setIsLiking] = useState(false);
   const [hasLiked, setHasLiked] = useState(() => {
@@ -98,6 +103,7 @@ export function ItineraryCard({
   const [isAddingToBucket, setIsAddingToBucket] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [isCheckingEdit, setIsCheckingEdit] = useState(false);
+  const [showBucketListMessage, setShowBucketListMessage] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [upgradeModalConfig, setUpgradeModalConfig] = useState({
     title: "Free Tier Limit Reached",
@@ -137,6 +143,9 @@ export function ItineraryCard({
     return () => {
       if (justLikedTimeoutRef.current) {
         clearTimeout(justLikedTimeoutRef.current);
+      }
+      if (bucketListMessageTimeoutRef.current) {
+        clearTimeout(bucketListMessageTimeoutRef.current);
       }
     };
   }, []);
@@ -219,6 +228,23 @@ export function ItineraryCard({
       if (result.success) {
         setInBucketList(true);
         toast.success('Added to your bucket list! ❤️');
+        
+        // Show "See your bucket list" message
+        setShowBucketListMessage(true);
+        
+        // Clear any existing timeout
+        if (bucketListMessageTimeoutRef.current) {
+          clearTimeout(bucketListMessageTimeoutRef.current);
+        }
+        
+        // Reset back to heart icon after 3.5 seconds
+        bucketListMessageTimeoutRef.current = setTimeout(() => {
+          setShowBucketListMessage(false);
+        }, 4000);
+        
+        // Invalidate bucket list queries to refresh the data
+        queryClient.invalidateQueries({ queryKey: ['bucket-list'] });
+        queryClient.invalidateQueries({ queryKey: ['bucket-list-ids'] });
       } else {
         if (result.error === 'Already in your bucket list') {
           setInBucketList(true);
@@ -246,13 +272,20 @@ export function ItineraryCard({
       return;
     }
     
-    // Otherwise, remove directly (for other pages)
+    // For homepage/gallery view, show confirmation dialog
+    setShowRemoveDialog(true);
+  };
+  
+  const confirmRemoveFromBucketList = async () => {
     try {
       const result = await removeFromBucketList(id);
       
       if (result.success) {
         setInBucketList(false);
         toast.success('Removed from bucket list');
+        // Invalidate bucket list queries to refresh the data
+        queryClient.invalidateQueries({ queryKey: ['bucket-list'] });
+        queryClient.invalidateQueries({ queryKey: ['bucket-list-ids'] });
       } else {
         toast.error(result.error || 'Failed to remove from bucket list');
       }
@@ -265,7 +298,9 @@ export function ItineraryCard({
   const handleViewClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    router.push(`/itinerary/${id}`);
+    // Navigate to bucket-list route if viewing from bucket list, otherwise use itinerary route
+    const targetUrl = showBucketListActions ? `/bucket-list/${id}` : `/itinerary/${id}`;
+    router.push(targetUrl);
   };
   
   const handleShare = async (e: React.MouseEvent) => {
@@ -547,7 +582,7 @@ export function ItineraryCard({
             </div>
             {showBucketListActions ? (
               <Link 
-                href={`/itinerary/${id}`}
+                href={`/bucket-list/${id}`}
                 className="text-sm text-blue-600 font-medium hover:underline cursor-pointer"
                 onClick={(e) => e.stopPropagation()}
                 scroll={true}
@@ -591,18 +626,31 @@ export function ItineraryCard({
             </button>
             
             {/* Bucket list button */}
-            <button
-              onClick={inBucketList ? handleRemoveFromBucketList : handleAddToBucketList}
-              disabled={isAddingToBucket || isCheckingBucketList}
-              className={`transition-all ${
-                inBucketList
-                  ? 'text-blue-600 cursor-default'
-                  : 'text-gray-500 hover:text-blue-600 active:scale-95'
-              } ${(isAddingToBucket || isCheckingBucketList) ? 'opacity-50' : ''}`}
-              title={inBucketList ? 'Remove from bucket list' : 'Add to bucket list'}
-            >
-              <Heart className={`w-4 h-4 ${inBucketList ? 'fill-current' : ''}`} />
-            </button>
+            {showBucketListMessage ? (
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  router.push('/bucket-list');
+                }}
+                className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors cursor-pointer"
+              >
+                See your bucket list
+              </button>
+            ) : (
+              <button
+                onClick={inBucketList ? handleRemoveFromBucketList : handleAddToBucketList}
+                disabled={isAddingToBucket || isCheckingBucketList}
+                className={`cursor-pointer ${
+                  inBucketList
+                    ? 'text-blue-600'
+                    : 'text-gray-500 hover:text-blue-600'
+                } ${(isAddingToBucket || isCheckingBucketList) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                title={inBucketList ? 'Remove from bucket list' : 'Add to bucket list'}
+              >
+                <Heart className={`w-4 h-4 ${inBucketList ? 'fill-current' : ''}`} />
+              </button>
+            )}
           </div>
         </div>
       ) : showBucketListActions ? (
@@ -648,14 +696,14 @@ export function ItineraryCard({
               <button
                 type="button"
                 onClick={handleViewClick}
-                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 cursor-pointer"
               >
                 <Eye className="w-4 h-4" /> View
               </button>
               <button 
                 type="button"
                 onClick={handleRemoveFromBucketList}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-300 transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-300 cursor-pointer"
               >
                 <Heart className="w-4 h-4 fill-current" /> Remove
               </button>
@@ -812,6 +860,14 @@ export function ItineraryCard({
           description={upgradeModalConfig.description}
           features={upgradeModalConfig.features}
         />
+        
+        {/* Remove from Bucket List Confirmation Dialog */}
+        <RemoveFromBucketDialog
+          open={showRemoveDialog}
+          onOpenChange={setShowRemoveDialog}
+          destination={ai_plan.city || destination}
+          onConfirm={confirmRemoveFromBucketList}
+        />
       </>
     );
   }
@@ -827,6 +883,14 @@ export function ItineraryCard({
         title={upgradeModalConfig.title}
         description={upgradeModalConfig.description}
         features={upgradeModalConfig.features}
+      />
+      
+      {/* Remove from Bucket List Confirmation Dialog */}
+      <RemoveFromBucketDialog
+        open={showRemoveDialog}
+        onOpenChange={setShowRemoveDialog}
+        destination={ai_plan.city || destination}
+        onConfirm={confirmRemoveFromBucketList}
       />
     </>
   );

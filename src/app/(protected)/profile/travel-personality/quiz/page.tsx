@@ -1,11 +1,19 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { TravelQuiz } from "@/components/travel-quiz";
 import { generateTravelProfile } from "@/lib/actions/profile-ai-actions";
 import type { QuizResponse } from "@/types/travel-profile";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 
 export default function TravelPersonalityQuizPage() {
   const [isGenerating, setIsGenerating] = useState(false);
@@ -40,20 +48,45 @@ export default function TravelPersonalityQuizPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 py-12">
-      <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold text-slate-900 mb-2">
-          Discover Your Travel Personality
-        </h1>
-        <p className="text-lg text-slate-600">
-          Take our fun 2-minute quiz to unlock personalized travel recommendations
-        </p>
-      </div>
+    <div className="min-h-screen bg-slate-50 py-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Breadcrumb Navigation */}
+        <div className="mb-6">
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <Link href="/profile" className="transition-colors text-slate-600 hover:text-slate-900">
+                  Profile
+                </Link>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <Link href="/profile/travel-personality" className="transition-colors text-slate-600 hover:text-slate-900">
+                  Travel Personality
+                </Link>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>Quiz</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+        </div>
 
-      <TravelQuiz 
-        onComplete={handleQuizComplete} 
-        isGenerating={isGenerating}
-      />
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-slate-900 mb-2">
+            Discover Your Travel Personality
+          </h1>
+          <p className="text-lg text-slate-600">
+            Take our fun 2-minute quiz to unlock personalized travel recommendations
+          </p>
+        </div>
+
+        <TravelQuiz 
+          onComplete={handleQuizComplete} 
+          isGenerating={isGenerating}
+        />
+      </div>
     </div>
   );
 }

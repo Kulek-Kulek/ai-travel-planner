@@ -45,7 +45,7 @@ export function SecurityAlertDialog({
           icon: <ShieldX className="h-10 w-10 text-destructive" />,
           bgColor: 'bg-destructive/10',
           titleColor: 'text-destructive',
-          defaultTitle: '🚨 Security Alert'
+          defaultTitle: 'Security Alert'
         };
       case 'warning':
         return {

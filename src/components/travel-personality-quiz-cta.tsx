@@ -15,8 +15,8 @@ import Link from "next/link";
 
 export function TravelPersonalityQuizCTA() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 py-12">
-      <div className="max-w-4xl mx-auto px-4">
+    <div className="min-h-screen bg-slate-50 py-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Hero Card */}
         <Card className="relative overflow-hidden p-8 mb-8">
@@ -37,20 +37,20 @@ export function TravelPersonalityQuizCTA() {
 
             {/* Quick Stats */}
             <div className="grid grid-cols-3 gap-4 mb-8">
-              <div className="text-center p-4 rounded-lg bg-white/80">
-                <Clock className="w-6 h-6 text-blue-600 mx-auto mb-2" />
+              <div className="text-center p-6 rounded-lg bg-white border-2 border-blue-200 shadow-sm">
+                <Clock className="w-8 h-8 text-blue-600 mx-auto mb-2" />
                 <div className="text-2xl font-bold text-slate-900">2 min</div>
-                <div className="text-xs text-slate-600">Quick & Fun</div>
+                <div className="text-sm text-slate-600">Quick & Fun</div>
               </div>
-              <div className="text-center p-4 rounded-lg bg-white/80">
-                <Target className="w-6 h-6 text-purple-600 mx-auto mb-2" />
+              <div className="text-center p-6 rounded-lg bg-white border-2 border-purple-200 shadow-sm">
+                <Target className="w-8 h-8 text-purple-600 mx-auto mb-2" />
                 <div className="text-2xl font-bold text-slate-900">12</div>
-                <div className="text-xs text-slate-600">Simple Questions</div>
+                <div className="text-sm text-slate-600">Simple Questions</div>
               </div>
-              <div className="text-center p-4 rounded-lg bg-white/80">
-                <Sparkles className="w-6 h-6 text-indigo-600 mx-auto mb-2" />
+              <div className="text-center p-6 rounded-lg bg-white border-2 border-indigo-200 shadow-sm">
+                <Sparkles className="w-8 h-8 text-indigo-600 mx-auto mb-2" />
                 <div className="text-2xl font-bold text-slate-900">AI</div>
-                <div className="text-xs text-slate-600">Powered</div>
+                <div className="text-sm text-slate-600">Powered</div>
               </div>
             </div>
 

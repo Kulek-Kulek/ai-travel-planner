@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { likeItinerary, addToBucketList, removeFromBucketList, isInBucketList } from '@/lib/actions/itinerary-actions';
 import { Button } from './ui/button';
+import { RemoveFromBucketDialog } from './remove-from-bucket-dialog';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { ThumbsUp, Heart } from 'lucide-react';
@@ -11,10 +13,12 @@ import { ThumbsUp, Heart } from 'lucide-react';
 interface ItineraryLikeButtonProps {
   itineraryId: string;
   initialLikes: number;
+  destination?: string;
 }
 
-export function ItineraryLikeButton({ itineraryId, initialLikes }: ItineraryLikeButtonProps) {
+export function ItineraryLikeButton({ itineraryId, initialLikes, destination = 'this destination' }: ItineraryLikeButtonProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const justLikedTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [currentLikes, setCurrentLikes] = useState(initialLikes || 0);
   const [isLiking, setIsLiking] = useState(false);
@@ -23,6 +27,7 @@ export function ItineraryLikeButton({ itineraryId, initialLikes }: ItineraryLike
   const [inBucketList, setInBucketList] = useState(false);
   const [isCheckingBucketList, setIsCheckingBucketList] = useState(true);
   const [isAddingToBucket, setIsAddingToBucket] = useState(false);
+  const [showRemoveDialog, setShowRemoveDialog] = useState(false);
   
   // Check localStorage after mount to avoid hydration mismatch
   useEffect(() => {
@@ -122,6 +127,9 @@ export function ItineraryLikeButton({ itineraryId, initialLikes }: ItineraryLike
       if (result.success) {
         setInBucketList(true);
         toast.success('Added to your bucket list! ❤️');
+        // Invalidate bucket list queries to refresh the data
+        queryClient.invalidateQueries({ queryKey: ['bucket-list'] });
+        queryClient.invalidateQueries({ queryKey: ['bucket-list-ids'] });
       } else {
         if (result.error === 'Already in your bucket list') {
           setInBucketList(true);
@@ -139,12 +147,20 @@ export function ItineraryLikeButton({ itineraryId, initialLikes }: ItineraryLike
   };
   
   const handleRemoveFromBucketList = async () => {
+    // Show confirmation dialog
+    setShowRemoveDialog(true);
+  };
+  
+  const confirmRemoveFromBucketList = async () => {
     try {
       const result = await removeFromBucketList(itineraryId);
       
       if (result.success) {
         setInBucketList(false);
         toast.success('Removed from bucket list');
+        // Invalidate bucket list queries to refresh the data
+        queryClient.invalidateQueries({ queryKey: ['bucket-list'] });
+        queryClient.invalidateQueries({ queryKey: ['bucket-list-ids'] });
       } else {
         toast.error(result.error || 'Failed to remove from bucket list');
       }
@@ -179,15 +195,23 @@ export function ItineraryLikeButton({ itineraryId, initialLikes }: ItineraryLike
         disabled={isAddingToBucket || isCheckingBucketList}
         variant={inBucketList ? 'default' : 'outline'}
         size="lg"
-        className={`flex items-center gap-2 ${
+        className={`flex items-center gap-2 cursor-pointer ${
           inBucketList
-            ? 'bg-blue-600 hover:bg-blue-700 text-white cursor-default'
+            ? 'bg-blue-600 hover:bg-blue-700 text-white'
             : 'hover:bg-blue-50 hover:text-blue-600 hover:border-blue-600'
-        } ${(isAddingToBucket || isCheckingBucketList) ? 'opacity-50' : ''} transition-all active:scale-95`}
+        } ${(isAddingToBucket || isCheckingBucketList) ? 'opacity-50 cursor-not-allowed' : ''}`}
         title={inBucketList ? 'Remove from bucket list' : 'Add to bucket list'}
       >
         <Heart className={`w-5 h-5 ${inBucketList ? 'fill-current' : ''}`} />
       </Button>
+      
+      {/* Remove from Bucket List Confirmation Dialog */}
+      <RemoveFromBucketDialog
+        open={showRemoveDialog}
+        onOpenChange={setShowRemoveDialog}
+        destination={destination}
+        onConfirm={confirmRemoveFromBucketList}
+      />
     </div>
   );
 }

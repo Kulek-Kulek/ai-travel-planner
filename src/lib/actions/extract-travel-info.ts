@@ -271,7 +271,7 @@ Return JSON in this EXACT format (all fields required):
         hasAccessibilityNeeds: parsed.hasAccessibilityNeeds || false,
         travelStyle: parsed.travelStyle || null,
         interests: parsed.interests || [],
-        securityError: `❌ Content Policy Violation: ${parsed.violationReason}`,
+        securityError: `[SECURITY_ERROR] Content Policy Violation: ${parsed.violationReason}`,
       };
     }
     
@@ -295,7 +295,7 @@ Return JSON in this EXACT format (all fields required):
         return {
           ...validated,
           destination: null, // Clear invalid destination
-          securityError: `❌ Invalid Destination: "${validated.destination}" is not a valid travel destination. ${aiDestinationValidation.reason || 'Please provide a real city, country, or region.'} Our platform is for legitimate travel planning only.`,
+          securityError: `[SECURITY_ERROR] Invalid Destination: "${validated.destination}" is not a valid travel destination. ${aiDestinationValidation.reason || 'Please provide a real city, country, or region.'} Our platform is for legitimate travel planning only.`,
         };
       }
     }

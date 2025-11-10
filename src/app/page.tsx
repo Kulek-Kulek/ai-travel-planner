@@ -15,7 +15,7 @@ import { getUserRole } from "@/lib/auth/admin";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Plane, Clock, Lock, CheckCircle2, LogIn, AlertTriangle, Check } from "lucide-react";
+import { Plane, Clock, Lock, CheckCircle2, LogIn, AlertTriangle, Check, Heart, Compass, Tag, Accessibility } from "lucide-react";
 import confetti from "canvas-confetti";
 
 type FormData = ItineraryFormDataWithToken;
@@ -126,7 +126,9 @@ export default function Home() {
             import('@/lib/actions/itinerary-actions').then(({ addToBucketList }) => {
               addToBucketList(pendingBucketListAdd).then((result) => {
                 if (result.success) {
-                  toast.success('Added to your bucket list! ❤️');
+                  toast.success('Added to your bucket list!', {
+                    icon: <Heart className="w-4 h-4 text-red-500 fill-current" />
+                  });
                   // Invalidate queries to refresh bucket list state
                   queryClient.invalidateQueries({ queryKey: ['bucket-list-ids'] });
                   queryClient.invalidateQueries({ queryKey: ['bucket-list'] });
@@ -490,8 +492,7 @@ export default function Home() {
         
         // Check if this is a security error (comprehensive detection for ALL violation types)
         const isSecurityError = 
-          errorMessage.includes("❌") ||  // Our security errors start with this
-          errorMessage.includes("🚨") ||
+          errorMessage.includes("[SECURITY_ERROR]") ||  // Our security errors start with this marker
           errorMessage.includes("Security Alert") ||
           errorMessage.includes("Security validation") ||
           errorMessage.includes("Content Policy Violation") ||  // Key phrase!
@@ -527,7 +528,7 @@ export default function Home() {
           errorMessage.toLowerCase().includes("upgrade");
         
         if (isSecurityError) {
-          console.log('🚨 Security error detected in generation:', errorMessage);
+          console.log('[SECURITY] Security error detected in generation:', errorMessage);
           
           // Parse detected issues from error message
           let detectedIssues: string[] = [];
@@ -543,15 +544,24 @@ export default function Home() {
           }
           
           // Determine severity
-          if (errorMessage.includes("⚠️") || errorMessage.includes("Warning")) {
+          if (errorMessage.includes("[SECURITY_WARNING]") || errorMessage.includes("Warning")) {
             severity = 'warning';
-          } else if (errorMessage.includes("🚨") || errorMessage.includes("❌")) {
+          } else if (errorMessage.includes("[SECURITY_ERROR]") || errorMessage.includes("[SECURITY_ALERT]")) {
             severity = 'block';
           }
           
+          // Clean the error message by removing security markers
+          let cleanedMessage = errorMessage
+            .replace(/\[SECURITY_ERROR\]/gi, '')
+            .replace(/\[SECURITY_WARNING\]/gi, '')
+            .replace(/\[SECURITY_ALERT\]/gi, '')
+            .replace(/^Content Policy Violation\s*:?\s*/i, '')
+            .replace(/^Security Alert\s*:?\s*/i, '')
+            .trim();
+          
           // Show security alert modal
           setSecurityError({
-            message: errorMessage,
+            message: cleanedMessage || "A security issue was detected with your request.",
             issues: detectedIssues.length > 0 ? detectedIssues : undefined,
             severity,
           });
@@ -870,7 +880,7 @@ export default function Home() {
                         className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-lg transition-shadow"
                         onClick={() => handleAuthRedirect('sign-up')}
                       >
-                        <span className="mr-2">✨</span>
+                        <CheckCircle2 className="w-4 h-4 mr-2" />
                         Create Free Account
                       </Button>
                       <Button 
@@ -904,7 +914,9 @@ export default function Home() {
                 {!result && !mutation.isPending && (
                   <div className="py-10">
                     <div className="mx-auto max-w-sm text-center">
-                      <div className="mx-auto mb-4 size-12 rounded-xl bg-slate-100 text-slate-400 grid place-content-center">🧭</div>
+                      <div className="mx-auto mb-4 size-12 rounded-xl bg-slate-100 text-slate-400 grid place-content-center">
+                        <Compass className="w-7 h-7" />
+                      </div>
                       <h3 className="text-base font-semibold text-slate-900">Your preview will appear here</h3>
                       <p className="mt-2 text-sm text-slate-500">Tell us about your trip to get a tailored plan with daily highlights.</p>
                     </div>
@@ -936,7 +948,7 @@ export default function Home() {
                       {['Analyzing your preferences','Exploring destination highlights','Curating balanced daily plan','Selecting showcase photos','Adding final touches'].map((label, idx) => (
                         <li key={idx} className="flex items-center gap-2">
                           <span className={`inline-grid size-5 place-content-center rounded-full border ${idx < currentStep ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-slate-400 border-slate-200'}`}>
-                            {idx < currentStep ? '✓' : '•'}
+                            {idx < currentStep ? <Check className="w-3 h-3" /> : '•'}
                           </span>
                           <span className={`${idx === currentStep ? 'text-slate-700' : ''}`}>{label}</span>
                         </li>
@@ -968,7 +980,7 @@ export default function Home() {
                             {result.children === 1 ? "child" : "children"}
                           </>
                         )}
-                        {result.hasAccessibilityNeeds && <> • ♿ Accessible</>}
+                        {result.hasAccessibilityNeeds && <> • <Accessibility className="w-4 h-4 inline" /> Accessible</>}
                       </p>
                     </div>
 
@@ -1104,27 +1116,27 @@ export default function Home() {
                                     {/* Benefits List */}
                                     <div className="grid grid-cols-2 gap-3 text-sm mb-6">
                                       <span className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5">
-                                        <span className="text-blue-600 font-bold">✓</span>
+                                        <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />
                                         <span className="text-slate-700">Edit & Save</span>
                                       </span>
                                       <span className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5">
-                                        <span className="text-blue-600 font-bold">✓</span>
+                                        <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />
                                         <span className="text-slate-700">Share Plans</span>
                                       </span>
                                       <span className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5">
-                                        <span className="text-blue-600 font-bold">✓</span>
+                                        <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />
                                         <span className="text-slate-700">Download PDF</span>
                                       </span>
                                       <span className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5">
-                                        <span className="text-blue-600 font-bold">✓</span>
+                                        <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />
                                         <span className="text-slate-700">Better AI Models</span>
                                       </span>
                                       <span className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5">
-                                        <span className="text-blue-600 font-bold">✓</span>
+                                        <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />
                                         <span className="text-slate-700">Book Hotels</span>
                                       </span>
                                       <span className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5">
-                                        <span className="text-blue-600 font-bold">✓</span>
+                                        <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />
                                         <span className="text-slate-700">Google Maps</span>
                                       </span>
                                     </div>
@@ -1157,8 +1169,9 @@ export default function Home() {
 
                     {result.aiPlan?.tags && result.aiPlan.tags.length > 0 && (
                       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                        <p className="text-sm font-medium text-slate-700 mb-2">
-                          🏷️ Tags:
+                        <p className="text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
+                          <Tag className="w-4 h-4" />
+                          <span>Tags:</span>
                         </p>
                         <div className="flex flex-wrap gap-2">
                           {result.aiPlan.tags.map((tag: string, idx: number) => (
