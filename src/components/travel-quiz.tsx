@@ -355,7 +355,7 @@ export function TravelQuiz({ onComplete, isGenerating = false }: TravelQuizProps
 
   const currentQ = questions[currentQuestion];
   const totalQuestions = questions.length;
-  const progress = ((currentQuestion + 1) / totalQuestions) * 100;
+  const progress = (currentQuestion / totalQuestions) * 100;
 
   const handleNext = () => {
     // Save current answer
@@ -453,7 +453,7 @@ export function TravelQuiz({ onComplete, isGenerating = false }: TravelQuizProps
     };
 
     return (
-      <div className="max-w-4xl mx-auto p-4 sm:p-6">
+      <div className="py-4 sm:py-6">
         <Card className="p-6 sm:p-8 shadow-xl">
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 text-blue-600 mb-4">
@@ -529,7 +529,7 @@ export function TravelQuiz({ onComplete, isGenerating = false }: TravelQuizProps
 
   // Question View
   return (
-    <div className="max-w-4xl mx-auto p-4 sm:p-6">
+    <div className="py-4 sm:py-6">
       {/* Progress */}
       <div className="mb-8">
         <div className="flex justify-between text-sm text-slate-600 mb-2">
@@ -561,7 +561,7 @@ export function TravelQuiz({ onComplete, isGenerating = false }: TravelQuizProps
                   <button
                     key={option.value}
                     onClick={() => handleSingleSelect(option.value)}
-                    className={`p-6 rounded-xl border-2 transition-all hover:scale-105 text-left ${
+                    className={`p-6 rounded-xl border-2 text-left ${
                       responses[currentQ.id as keyof QuizResponse] === option.value
                         ? 'border-blue-500 bg-blue-50 shadow-lg'
                         : 'border-slate-200 hover:border-blue-300 bg-white'
@@ -589,7 +589,7 @@ export function TravelQuiz({ onComplete, isGenerating = false }: TravelQuizProps
                   <button
                     key={option.value}
                     onClick={() => handleSingleSelect(option.value)}
-                    className={`p-4 rounded-lg border-2 transition-all hover:scale-105 ${
+                    className={`p-4 rounded-lg border-2 ${
                       responses[currentQ.id as keyof QuizResponse] === option.value
                         ? 'border-blue-500 bg-blue-50 shadow-md'
                         : 'border-slate-200 hover:border-blue-300 bg-white'
@@ -619,7 +619,7 @@ export function TravelQuiz({ onComplete, isGenerating = false }: TravelQuizProps
                       key={option.value}
                       onClick={() => handleMultiSelect(option.value)}
                       disabled={!selectedOptions.includes(option.value) && selectedOptions.length >= (currentQ.max || 999)}
-                      className={`px-4 py-3 rounded-full border-2 transition-all hover:scale-105 flex items-center gap-2 ${
+                      className={`px-4 py-3 rounded-full border-2 flex items-center gap-2 ${
                         selectedOptions.includes(option.value)
                           ? 'border-blue-500 bg-blue-500 text-white shadow-md'
                           : 'border-slate-300 bg-white text-slate-700 hover:border-blue-300'

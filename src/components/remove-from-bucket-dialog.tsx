@@ -35,7 +35,7 @@ export function RemoveFromBucketDialog({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
-            <Heart className="w-5 h-5 text-red-600" />
+            <Heart className="w-5 h-5 text-blue-600 fill-current" />
             Remove from Bucket List?
           </AlertDialogTitle>
           <AlertDialogDescription asChild>
@@ -54,7 +54,7 @@ export function RemoveFromBucketDialog({
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleConfirm}
-            className="bg-red-600 hover:bg-red-700 text-white"
+            className="bg-blue-600 hover:bg-blue-700 text-white"
           >
             Remove
           </AlertDialogAction>

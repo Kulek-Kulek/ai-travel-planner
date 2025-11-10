@@ -15,7 +15,7 @@ import { getUserRole } from "@/lib/auth/admin";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Plane, Clock, Lock, CheckCircle2, LogIn, AlertTriangle, Check } from "lucide-react";
+import { Plane, Clock, Lock, CheckCircle2, LogIn, AlertTriangle, Check, Heart, Compass, Tag, Accessibility } from "lucide-react";
 import confetti from "canvas-confetti";
 
 type FormData = ItineraryFormDataWithToken;
@@ -56,6 +56,7 @@ export default function Home() {
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [openDayIndex, setOpenDayIndex] = useState<number | null>(null);
   const [hasCreatedPlanWhileLoggedOut, setHasCreatedPlanWhileLoggedOut] = useState(false);
+  const [formResetKey, setFormResetKey] = useState(0);
   const queryClient = useQueryClient();
   const galleryRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLDivElement>(null);
@@ -76,12 +77,12 @@ export default function Home() {
   // Check authentication status on mount and listen to auth changes
   useEffect(() => {
     const supabase = createClient();
-    
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       const isAuth = !!session?.user;
       setIsAuthenticated(isAuth);
-      
+
       // On initial load, check for previous anonymous session
       if (!isAuth) {
         const createdPlanWhileLoggedOut = sessionStorage.getItem('createdPlanWhileLoggedOut');
@@ -90,11 +91,11 @@ export default function Home() {
         }
       }
     });
-    
+
     // Listen to auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       const isAuth = !!session?.user;
-      
+
       // Handle sign in
       if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') && isAuth) {
         setIsAuthenticated(true);
@@ -102,30 +103,32 @@ export default function Home() {
         sessionStorage.removeItem('createdPlanWhileLoggedOut');
         sessionStorage.removeItem('draftItineraryId');
         setHasCreatedPlanWhileLoggedOut(false);
-        
+
         // Check if there's a pending bucket list add (only on actual sign in, not on refresh)
         if (event === 'SIGNED_IN') {
           // Invalidate all itinerary queries to show user's itineraries
-          queryClient.invalidateQueries({ 
+          queryClient.invalidateQueries({
             queryKey: ["public-itineraries-v2"],
             refetchType: 'all'
           });
-          queryClient.invalidateQueries({ 
+          queryClient.invalidateQueries({
             queryKey: ["public-itineraries"],
             refetchType: 'all'
           });
-          queryClient.invalidateQueries({ 
+          queryClient.invalidateQueries({
             queryKey: ["my-itineraries"],
             refetchType: 'all'
           });
-          
+
           const pendingBucketListAdd = sessionStorage.getItem('pendingBucketListAdd');
           if (pendingBucketListAdd) {
             // Import and execute the add
             import('@/lib/actions/itinerary-actions').then(({ addToBucketList }) => {
               addToBucketList(pendingBucketListAdd).then((result) => {
                 if (result.success) {
-                  toast.success('Added to your bucket list! ❤️');
+                  toast.success('Added to your bucket list!', {
+                    icon: <Heart className="w-4 h-4 text-red-500 fill-current" />
+                  });
                   // Invalidate queries to refresh bucket list state
                   queryClient.invalidateQueries({ queryKey: ['bucket-list-ids'] });
                   queryClient.invalidateQueries({ queryKey: ['bucket-list'] });
@@ -137,7 +140,7 @@ export default function Home() {
           }
         }
       }
-      
+
       // Handle sign out - be explicit about sign out events
       if (event === 'SIGNED_OUT') {
         setIsAuthenticated(false);
@@ -145,13 +148,13 @@ export default function Home() {
         setResult(null);
         setHasSubmitted(false);
         setHasCreatedPlanWhileLoggedOut(false);
-        
+
         // Clear all sessionStorage items
         sessionStorage.removeItem('createdPlanWhileLoggedOut');
         sessionStorage.removeItem('draftItineraryId');
         sessionStorage.removeItem('itineraryId');
       }
-      
+
       // Also handle the case where session becomes null but no explicit SIGNED_OUT event (safety check)
       if (!isAuth && session === null && event !== 'SIGNED_OUT') {
         setIsAuthenticated(false);
@@ -163,7 +166,7 @@ export default function Home() {
         sessionStorage.removeItem('itineraryId');
       }
     });
-    
+
     // Cleanup subscription on unmount
     return () => {
       subscription.unsubscribe();
@@ -174,7 +177,7 @@ export default function Home() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     let itineraryId = params.get("itineraryId");
-    
+
     // If not in URL, check sessionStorage for a recently created draft
     if (!itineraryId) {
       const stored = sessionStorage.getItem('draftItineraryId');
@@ -182,23 +185,23 @@ export default function Home() {
         itineraryId = stored;
       }
     }
-    
+
     if (itineraryId) {
       // Check if already processing this ID to prevent duplicate claims
       if (claimedIdsRef.current.has(itineraryId)) {
         return;
       }
-      
+
       // Mark as processing immediately before any async operations
       claimedIdsRef.current.add(itineraryId);
-      
+
       const loadItinerary = async () => {
         try {
           const response = await fetch(`/api/itineraries/${itineraryId}`);
-          
+
           if (response.ok) {
             const data = await response.json();
-            
+
             if (data.success && data.data) {
               const itinerary = data.data;
               setResult({
@@ -213,33 +216,33 @@ export default function Home() {
                 model: "anthropic/claude-3-haiku" as const,
               });
               setHasSubmitted(true);
-              
+
               // If this is a draft, check if user is now authenticated and claim it
               if (itinerary.status === 'draft') {
                 const supabase = createClient();
                 supabase.auth.getSession().then(({ data: { session } }) => {
                   if (session?.user) {
-                      claimDraftItinerary(itineraryId!).then(async (result) => {
-                        if (result.success) {
-                          
-                          // Clean up sessionStorage after successful claim
-                          sessionStorage.removeItem('createdPlanWhileLoggedOut');
-                          sessionStorage.removeItem('draftItineraryId');
-                          sessionStorage.removeItem('itineraryId');
-                          
-                          // Clear all state to re-enable form
-                          setResult(null);
-                          setHasSubmitted(false);
-                          setHasCreatedPlanWhileLoggedOut(false); // Clear this state too!
-                          
-                          toast.success("Itinerary saved to your account!", {
-                            description: "Your travel plan is now permanently saved",
-                            action: {
-                              label: "View My Plans",
-                              onClick: () => window.location.href = "/my-plans",
-                            },
-                          });
-                        
+                    claimDraftItinerary(itineraryId!).then(async (result) => {
+                      if (result.success) {
+
+                        // Clean up sessionStorage after successful claim
+                        sessionStorage.removeItem('createdPlanWhileLoggedOut');
+                        sessionStorage.removeItem('draftItineraryId');
+                        sessionStorage.removeItem('itineraryId');
+
+                        // Clear all state to re-enable form
+                        setResult(null);
+                        setHasSubmitted(false);
+                        setHasCreatedPlanWhileLoggedOut(false); // Clear this state too!
+
+                        toast.success("Itinerary saved to your account!", {
+                          description: "Your travel plan is now permanently saved",
+                          action: {
+                            label: "View My Plans",
+                            onClick: () => window.location.href = "/my-plans",
+                          },
+                        });
+
                         // Fetch the complete itinerary data and add it to the gallery cache
                         // After claiming, the itinerary should now be published
                         try {
@@ -248,16 +251,16 @@ export default function Home() {
                             const itineraryData = await itineraryResponse.json();
                             if (itineraryData.success && itineraryData.data) {
                               const claimedItinerary = itineraryData.data;
-                              
+
                               // Only add to gallery if the itinerary is published (not a draft)
                               // After claiming, it should be published, but double-check
                               if (claimedItinerary.status === 'published' && !claimedItinerary.is_private) {
                                 // Add the claimed itinerary to the top of the unfiltered gallery cache
                                 const allQueries = queryClient.getQueriesData({ queryKey: ['public-itineraries-v2'] });
-                                
+
                                 for (const [queryKey, queryData] of allQueries) {
                                   const [, selectedTags, destinationSearch] = queryKey as [string, string[], string, string | number];
-                                  
+
                                   if ((!selectedTags || selectedTags.length === 0) && !destinationSearch) {
                                     if (queryData && typeof queryData === 'object' && 'itineraries' in queryData) {
                                       const currentData = queryData as { itineraries: ResultData[]; total: number };
@@ -276,29 +279,29 @@ export default function Home() {
                         } catch (error) {
                           console.error('Failed to fetch and cache claimed itinerary:', error);
                         }
-                        
+
                         // Invalidate other queries
-                        queryClient.invalidateQueries({ 
+                        queryClient.invalidateQueries({
                           queryKey: ["public-itineraries"],
                           refetchType: 'all'
                         });
-                        queryClient.invalidateQueries({ 
+                        queryClient.invalidateQueries({
                           queryKey: ["my-itineraries"],
                           refetchType: 'all'
                         });
-                        queryClient.invalidateQueries({ 
+                        queryClient.invalidateQueries({
                           queryKey: ["all-tags"],
                           refetchType: 'all'
                         });
-                        queryClient.invalidateQueries({ 
+                        queryClient.invalidateQueries({
                           queryKey: ["stats"],
                           refetchType: 'all'
                         });
-                        queryClient.invalidateQueries({ 
+                        queryClient.invalidateQueries({
                           queryKey: ["profile"],
                           refetchType: 'all'
                         });
-                        
+
                         // Scroll to gallery
                         const scrollTimeout = setTimeout(() => {
                           if (galleryRef.current) {
@@ -308,12 +311,12 @@ export default function Home() {
                         scrollTimeoutRefs.current.push(scrollTimeout);
                       } else {
                         // Check if this is a tier limit error
-                        const isTierLimitError = 
+                        const isTierLimitError =
                           result.error?.toLowerCase().includes('limit') ||
                           result.error?.toLowerCase().includes('upgrade') ||
                           result.error?.toLowerCase().includes('tier') ||
                           result.error?.toLowerCase().includes('reached');
-                        
+
                         if (isTierLimitError) {
                           // Show upgrade modal for tier limit errors
                           setShowUpgradeModal(true);
@@ -331,7 +334,7 @@ export default function Home() {
                   }
                 });
               }
-              
+
               // Clean up URL but keep draftItineraryId in sessionStorage
               window.history.replaceState({}, document.title, window.location.pathname);
             }
@@ -352,7 +355,7 @@ export default function Home() {
         const galleryTop = galleryRef.current!.getBoundingClientRect().top + window.scrollY - 100;
         window.scrollTo({ top: galleryTop, behavior: "smooth" });
       }, 500);
-      
+
       return () => clearTimeout(scrollTimeout);
     }
   }, [isAuthenticated, result]);
@@ -369,7 +372,7 @@ export default function Home() {
       if (response.success) {
         // Trigger confetti effect
         triggerConfetti();
-        
+
         // Show success toast
         toast.success("Itinerary generated!", {
           description: `${variables.days}-day trip to ${response.data.city}`,
@@ -387,7 +390,7 @@ export default function Home() {
         // Omit turnstileToken from result data (only needed for submission)
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { turnstileToken, ...resultData } = variables;
-        
+
         setResult({
           ...resultData,
           notes: resultData.notes || '',
@@ -402,19 +405,19 @@ export default function Home() {
             const itineraryData = await itineraryResponse.json();
             if (itineraryData.success && itineraryData.data) {
               const newItinerary = itineraryData.data;
-              
+
               // Only add to gallery if the itinerary is published (not a draft)
               // Drafts should not appear in the public gallery
               if (newItinerary.status === 'published' && !newItinerary.is_private) {
                 // Add the new itinerary to the top of the unfiltered gallery cache
                 // Find all unfiltered gallery query keys
                 const allQueries = queryClient.getQueriesData({ queryKey: ['public-itineraries-v2'] });
-                
+
                 for (const [queryKey, queryData] of allQueries) {
                   // Only update unfiltered queries (selectedTags=[], destinationSearch='')
                   // The query key structure is: ['public-itineraries-v2', selectedTags, destinationSearch, timestampKey]
                   const [, selectedTags, destinationSearch] = queryKey as [string, string[], string, string | number];
-                  
+
                   if ((!selectedTags || selectedTags.length === 0) && !destinationSearch) {
                     // This is an unfiltered query, prepend the new itinerary
                     if (queryData && typeof queryData === 'object' && 'itineraries' in queryData) {
@@ -437,22 +440,22 @@ export default function Home() {
         }
 
         // Invalidate other queries (but not the unfiltered gallery queries we just updated)
-        queryClient.invalidateQueries({ 
+        queryClient.invalidateQueries({
           queryKey: ["public-itineraries"],
           refetchType: 'all'
         });
-        queryClient.invalidateQueries({ 
+        queryClient.invalidateQueries({
           queryKey: ["all-tags"],
           refetchType: 'all'
         });
-        queryClient.invalidateQueries({ 
+        queryClient.invalidateQueries({
           queryKey: ["stats"],
           refetchType: 'all'
         });
-        
+
         // Also invalidate my-itineraries if user is authenticated
         if (isAuthenticated) {
-          queryClient.invalidateQueries({ 
+          queryClient.invalidateQueries({
             queryKey: ["my-itineraries"],
             refetchType: 'all'
           });
@@ -464,7 +467,7 @@ export default function Home() {
           sessionStorage.setItem('createdPlanWhileLoggedOut', 'true');
           sessionStorage.setItem('draftItineraryId', response.data.id);
           setHasCreatedPlanWhileLoggedOut(true);
-          
+
           // Scroll to auth banner
           const authScrollTimeout = setTimeout(() => {
             if (authBannerRef.current) {
@@ -477,16 +480,19 @@ export default function Home() {
           scrollTimeoutRefs.current.push(authScrollTimeout);
         }
 
+        // Reset the form to allow creating another itinerary
+        // Increment the key to force form remount and clear all fields
+        setFormResetKey(prev => prev + 1);
+
         // NO auto-redirect - let user see preview first
         // They can click the banner buttons to sign in if needed
       } else {
         // Check error type and show appropriate UI
         const errorMessage = response.error || "";
-        
+
         // Check if this is a security error (comprehensive detection for ALL violation types)
-        const isSecurityError = 
-          errorMessage.includes("❌") ||  // Our security errors start with this
-          errorMessage.includes("🚨") ||
+        const isSecurityError =
+          errorMessage.includes("[SECURITY_ERROR]") ||  // Our security errors start with this marker
           errorMessage.includes("Security Alert") ||
           errorMessage.includes("Security validation") ||
           errorMessage.includes("Content Policy Violation") ||  // Key phrase!
@@ -514,20 +520,20 @@ export default function Home() {
           errorMessage.toLowerCase().includes("dangerous activit") ||
           errorMessage.toLowerCase().includes("self-harm") ||
           errorMessage.toLowerCase().includes("security");
-        
+
         // Check if this is a tier limit error
-        const isTierLimitError = 
+        const isTierLimitError =
           errorMessage.toLowerCase().includes("limit reached") ||
           errorMessage.toLowerCase().includes("tier limit") ||
           errorMessage.toLowerCase().includes("upgrade");
-        
+
         if (isSecurityError) {
-          console.log('🚨 Security error detected in generation:', errorMessage);
-          
+          console.log('[SECURITY] Security error detected in generation:', errorMessage);
+
           // Parse detected issues from error message
           let detectedIssues: string[] = [];
           let severity: 'error' | 'warning' | 'block' = 'block';
-          
+
           // Extract issues from error message
           const issuesMatch = errorMessage.match(/(?:found:|detected:|Issues detected:)\s*([^.]+)/i);
           if (issuesMatch) {
@@ -536,17 +542,26 @@ export default function Home() {
               .map(s => s.trim())
               .filter(s => s.length > 0);
           }
-          
+
           // Determine severity
-          if (errorMessage.includes("⚠️") || errorMessage.includes("Warning")) {
+          if (errorMessage.includes("[SECURITY_WARNING]") || errorMessage.includes("Warning")) {
             severity = 'warning';
-          } else if (errorMessage.includes("🚨") || errorMessage.includes("❌")) {
+          } else if (errorMessage.includes("[SECURITY_ERROR]") || errorMessage.includes("[SECURITY_ALERT]")) {
             severity = 'block';
           }
-          
+
+          // Clean the error message by removing security markers
+          const cleanedMessage = errorMessage
+            .replace(/\[SECURITY_ERROR\]/gi, '')
+            .replace(/\[SECURITY_WARNING\]/gi, '')
+            .replace(/\[SECURITY_ALERT\]/gi, '')
+            .replace(/^Content Policy Violation\s*:?\s*/i, '')
+            .replace(/^Security Alert\s*:?\s*/i, '')
+            .trim();
+
           // Show security alert modal
           setSecurityError({
-            message: errorMessage,
+            message: cleanedMessage || "A security issue was detected with your request.",
             issues: detectedIssues.length > 0 ? detectedIssues : undefined,
             severity,
           });
@@ -574,7 +589,7 @@ export default function Home() {
   useEffect(() => {
     // Keep progress bar moving until we have the result AND it's not pending
     const shouldShowProgress = mutation.isPending || (hasSubmitted && !result && !userCancelled);
-    
+
     if (!shouldShowProgress) {
       setLoadingMessage("");
       setProgress(0);
@@ -635,10 +650,10 @@ export default function Home() {
   const triggerConfetti = () => {
     const duration = 2500;
     const animationEnd = Date.now() + duration;
-    const defaults = { 
-      startVelocity: 25, 
-      spread: 360, 
-      ticks: 60, 
+    const defaults = {
+      startVelocity: 25,
+      spread: 360,
+      ticks: 60,
       zIndex: 9999,
       particleCount: 60,
       colors: ['#4F46E5', '#06B6D4', '#10B981', '#F59E0B', '#EC4899']
@@ -661,21 +676,21 @@ export default function Home() {
       }
 
       const particleCount = 30 * (timeLeft / duration);
-      
+
       // Center burst - higher on screen (near top toast position)
       confetti({
         ...defaults,
         particleCount: particleCount * 0.8,
         origin: { x: 0.5, y: 0.25 }
       });
-      
+
       // Left side confetti - higher
       confetti({
         ...defaults,
         particleCount: particleCount * 0.3,
         origin: { x: 0.25, y: 0.35 }
       });
-      
+
       // Right side confetti - higher
       confetti({
         ...defaults,
@@ -719,22 +734,26 @@ export default function Home() {
       });
       return;
     }
-    
+
     setResult(null);
     setHasSubmitted(true);
     setUserCancelled(false);
-    
-    // Scroll to preview area immediately
+
+    // Scroll to preview area with offset (100px desktop, 50px mobile)
     const previewScrollTimeout = setTimeout(() => {
       if (previewRef.current) {
-        previewRef.current.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
+        const offset = window.innerWidth >= 768 ? 100 : 50; // md breakpoint
+        const elementPosition = previewRef.current.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.pageYOffset - offset;
+
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: "smooth"
         });
       }
     }, 100);
     scrollTimeoutRefs.current.push(previewScrollTimeout);
-    
+
     mutation.mutate({
       destination: data.destination,
       days: data.days,
@@ -763,7 +782,7 @@ export default function Home() {
   // Handle redirecting to sign-in/sign-up after saving draft
   const handleAuthRedirect = async (authPage: 'sign-in' | 'sign-up') => {
     if (!result || !result.aiPlan) return;
-    
+
     // The itinerary was already saved by generateItinerary
     // Store it in sessionStorage so it persists through navigation
     const itineraryId = result.aiPlan.id;
@@ -784,9 +803,8 @@ export default function Home() {
         >
           {/* Form Section */}
           <div
-            className={`self-start rounded-3xl border border-slate-200 bg-white/90 p-8 shadow-[0_40px_100px_-60px_rgba(30,64,175,0.6)] backdrop-blur-lg ${
-              mutation.isPending && !userCancelled ? "pointer-events-none opacity-60" : ""
-            }`}
+            className={`self-start rounded-3xl border border-slate-200 bg-white/90 p-8 shadow-[0_40px_100px_-60px_rgba(30,64,175,0.6)] backdrop-blur-lg ${mutation.isPending && !userCancelled ? "pointer-events-none opacity-60" : ""
+              }`}
             aria-busy={mutation.isPending}
           >
             <h2 className="text-2xl font-semibold text-slate-900">
@@ -799,7 +817,7 @@ export default function Home() {
 
             <div className="mt-5">
               <ItineraryFormAIEnhanced
-                key={`form-${isAuthenticated}`}
+                key={`form-${isAuthenticated}-${formResetKey}`}
                 onSubmit={handleSubmit}
                 isLoading={mutation.isPending}
                 modelOverride="anthropic/claude-3.5-haiku"
@@ -817,7 +835,7 @@ export default function Home() {
             >
               {/* Auth Banner - shown when not authenticated and preview is ready */}
               {!isAuthenticated && result && !mutation.isPending && (
-                <div 
+                <div
                   ref={authBannerRef}
                   className="mb-6 rounded-2xl border-2 border-indigo-300 bg-gradient-to-r from-indigo-50 via-blue-50 to-indigo-50 p-6 shadow-md"
                 >
@@ -856,17 +874,17 @@ export default function Home() {
                       </ul>
                     </div>
                     <div className="flex flex-col gap-3 sm:flex-row">
-                      <Button 
-                        size="lg" 
+                      <Button
+                        size="lg"
                         className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-lg transition-shadow"
                         onClick={() => handleAuthRedirect('sign-up')}
                       >
-                        <span className="mr-2">✨</span>
+                        <CheckCircle2 className="w-4 h-4 mr-2" />
                         Create Free Account
                       </Button>
-                      <Button 
-                        size="lg" 
-                        variant="outline" 
+                      <Button
+                        size="lg"
+                        variant="outline"
                         className="border-indigo-300 hover:bg-indigo-50"
                         onClick={() => handleAuthRedirect('sign-in')}
                       >
@@ -881,21 +899,22 @@ export default function Home() {
                 <h2 className="text-2xl font-semibold text-slate-900">Preview</h2>
                 <span
                   aria-live="polite"
-                  className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${
-                    mutation.isPending && !userCancelled
+                  className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${mutation.isPending && !userCancelled
                       ? "bg-indigo-100 text-indigo-700"
                       : "bg-emerald-100 text-emerald-700"
-                  }`}
+                    }`}
                 >
                   {mutation.isPending && !userCancelled ? "Generating" : "Ready"}
                 </span>
               </div>
 
-                <div className="mt-6 space-y-6">
+              <div className="mt-6 space-y-6">
                 {!result && !mutation.isPending && (
                   <div className="py-10">
                     <div className="mx-auto max-w-sm text-center">
-                      <div className="mx-auto mb-4 size-12 rounded-xl bg-slate-100 text-slate-400 grid place-content-center">🧭</div>
+                      <div className="mx-auto mb-4 size-12 rounded-xl bg-slate-100 text-slate-400 grid place-content-center">
+                        <Compass className="w-7 h-7" />
+                      </div>
                       <h3 className="text-base font-semibold text-slate-900">Your preview will appear here</h3>
                       <p className="mt-2 text-sm text-slate-500">Tell us about your trip to get a tailored plan with daily highlights.</p>
                     </div>
@@ -924,10 +943,10 @@ export default function Home() {
                     </div>
 
                     <ul className="mt-4 grid gap-2 text-sm text-slate-500 sm:grid-cols-2">
-                      {['Analyzing your preferences','Exploring destination highlights','Curating balanced daily plan','Selecting showcase photos','Adding final touches'].map((label, idx) => (
+                      {['Analyzing your preferences', 'Exploring destination highlights', 'Curating balanced daily plan', 'Selecting showcase photos', 'Adding final touches'].map((label, idx) => (
                         <li key={idx} className="flex items-center gap-2">
                           <span className={`inline-grid size-5 place-content-center rounded-full border ${idx < currentStep ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-slate-400 border-slate-200'}`}>
-                            {idx < currentStep ? '✓' : '•'}
+                            {idx < currentStep ? <Check className="w-3 h-3" /> : '•'}
                           </span>
                           <span className={`${idx === currentStep ? 'text-slate-700' : ''}`}>{label}</span>
                         </li>
@@ -959,7 +978,7 @@ export default function Home() {
                             {result.children === 1 ? "child" : "children"}
                           </>
                         )}
-                        {result.hasAccessibilityNeeds && <> • ♿ Accessible</>}
+                        {result.hasAccessibilityNeeds && <> • <Accessibility className="w-4 h-4 inline" /> Accessible</>}
                       </p>
                     </div>
 
@@ -969,7 +988,7 @@ export default function Home() {
                       const panelId = `day-panel-${dayIndex}`;
                       const isFirstDay = dayIndex === 0;
                       const isLocked = !isAuthenticated && !isFirstDay;
-                      
+
                       return (
                         <div
                           key={dayIndex}
@@ -1029,7 +1048,7 @@ export default function Home() {
                                 {day.places?.length || 0} stop{(day.places?.length || 0) === 1 ? "" : "s"}
                               </span>
                             </button>
-                            
+
                             {isLocked && (
                               <p className="text-xs text-slate-500 italic pl-2">
                                 Sign in to unlock this day
@@ -1042,7 +1061,7 @@ export default function Home() {
                               {day.places?.map((place, placeIndex) => {
                                 // For non-authenticated users on first day, blur bottom half
                                 const shouldBlur = !isAuthenticated && isFirstDay && placeIndex >= Math.ceil(day.places.length / 2);
-                                
+
                                 return (
                                   <div
                                     key={placeIndex}
@@ -1060,7 +1079,7 @@ export default function Home() {
                                           </div>
                                         </div>
                                       </div>
-                                      
+
                                       {/* Place Details */}
                                       <div className="flex-1 min-w-0">
                                         <h3 className="text-lg font-semibold text-slate-900 mb-2">
@@ -1072,7 +1091,7 @@ export default function Home() {
                                   </div>
                                 );
                               })}
-                              
+
                               {/* Sign up overlay for first day when not authenticated */}
                               {!isAuthenticated && isFirstDay && (
                                 <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-100 via-slate-50/98 to-transparent pt-16 pb-5 flex items-end justify-center">
@@ -1086,42 +1105,42 @@ export default function Home() {
                                         Unlock Your Complete Journey
                                       </h3>
                                     </div>
-                                    
+
                                     {/* Description */}
                                     <p className="text-base text-slate-600 mb-6 leading-relaxed mt-6">
                                       Sign up <span className="font-bold text-blue-600">free</span> to see all <span className="inline-flex items-center justify-center font-bold text-blue-600">{result.aiPlan?.days?.length || 0} days</span> of your personalized itinerary
                                     </p>
-                                    
+
                                     {/* Benefits List */}
                                     <div className="grid grid-cols-2 gap-3 text-sm mb-6">
                                       <span className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5">
-                                        <span className="text-blue-600 font-bold">✓</span>
+                                        <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />
                                         <span className="text-slate-700">Edit & Save</span>
                                       </span>
                                       <span className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5">
-                                        <span className="text-blue-600 font-bold">✓</span>
+                                        <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />
                                         <span className="text-slate-700">Share Plans</span>
                                       </span>
                                       <span className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5">
-                                        <span className="text-blue-600 font-bold">✓</span>
+                                        <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />
                                         <span className="text-slate-700">Download PDF</span>
                                       </span>
                                       <span className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5">
-                                        <span className="text-blue-600 font-bold">✓</span>
+                                        <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />
                                         <span className="text-slate-700">Better AI Models</span>
                                       </span>
                                       <span className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5">
-                                        <span className="text-blue-600 font-bold">✓</span>
+                                        <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />
                                         <span className="text-slate-700">Book Hotels</span>
                                       </span>
                                       <span className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5">
-                                        <span className="text-blue-600 font-bold">✓</span>
+                                        <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />
                                         <span className="text-slate-700">Google Maps</span>
                                       </span>
                                     </div>
-                                    
+
                                     {/* CTA Button */}
-                                    <Button 
+                                    <Button
                                       onClick={() => handleAuthRedirect('sign-up')}
                                       className="mt-2 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-md hover:shadow-lg transition-all"
                                       size="lg"
@@ -1129,7 +1148,7 @@ export default function Home() {
                                       <Plane className="w-4 h-4 mr-2" />
                                       Create Free Account
                                     </Button>
-                                    
+
                                     {/* Already have account link */}
                                     <button
                                       onClick={() => handleAuthRedirect('sign-in')}
@@ -1148,8 +1167,9 @@ export default function Home() {
 
                     {result.aiPlan?.tags && result.aiPlan.tags.length > 0 && (
                       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                        <p className="text-sm font-medium text-slate-700 mb-2">
-                          🏷️ Tags:
+                        <p className="text-sm font-medium text-slate-700 mb-2 flex items-center gap-2">
+                          <Tag className="w-4 h-4" />
+                          <span>Tags:</span>
                         </p>
                         <div className="flex flex-wrap gap-2">
                           {result.aiPlan.tags.map((tag: string, idx: number) => (
@@ -1215,11 +1235,11 @@ export default function Home() {
       </main>
 
       {/* Upgrade Modal */}
-      <UpgradeModal 
-        open={showUpgradeModal} 
+      <UpgradeModal
+        open={showUpgradeModal}
         onOpenChange={setShowUpgradeModal}
       />
-      
+
       <SecurityAlertDialog
         open={showSecurityAlert}
         onOpenChange={setShowSecurityAlert}

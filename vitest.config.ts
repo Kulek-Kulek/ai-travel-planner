@@ -8,7 +8,24 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     setupFiles: ['./vitest.setup.ts'],
-    include: ['**/__tests__/**/*.test.ts', '**/__tests__/**/*.test.tsx'],
+    include: [
+      '**/__tests__/**/*.test.ts', 
+      '**/__tests__/**/*.test.tsx',
+      'tests/**/*.test.ts',
+      'tests/**/*.test.tsx',
+    ],
+    // Exclude integration tests that need database in CI
+    exclude: process.env.CI ? [
+      '**/node_modules/**',
+      '**/dist/**',
+      'tests/integration/transaction-atomicity.test.ts',
+      'tests/integration/phase2-security.test.ts',
+      'tests/integration/actions/itinerary-actions.test.ts',
+      'tests/unit/utils/share.test.ts', // Needs browser environment
+    ] : [
+      '**/node_modules/**',
+      '**/dist/**',
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],

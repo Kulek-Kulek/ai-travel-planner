@@ -413,11 +413,27 @@ export async function updateItineraryPrivacy(
       return { success: false, error: 'Not authenticated' };
     }
     
+    // MED-1: Explicit ownership check before update
+    const { data: itinerary, error: fetchError } = await supabase
+      .from('itineraries')
+      .select('id, user_id')
+      .eq('id', id)
+      .single();
+    
+    if (fetchError || !itinerary) {
+      return { success: false, error: 'Itinerary not found' };
+    }
+    
+    if (itinerary.user_id !== user.id) {
+      console.warn(`⚠️ Unauthorized access attempt: User ${user.id} tried to update itinerary ${id}`);
+      return { success: false, error: 'Unauthorized: You do not own this itinerary' };
+    }
+    
+    // Now perform the update
     const { error } = await supabase
       .from('itineraries')
       .update({ is_private: isPrivate })
-      .eq('id', id)
-      .eq('user_id', user.id);
+      .eq('id', id);
     
     if (error) {
       console.error('Error updating itinerary:', error);
@@ -451,11 +467,27 @@ export async function updateItineraryStatus(
       return { success: false, error: 'Not authenticated' };
     }
     
+    // MED-1: Explicit ownership check before update
+    const { data: itinerary, error: fetchError } = await supabase
+      .from('itineraries')
+      .select('id, user_id')
+      .eq('id', id)
+      .single();
+    
+    if (fetchError || !itinerary) {
+      return { success: false, error: 'Itinerary not found' };
+    }
+    
+    if (itinerary.user_id !== user.id) {
+      console.warn(`⚠️ Unauthorized access attempt: User ${user.id} tried to update status of itinerary ${id}`);
+      return { success: false, error: 'Unauthorized: You do not own this itinerary' };
+    }
+    
+    // Now perform the update
     const { error } = await supabase
       .from('itineraries')
       .update({ status })
-      .eq('id', id)
-      .eq('user_id', user.id);
+      .eq('id', id);
     
     if (error) {
       console.error('Error updating status:', error);
@@ -492,11 +524,27 @@ export async function updateItinerary(
       return { success: false, error: 'Not authenticated' };
     }
     
+    // MED-1: Explicit ownership check before update
+    const { data: itinerary, error: fetchError } = await supabase
+      .from('itineraries')
+      .select('id, user_id')
+      .eq('id', id)
+      .single();
+    
+    if (fetchError || !itinerary) {
+      return { success: false, error: 'Itinerary not found' };
+    }
+    
+    if (itinerary.user_id !== user.id) {
+      console.warn(`⚠️ Unauthorized access attempt: User ${user.id} tried to update itinerary ${id}`);
+      return { success: false, error: 'Unauthorized: You do not own this itinerary' };
+    }
+    
+    // Now perform the update
     const { error } = await supabase
       .from('itineraries')
       .update(updates)
-      .eq('id', id)
-      .eq('user_id', user.id);
+      .eq('id', id);
     
     if (error) {
       console.error('Error updating itinerary:', error);
@@ -527,11 +575,27 @@ export async function deleteItinerary(id: string): Promise<ActionResult<void>> {
       return { success: false, error: 'Not authenticated' };
     }
     
+    // MED-1: Explicit ownership check before deletion
+    const { data: itinerary, error: fetchError } = await supabase
+      .from('itineraries')
+      .select('id, user_id')
+      .eq('id', id)
+      .single();
+    
+    if (fetchError || !itinerary) {
+      return { success: false, error: 'Itinerary not found' };
+    }
+    
+    if (itinerary.user_id !== user.id) {
+      console.warn(`⚠️ Unauthorized deletion attempt: User ${user.id} tried to delete itinerary ${id}`);
+      return { success: false, error: 'Unauthorized: You do not own this itinerary' };
+    }
+    
+    // Now perform the deletion
     const { error } = await supabase
       .from('itineraries')
       .delete()
-      .eq('id', id)
-      .eq('user_id', user.id);
+      .eq('id', id);
     
     if (error) {
       console.error('Error deleting itinerary:', error);

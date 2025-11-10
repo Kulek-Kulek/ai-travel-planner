@@ -30,8 +30,10 @@ export default async function UsagePage() {
 
   if (!subscription || !stats) {
     return (
-      <div className="container mx-auto px-4 py-12">
-        <p>Unable to load usage information.</p>
+      <div className="min-h-screen bg-slate-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <p>Unable to load usage information.</p>
+        </div>
       </div>
     );
   }
@@ -56,13 +58,14 @@ export default async function UsagePage() {
     premiumLimit !== null ? Math.max(0, premiumLimit - premiumUsed) : null;
 
   return (
-    <div className="container mx-auto px-4 py-12 max-w-6xl">
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold mb-2">Usage Dashboard</h1>
-        <p className="text-muted-foreground">
-          Track your subscription usage and statistics
-        </p>
-      </div>
+    <div className="min-h-screen bg-slate-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold mb-2">Usage Dashboard</h1>
+          <p className="text-muted-foreground">
+            Track your subscription usage and statistics
+          </p>
+        </div>
 
       {/* Current Plan */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
@@ -143,7 +146,7 @@ export default async function UsagePage() {
 
         {/* Economy Usage (Pro tier) */}
         {isProTier && (
-          <div className="border rounded-lg p-6">
+          <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
             <h3 className="font-semibold mb-4">Economy Models</h3>
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
@@ -175,7 +178,7 @@ export default async function UsagePage() {
 
         {/* Premium Usage (Pro tier) */}
         {isProTier && (
-          <div className="border rounded-lg p-6">
+          <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
             <h3 className="font-semibold mb-4">Premium Models</h3>
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
@@ -209,7 +212,7 @@ export default async function UsagePage() {
 
       {/* Statistics */}
       <div className="grid gap-6 md:grid-cols-3 mb-8">
-        <div className="border rounded-lg p-6">
+        <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
           <div className="flex items-center gap-3 mb-2">
             <TrendingUp className="size-5 text-primary" />
             <h3 className="font-semibold">Total Plans</h3>
@@ -218,7 +221,7 @@ export default async function UsagePage() {
           <p className="text-sm text-muted-foreground">All-time</p>
         </div>
 
-        <div className="border rounded-lg p-6">
+        <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
           <div className="flex items-center gap-3 mb-2">
             <Calendar className="size-5 text-primary" />
             <h3 className="font-semibold">This Month</h3>
@@ -229,7 +232,7 @@ export default async function UsagePage() {
           </p>
         </div>
 
-        <div className="border rounded-lg p-6">
+        <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
           <div className="flex items-center gap-3 mb-2">
             <Sparkles className="size-5 text-primary" />
             <h3 className="font-semibold">Total Cost</h3>
@@ -244,7 +247,7 @@ export default async function UsagePage() {
       </div>
 
       {/* Model Usage Breakdown */}
-      <div className="border rounded-lg p-6">
+      <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
         <h3 className="font-semibold text-lg mb-4">Model Usage Breakdown</h3>
         <div className="grid gap-4 md:grid-cols-2">
           {Object.entries(stats.modelUsage).map(([modelKey, count]) => {
@@ -279,7 +282,7 @@ export default async function UsagePage() {
       </div>
 
       {/* Rate Limits Info */}
-      <div className="border rounded-lg p-6 mt-6 bg-muted/30">
+      <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6 mt-6">
         <h3 className="font-semibold mb-3">Rate Limits</h3>
         <div className="grid gap-4 md:grid-cols-2 text-sm">
           <div>
@@ -313,6 +316,7 @@ export default async function UsagePage() {
           </Button>
         </div>
       )}
+      </div>
     </div>
   );
 }

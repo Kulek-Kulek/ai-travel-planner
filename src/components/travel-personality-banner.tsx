@@ -51,11 +51,6 @@ export function TravelPersonalityBanner() {
     checkUserAndProfile();
   }, []);
 
-  const handleDismiss = () => {
-    setBannerState('dismissed');
-    sessionStorage.setItem('travelProfileBannerDismissed', 'true');
-  };
-
   if (bannerState === 'loading' || bannerState === 'dismissed') {
     return null;
   }
