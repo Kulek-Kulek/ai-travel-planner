@@ -303,7 +303,7 @@ export async function generateItinerary(
         // Check if this might be an AI refusal (content policy violation)
         return {
           success: false,
-          error: "❌ Unable to generate itinerary. This request may violate our content policy. Our platform is for legitimate travel planning only.",
+          error: "[SECURITY_ERROR] Unable to generate itinerary. This request may violate our content policy. Our platform is for legitimate travel planning only.",
         };
       }
 
@@ -352,7 +352,7 @@ export async function generateItinerary(
         // Check if this might be an AI refusal (content policy violation)
         return {
           success: false,
-          error: "❌ Unable to generate itinerary. This request may violate our content policy. Our platform is for legitimate travel planning only.",
+          error: "[SECURITY_ERROR] Unable to generate itinerary. This request may violate our content policy. Our platform is for legitimate travel planning only.",
         };
       }
 

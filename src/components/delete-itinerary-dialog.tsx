@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { MessageSquareWarning } from 'lucide-react';
 
 interface DeleteItineraryDialogProps {
   open: boolean;
@@ -48,7 +49,7 @@ export function DeleteItineraryDialog({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle className="text-red-600">
-            ⚠️ Delete Itinerary?
+            <MessageSquareWarning className="w-5 h-5 text-red-600 inline-block mr-2" /> Delete Itinerary?
           </AlertDialogTitle>
           <AlertDialogDescription asChild>
             <div className="space-y-4">

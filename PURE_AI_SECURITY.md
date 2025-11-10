@@ -369,3 +369,5 @@ This is a **pure AI solution** that trusts machine intelligence to understand hu
 **No regex. No word lists. Just smart AI doing what it does best: understanding language and intent.**
 
 
+
+

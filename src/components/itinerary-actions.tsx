@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { DeleteItineraryDialog } from '@/components/delete-itinerary-dialog';
 import { deleteItinerary } from '@/lib/actions/itinerary-actions';
 import { toast } from 'sonner';
+import { Pencil, Settings, Trash2} from 'lucide-react';
 
 interface ItineraryActionsProps {
   itineraryId: string;
@@ -34,22 +35,25 @@ export function ItineraryActions({ itineraryId, destination, isOwner }: Itinerar
       <div className="space-y-4">
         {isOwner && (
           <>
-            <p className="text-gray-700 text-center mb-4">
-              ⚙️ Manage this itinerary
-            </p>
+            <div className="flex items-center justify-center gap-2 text-gray-700 mb-4">
+              <Settings className="w-5 h-5" />
+              <p className="font-medium text-lg">Manage this itinerary</p>
+            </div>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Link href={`/itinerary/${itineraryId}/edit`}>
-                <Button variant="outline" size="lg" className="w-full sm:w-auto">
-                  ✏️ Edit & Regenerate
+                <Button variant="outline" size="lg" className="w-full sm:w-auto gap-2">
+                  <Pencil className="w-4 h-4" />
+                  Edit & Regenerate
                 </Button>
               </Link>
               <Button
                 variant="destructive"
                 size="lg"
                 onClick={() => setDeleteDialog(true)}
-                className="w-full sm:w-auto"
+                className="w-full sm:w-auto gap-2"
               >
-                🗑️ Delete Itinerary
+                <Trash2 className="w-4 h-4" />
+                Delete Itinerary
               </Button>
             </div>
             <div className="border-t border-gray-200 my-4"></div>
