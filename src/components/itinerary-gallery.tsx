@@ -21,37 +21,43 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-  
+
   // Read initial values from URL
   const [selectedTags, setSelectedTags] = useState<string[]>(() => {
     const tagsParam = searchParams.get('tags');
     return tagsParam ? tagsParam.split(',').filter(Boolean) : [];
   });
-  
+
   const [destinationSearch, setDestinationSearch] = useState<string>(() => {
     return searchParams.get('destination') || '';
   });
-  
+
   const [bucketListIds, setBucketListIds] = useState<Set<string>>(new Set());
   const [visibleNatureTags, setVisibleNatureTags] = useState(22); // Show ~2 lines initially (~6 tags per line)
   const [randomSeed] = useState(() => Date.now()); // Generate once on mount for random queries
+  const [isMounted, setIsMounted] = useState(false); // Track client-side hydration
   const queryClient = useQueryClient();
+
+  // Track when component has mounted to avoid hydration mismatches
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Update URL when filters change
   useEffect(() => {
     const params = new URLSearchParams();
-    
+
     if (destinationSearch) {
       params.set('destination', destinationSearch);
     }
-    
+
     if (selectedTags.length > 0) {
       params.set('tags', selectedTags.join(','));
     }
-    
+
     const queryString = params.toString();
     const newUrl = queryString ? `${pathname}?${queryString}` : pathname;
-    
+
     // Update URL without triggering a navigation
     router.replace(newUrl, { scroll: false });
   }, [selectedTags, destinationSearch, pathname, router]);
@@ -60,7 +66,7 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
   // Add timestamp to force refetch on each mount when no filters
   const hasFilters = selectedTags.length > 0 || destinationSearch;
   const timestampKey = hasFilters ? 'filtered' : randomSeed;
-  
+
   const { data: itinerariesData, isLoading, isFetching, error: queryError } = useQuery({
     queryKey: ['public-itineraries-v2', selectedTags, destinationSearch, timestampKey],
     queryFn: async () => {
@@ -73,23 +79,23 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
         params.set('destination', destinationSearch);
       }
       params.set('limit', '24');
-      
+
       // Use random ordering when no filters are applied
       if (!hasFilters) {
         params.set('random', 'true');
       }
-      
+
       const url = `/api/itineraries?${params.toString()}`;
-      
+
       const response = await fetch(url);
-      
+
       if (!response.ok) {
         const error = await response.json().catch(() => ({ error: 'Unknown error' }));
         console.error('❌ BROWSER: API error:', error);
         toast.error('Failed to load itineraries');
         return { itineraries: [], total: 0 };
       }
-      
+
       const data = await response.json();
       return data;
     },
@@ -97,7 +103,7 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
     staleTime: 0,
     gcTime: hasFilters ? 5 * 60 * 1000 : 0, // Keep filtered results cached for 5 min, but clear random results immediately
   });
-  
+
   // Log query errors
   if (queryError) {
     console.error('❌ React Query Error:', queryError);
@@ -116,9 +122,9 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
       return data;
     },
   });
-  
+
   const allTags = tagsData?.tags || [];
-  
+
   // Fetch total statistics
   const { data: statsData } = useQuery({
     queryKey: ['stats'],
@@ -132,9 +138,9 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
     },
     staleTime: 2 * 60 * 1000, // Consider data fresh for 2 minutes
   });
-  
+
   const totalItinerariesInDatabase = statsData?.totalItineraries || 0;
-  
+
   // Fetch bucket list IDs for authenticated users
   // Re-fetch whenever we navigate to this page or itineraries change
   useEffect(() => {
@@ -142,25 +148,25 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
       // Check if user is authenticated
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       if (!user) {
         setBucketListIds(new Set());
         return;
       }
-      
+
       const result = await getBucketListIds();
       if (result.success) {
         setBucketListIds(new Set(result.data));
       }
     }
-    
+
     loadBucketListIds();
-    
+
     // Also listen for focus event to refresh when user returns from login
     const handleFocus = () => {
       loadBucketListIds();
     };
-    
+
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
   }, [itinerariesData]); // Re-fetch when itineraries data changes
@@ -169,7 +175,7 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
   const total = itinerariesData?.total || 0;
 
   const toggleTag = (tag: string) => {
-    setSelectedTags(prev => 
+    setSelectedTags(prev =>
       prev.includes(tag)
         ? prev.filter(t => t !== tag)
         : [...prev, tag]
@@ -188,7 +194,7 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
   // Admin: Delete itinerary
   const handleDelete = async (id: string) => {
     const result = await deleteItineraryAdmin(id);
-    
+
     if (result.success) {
       toast.success('Itinerary deleted');
       queryClient.invalidateQueries({ queryKey: ['public-itineraries-v2'] });
@@ -201,7 +207,7 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
   // Admin: Toggle privacy
   const handleTogglePrivacy = async (id: string, currentPrivacy: boolean) => {
     const result = await updateItineraryPrivacyAdmin(id, !currentPrivacy);
-    
+
     if (result.success) {
       toast.success(`Set to ${!currentPrivacy ? 'private' : 'public'}`);
       queryClient.invalidateQueries({ queryKey: ['public-itineraries-v2'] });
@@ -228,28 +234,28 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
     "14 days",
     "14+ days"
   ];
-  
+
   const GROUP_SIZE_TAGS = [
     "solo",
     "2 people",
     "group",
     "family"
   ];
-  
+
   // Filter out duration and group tags from allTags to get nature tags
-  const natureTags = allTags.filter((tag: string) => 
+  const natureTags = allTags.filter((tag: string) =>
     !DURATION_TAGS.includes(tag) && !GROUP_SIZE_TAGS.includes(tag)
   );
-  
+
   // Handle "Show More" for nature tags
   const displayedNatureTags = natureTags.slice(0, visibleNatureTags);
   const hasMoreNatureTags = natureTags.length > visibleNatureTags;
   const showLessButton = visibleNatureTags > 22;
-  
+
   const handleShowMoreTags = () => {
     setVisibleNatureTags(prev => prev + 22); // Add ~3 lines (6 tags per line)
   };
-  
+
   const handleShowLessTags = () => {
     setVisibleNatureTags(22); // Reset to initial 2 lines
   };
@@ -282,7 +288,9 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
           <p className="text-sm text-gray-600 mt-1">
             {selectedTags.length > 0 || destinationSearch
               ? `Showing ${total} ${total === 1 ? 'itinerary' : 'itineraries'} matching your filters`
-              : `Currently showing ${total} of ${totalItinerariesInDatabase.toLocaleString()} ${totalItinerariesInDatabase === 1 ? 'itinerary' : 'itineraries'} to search from.`}
+              : isMounted
+                ? `Currently showing ${total} of ${totalItinerariesInDatabase.toLocaleString()} ${totalItinerariesInDatabase === 1 ? 'itinerary' : 'itineraries'} to search from.`
+                : 'Loading itineraries...'}
           </p>
         </div>
         {(isLoading || isFetching) && (
@@ -352,11 +360,10 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
                   <button
                     key={tag}
                     onClick={() => toggleTag(tag)}
-                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                      isSelected
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${isSelected
                         ? 'bg-blue-600 text-white border-2 border-blue-600'
                         : 'bg-gray-100 text-gray-700 border-2 border-gray-200 hover:border-blue-300'
-                    }`}
+                      }`}
                   >
                     {tag}
                   </button>
@@ -377,11 +384,10 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
                   <button
                     key={tag}
                     onClick={() => toggleTag(tag)}
-                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                      isSelected
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${isSelected
                         ? 'bg-blue-600 text-white border-2 border-blue-600'
                         : 'bg-gray-100 text-gray-700 border-2 border-gray-200 hover:border-blue-300'
-                    }`}
+                      }`}
                   >
                     {tag}
                   </button>
@@ -403,18 +409,17 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
                     <button
                       key={tag}
                       onClick={() => toggleTag(tag)}
-                      className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                        isSelected
+                      className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${isSelected
                           ? 'bg-blue-600 text-white border-2 border-blue-600'
                           : 'bg-gray-100 text-gray-700 border-2 border-gray-200 hover:border-blue-300'
-                      }`}
+                        }`}
                     >
                       {tag}
                     </button>
                   );
                 })}
               </div>
-              
+
               {/* Show More / Show Less Buttons */}
               {(hasMoreNatureTags || showLessButton) && (
                 <div className="mt-3 flex gap-2">
@@ -489,8 +494,8 @@ export function ItineraryGallery({ isAdmin = false }: ItineraryGalleryProps) {
       {!isLoading && itineraries.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {itineraries.map((itinerary: Itinerary) => (
-            <ItineraryCard 
-              key={itinerary.id} 
+            <ItineraryCard
+              key={itinerary.id}
               itinerary={itinerary}
               showActions={isAdmin}
               isInBucketList={bucketListIds.has(itinerary.id)}
