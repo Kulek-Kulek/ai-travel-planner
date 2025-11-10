@@ -154,6 +154,8 @@ export const ItineraryFormAIEnhanced = ({
   const submitButtonRef = useRef<HTMLButtonElement>(null);
   // Track last time user typed to prevent scroll interruption
   const lastTypedTimeRef = useRef<number>(Date.now());
+  // Track when AI is programmatically setting values to prevent re-extraction
+  const isAISettingValuesRef = useRef<boolean>(false);
 
   const defaultFormValues = {
     destination: "",
@@ -190,6 +192,11 @@ export const ItineraryFormAIEnhanced = ({
   // AI-powered extraction with debouncing
   // Re-analyzes when notes OR any manual input changes
   useEffect(() => {
+    // Skip extraction if AI is currently setting values (prevents duplicate analysis)
+    if (isAISettingValuesRef.current) {
+      return;
+    }
+    
     // Clear existing timeout
     if (extractionTimeout) {
       clearTimeout(extractionTimeout);
@@ -237,6 +244,9 @@ export const ItineraryFormAIEnhanced = ({
         
         setExtractedInfo(extractedData);
 
+        // Set flag to prevent re-extraction when AI fills fields
+        isAISettingValuesRef.current = true;
+
         // Auto-fill fields if they're empty
         if (extractedData.destination && !form.getValues("destination")) {
           form.setValue("destination", extractedData.destination, { shouldValidate: true });
@@ -282,6 +292,11 @@ export const ItineraryFormAIEnhanced = ({
             console.error("Failed to parse endDate:", extractedData.endDate, error);
           }
         }
+        
+        // Clear the flag after a brief delay to allow values to settle
+        setTimeout(() => {
+          isAISettingValuesRef.current = false;
+        }, 100);
         
         // Check if critical fields are missing after extraction
         const hasDestination = extractedData.destination || form.getValues("destination");
@@ -494,8 +509,8 @@ export const ItineraryFormAIEnhanced = ({
 
                 {/* AI Analysis Status */}
                 {isExtracting && (
-                  <div className="flex items-center gap-2 text-sm text-indigo-600">
-                    <Sparkles className="h-4 w-4 animate-pulse" />
+                  <div className="mt-3 flex items-center gap-2.5 rounded-xl border-2 border-indigo-200 bg-indigo-50 px-4 py-3 text-base font-medium text-indigo-700">
+                    <Sparkles className="h-5 w-5 animate-pulse" />
                     <span>AI is analyzing your description...</span>
                   </div>
                 )}
