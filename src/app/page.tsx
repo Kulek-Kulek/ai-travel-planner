@@ -818,7 +818,7 @@ export default function Home() {
           {hasSubmitted && ((mutation.isPending && !userCancelled) || result) && (
             <div
               ref={previewRef}
-              className="rounded-3xl border border-slate-200 bg-white/80 p-8 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.35)] backdrop-blur-xl"
+              className="mt-[50px] md:mt-[100px] rounded-3xl border border-slate-200 bg-white/80 p-8 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.35)] backdrop-blur-xl"
             >
               {/* Auth Banner - shown when not authenticated and preview is ready */}
               {!isAuthenticated && result && !mutation.isPending && (
