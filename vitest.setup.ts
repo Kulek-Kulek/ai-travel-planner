@@ -8,16 +8,18 @@ process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key'
 
 // Add custom matchers if needed
 expect.extend({
-  toBeSecurityError(received: any) {
-    const pass = 
-      received && 
+  toBeSecurityError(received: unknown) {
+    const pass =
       typeof received === 'object' &&
-      (received.error === 'content_policy_violation' || 
-       received.securityError !== undefined)
+      received !== null &&
+      // @ts-expect-error index signature lookup for runtime check
+      (received.error === 'content_policy_violation' ||
+        // @ts-expect-error index signature lookup for runtime check
+        received.securityError !== undefined)
 
     return {
       pass,
-      message: () => 
+      message: () =>
         pass
           ? 'Expected not to be a security error'
           : 'Expected to be a security error with \'error\' or \'securityError\' field',
@@ -27,11 +29,11 @@ expect.extend({
 
 // Extend TypeScript types for custom matchers
 declare module 'vitest' {
-  interface Assertion<T = any> {
-    toBeSecurityError(): T
+  interface Assertion {
+    toBeSecurityError(): void
   }
   interface AsymmetricMatchersContaining {
-    toBeSecurityError(): any
+    toBeSecurityError(): void
   }
 }
 

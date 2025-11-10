@@ -140,16 +140,16 @@ export const ItineraryFormAIEnhanced = ({
   const [extractedInfo, setExtractedInfo] = useState<ExtractedTravelInfo | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractionTimeout, setExtractionTimeout] = useState<NodeJS.Timeout | null>(null);
-  
+
   // Turnstile token state - required for bot protection
   const isTurnstileEnabled = !!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-  
+
   // Security alert state (from main branch)
   const [showSecurityAlert, setShowSecurityAlert] = useState(false);
   const [securityAlertMessage, setSecurityAlertMessage] = useState<string>("");
   const [hasSecurityViolation, setHasSecurityViolation] = useState(false);
-  
+
   // Ref for the submit button to enable auto-scroll
   const submitButtonRef = useRef<HTMLButtonElement>(null);
   // Ref for the AI analyzing indicator to enable auto-scroll
@@ -198,7 +198,7 @@ export const ItineraryFormAIEnhanced = ({
     if (isAISettingValuesRef.current) {
       return;
     }
-    
+
     // Clear existing timeout
     if (extractionTimeout) {
       clearTimeout(extractionTimeout);
@@ -214,13 +214,13 @@ export const ItineraryFormAIEnhanced = ({
     // Set new timeout - extract after user stops typing for 1.5 seconds
     const timeout = setTimeout(async () => {
       setIsExtracting(true);
-      
+
       try {
         // Use modelOverride if provided (for tier-based model selection)
-        const extracted = modelOverride 
+        const extracted = modelOverride
           ? await extractTravelInfoWithAI(watchNotes, modelOverride)
           : await extractTravelInfoWithAI(watchNotes);
-        
+
         // Check if there's a security error
         // IMPORTANT: Security detection and field extraction are SEPARATE features
         // We ALWAYS prefill fields even if security issues are detected
@@ -228,19 +228,19 @@ export const ItineraryFormAIEnhanced = ({
         let extractedData = extracted;
         if ('securityError' in extracted && extracted.securityError) {
           // Clean the error message by removing security markers
-          let cleanedMessage = extracted.securityError
+          const cleanedMessage = extracted.securityError
             .replace(/\[SECURITY_ERROR\]/gi, '')
             .replace(/\[SECURITY_WARNING\]/gi, '')
             .replace(/\[SECURITY_ALERT\]/gi, '')
             .replace(/^Content Policy Violation\s*:?\s*/i, '')
             .replace(/^Security Alert\s*:?\s*/i, '')
             .trim();
-          
+
           // Show security alert modal
           setSecurityAlertMessage(cleanedMessage || "A security issue was detected with your request.");
           setShowSecurityAlert(true);
           setHasSecurityViolation(true); // Flag that this request has security issues
-          
+
           // CRITICAL FIX: Remove securityError from the extracted object before saving
           // This allows the extracted fields to be used for prefilling while keeping
           // the security flag separate for blocking generation
@@ -252,7 +252,7 @@ export const ItineraryFormAIEnhanced = ({
           // Clear security violation flag if extraction succeeded without errors
           setHasSecurityViolation(false);
         }
-        
+
         setExtractedInfo(extractedData);
 
         // Set flag to prevent re-extraction when AI fills fields
@@ -271,13 +271,13 @@ export const ItineraryFormAIEnhanced = ({
         if (extractedData.children && !form.getValues("children")) {
           form.setValue("children", extractedData.children, { shouldValidate: true });
         }
-        
+
         // Pre-fill child ages if extracted
         if (extractedData.childAges && extractedData.childAges.length > 0 && !form.getValues("childAges")?.length) {
           form.setValue("childAges", extractedData.childAges, { shouldValidate: true });
           setChildAgesInput(extractedData.childAges.map(age => age.toString()));
         }
-        
+
         if (extractedData.hasAccessibilityNeeds) {
           form.setValue("hasAccessibilityNeeds", true, { shouldValidate: true });
         }
@@ -303,27 +303,27 @@ export const ItineraryFormAIEnhanced = ({
             console.error("Failed to parse endDate:", extractedData.endDate, error);
           }
         }
-        
+
         // Clear the flag after a brief delay to allow values to settle
         setTimeout(() => {
           isAISettingValuesRef.current = false;
         }, 100);
-        
+
         // Check if critical fields are missing after extraction
         const hasDestination = extractedData.destination || form.getValues("destination");
         const hasDays = extractedData.days || (form.getValues("days") && form.getValues("days") > 0);
         const missingCriticalFields = !hasDestination || !hasDays;
-        
+
         // Auto-open detailed fields if critical information is missing
         if (missingCriticalFields && !showDetailedFields) {
           setShowDetailedFields(true);
-          
+
           // Show helpful message
           toast.info("Please complete the missing information", {
             description: "We need a bit more detail about your destination and trip length",
           });
         }
-        
+
         // Force validation refresh after extraction
         // This ensures error messages clear when fields become valid
         setTimeout(() => {
@@ -344,7 +344,7 @@ export const ItineraryFormAIEnhanced = ({
     return () => {
       if (timeout) clearTimeout(timeout);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchNotes, watchDestination, watchDays, watchTravelers, watchChildren, watchStartDate, watchEndDate]); // Re-analyze when any input changes
 
   // Auto-scroll to submit button when AI extraction completes and form is valid
@@ -353,23 +353,23 @@ export const ItineraryFormAIEnhanced = ({
     if (!isExtracting && extractedInfo && submitButtonRef.current && form.formState.isValid && !hasSecurityViolation) {
       // Record when this effect starts (when extraction completes)
       const extractionCompleteTime = Date.now();
-      
+
       // Wait 3 seconds before auto-scrolling to give user time to review extracted info
       const scrollTimeout = setTimeout(() => {
         // Before scrolling, check if user has typed since extraction completed
         const timeSinceLastTyped = Date.now() - lastTypedTimeRef.current;
         const timeSinceExtractionComplete = Date.now() - extractionCompleteTime;
-        
+
         // Only scroll if user hasn't typed in the last 3 seconds
         // This prevents interrupting the user if they resumed typing
         if (timeSinceLastTyped >= 3000 || timeSinceLastTyped >= timeSinceExtractionComplete) {
-          submitButtonRef.current?.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'center' 
+          submitButtonRef.current?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center'
           });
         }
       }, 3000);
-      
+
       // Cleanup: clear timeout if component unmounts or dependencies change
       return () => {
         clearTimeout(scrollTimeout);
@@ -389,7 +389,7 @@ export const ItineraryFormAIEnhanced = ({
           });
         }
       }, 100);
-      
+
       return () => clearTimeout(scrollTimeout);
     }
   }, [showDetailedFields, isExtracting]);
@@ -464,14 +464,14 @@ export const ItineraryFormAIEnhanced = ({
     };
 
     onSubmit(capitalizedData);
-    
+
     // Reset token after submission to require new verification
     setTurnstileToken(null);
   };
 
   const handleFormError = () => {
     setShowDetailedFields(true);
-    
+
     toast.error("Please provide missing information", {
       description: "We need a few more details to generate your perfect itinerary",
     });
@@ -481,9 +481,9 @@ export const ItineraryFormAIEnhanced = ({
   const hasDestination = extractedInfo?.destination !== null || form.getValues("destination");
   const hasDays = extractedInfo?.days !== null || (form.getValues("days") && form.getValues("days") > 0);
   const hasTravelers = extractedInfo?.travelers !== null || form.getValues("travelers") > 0;
-  
+
   const confidence = extractedInfo ? calculateExtractionConfidence(extractedInfo) : 0;
-  
+
   // Check if form should be disabled (user created plan while logged out)
   const isFormDisabled = !isAuthenticated && hasResult;
 
@@ -537,7 +537,7 @@ export const ItineraryFormAIEnhanced = ({
 
                 {/* AI Analysis Status */}
                 {isExtracting && (
-                  <div 
+                  <div
                     ref={aiAnalyzingRef}
                     className="mt-3 flex items-center gap-2.5 rounded-xl border-2 border-indigo-200 bg-indigo-50 px-4 py-3 text-base font-medium text-indigo-700"
                   >
@@ -567,7 +567,7 @@ export const ItineraryFormAIEnhanced = ({
                         </span>
                       </div>
                     </div>
-                    
+
                     <div className="space-y-1.5">
                       <div className="flex items-center gap-2 text-sm">
                         {hasDestination ? (
@@ -579,7 +579,7 @@ export const ItineraryFormAIEnhanced = ({
                           Destination: {form.getValues("destination") || extractedInfo.destination || "Not specified"}
                         </span>
                       </div>
-                      
+
                       <div className="flex items-center gap-2 text-sm">
                         {hasDays ? (
                           <CheckCircle2 className="h-4 w-4 text-green-600" />
@@ -590,7 +590,7 @@ export const ItineraryFormAIEnhanced = ({
                           Trip length: {form.getValues("days") > 0 ? `${form.getValues("days")} days` : (extractedInfo.days ? `${extractedInfo.days} days` : "Not specified")}
                         </span>
                       </div>
-                      
+
                       <div className="flex items-center gap-2 text-sm">
                         {hasTravelers ? (
                           <CheckCircle2 className="h-4 w-4 text-green-600" />
@@ -649,7 +649,7 @@ export const ItineraryFormAIEnhanced = ({
                               Pro tip: Add your travel dates for a more precise plan!
                             </p>
                             <p className="text-xs text-blue-700 mt-1">
-                              Knowing your specific dates helps us recommend seasonal activities, 
+                              Knowing your specific dates helps us recommend seasonal activities,
                               check for local events, and suggest the best times to visit attractions.
                             </p>
                             <button
@@ -671,11 +671,11 @@ export const ItineraryFormAIEnhanced = ({
                         onClick={() => setShowDetailedFields(!showDetailedFields)}
                         className="text-sm text-indigo-600 hover:text-indigo-700 underline font-medium"
                       >
-                        {showDetailedFields 
-                          ? "Hide detailed fields" 
-                          : ((!hasDestination || !hasDays || !hasTravelers) 
-                              ? "Fill in missing details manually" 
-                              : "Edit or add more details")}
+                        {showDetailedFields
+                          ? "Hide detailed fields"
+                          : ((!hasDestination || !hasDays || !hasTravelers)
+                            ? "Fill in missing details manually"
+                            : "Edit or add more details")}
                       </button>
                     </div>
                   </div>
@@ -892,8 +892,8 @@ export const ItineraryFormAIEnhanced = ({
                           const numValue = parseInt(e.target.value, 10);
                           const value =
                             e.target.value === "" ||
-                            Number.isNaN(numValue) ||
-                            numValue === 0
+                              Number.isNaN(numValue) ||
+                              numValue === 0
                               ? undefined
                               : numValue;
                           field.onChange(value);
@@ -1065,8 +1065,8 @@ export const ItineraryFormAIEnhanced = ({
                           {lockedModels.length > 0 && (
                             <>
                               <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-t mt-2 pt-2 flex items-center gap-2">
-                              <Lock className="size-3.5" />  
-                              <span>Premium Models</span>
+                                <Lock className="size-3.5" />
+                                <span>Premium Models</span>
                               </div>
                               {lockedModels.map((option) => {
                                 const pricingKey = getPricingModelKey(option.value);
@@ -1094,7 +1094,7 @@ export const ItineraryFormAIEnhanced = ({
                     </FormControl>
                     <FormMessage />
                   </FormItem>
-                  
+
                   {/* Upgrade prompt for locked models - Full width outside the select */}
                   {lockedModels.length > 0 && userTier === 'free' && (
                     <div className="mt-4 p-4 border border-blue-200 bg-blue-50/50 rounded-lg">
@@ -1105,8 +1105,8 @@ export const ItineraryFormAIEnhanced = ({
                             Unlock Premium AI Models
                           </p>
                           <p className="text-xs text-blue-700 mb-2">
-                            Access <strong>Claude Haiku</strong> and <strong>GPT-4o</strong> with 
-                            Pay-as-you-go ({formatCurrency(0.3)}-{formatCurrency(0.5)} per plan) 
+                            Access <strong>Claude Haiku</strong> and <strong>GPT-4o</strong> with
+                            Pay-as-you-go ({formatCurrency(0.3)}-{formatCurrency(0.5)} per plan)
                             or Pro plan ({formatCurrency(9.99)}/month).
                           </p>
                           <Link
@@ -1145,13 +1145,13 @@ export const ItineraryFormAIEnhanced = ({
             />
           </div>
         )}
- 
 
-        <Button 
+
+        <Button
           ref={submitButtonRef}
-          type="submit" 
-          className="w-full h-12 text-base" 
-          disabled={isLoading || isExtracting || (hasResult && !isAuthenticated) || !turnstileToken || hasSecurityViolation} 
+          type="submit"
+          className="w-full h-12 text-base"
+          disabled={isLoading || isExtracting || (hasResult && !isAuthenticated) || !turnstileToken || hasSecurityViolation}
           size="lg"
         >
           {isLoading ? (
@@ -1176,7 +1176,7 @@ export const ItineraryFormAIEnhanced = ({
           )}
         </Button>
       </form>
-      
+
       {/* Security Alert Modal */}
       <SecurityAlertDialog
         open={showSecurityAlert}
