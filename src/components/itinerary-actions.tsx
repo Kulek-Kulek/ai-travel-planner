@@ -7,12 +7,14 @@ import { Button } from '@/components/ui/button';
 import { DeleteItineraryDialog } from '@/components/delete-itinerary-dialog';
 import { deleteItinerary } from '@/lib/actions/itinerary-actions';
 import { toast } from 'sonner';
-import { Pencil, Settings, Trash2} from 'lucide-react';
+import { Pencil, Settings, Trash2 } from 'lucide-react';
 
 interface ItineraryActionsProps {
   itineraryId: string;
   destination: string;
   isOwner: boolean;
+  isPrivate?: boolean;
+  status?: string | undefined;
 }
 
 export function ItineraryActions({ itineraryId, destination, isOwner }: ItineraryActionsProps) {
@@ -21,7 +23,7 @@ export function ItineraryActions({ itineraryId, destination, isOwner }: Itinerar
 
   const handleDelete = async () => {
     const result = await deleteItinerary(itineraryId);
-    
+
     if (result.success) {
       toast.success('Itinerary deleted successfully');
       router.push('/my-plans');
@@ -59,7 +61,7 @@ export function ItineraryActions({ itineraryId, destination, isOwner }: Itinerar
             <div className="border-t border-gray-200 my-4"></div>
           </>
         )}
-        
+
         <p className="text-gray-700 text-center mb-4">
           ✨ Want to create your own personalized itinerary?
         </p>

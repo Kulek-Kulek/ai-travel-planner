@@ -17,21 +17,22 @@ const requiredEnvVars = [
   'TURNSTILE_SECRET_KEY',
 ] as const;
 
-const optionalEnvVars = [
-  'NEXT_PUBLIC_APP_URL',
-  'PEXELS_API_KEY',
-  'STRIPE_PRO_PRICE_ID',
-  'STRIPE_CREDIT_2_PRICE_ID',
-  'STRIPE_CREDIT_5_PRICE_ID',
-  'STRIPE_CREDIT_10_PRICE_ID',
-  'STRIPE_CREDIT_20_PRICE_ID',
-  'NEXT_PUBLIC_TURNSTILE_SITE_KEY',
-] as const;
+// Optional environment variables that may not be set
+// const optionalEnvVars = [
+//   'NEXT_PUBLIC_APP_URL',
+//   'PEXELS_API_KEY',
+//   'STRIPE_PRO_PRICE_ID',
+//   'STRIPE_CREDIT_2_PRICE_ID',
+//   'STRIPE_CREDIT_5_PRICE_ID',
+//   'STRIPE_CREDIT_10_PRICE_ID',
+//   'STRIPE_CREDIT_20_PRICE_ID',
+//   'NEXT_PUBLIC_TURNSTILE_SITE_KEY',
+// ] as const;
 
 // Skip validation during build process (Vercel, etc.)
 // Environment variables are only needed at runtime, not during static build
-const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build' || 
-                    process.env.NEXT_PHASE === 'phase-export';
+const isBuildTime = process.env.NEXT_PHASE === 'phase-production-build' ||
+  process.env.NEXT_PHASE === 'phase-export';
 
 // Validate on import (startup), but skip during build
 const missingVars: string[] = [];
@@ -52,8 +53,8 @@ if (!isBuildTime) {
 }
 
 // Validate formats
-if (process.env.NEXT_PUBLIC_SUPABASE_URL && 
-    !process.env.NEXT_PUBLIC_SUPABASE_URL.startsWith('https://')) {
+if (process.env.NEXT_PUBLIC_SUPABASE_URL &&
+  !process.env.NEXT_PUBLIC_SUPABASE_URL.startsWith('https://')) {
   throw new Error('NEXT_PUBLIC_SUPABASE_URL must be a valid HTTPS URL');
 }
 
@@ -86,10 +87,10 @@ export const ENV = {
   SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL!,
   SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  
+
   // OpenRouter
   OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY!,
-  
+
   // Stripe
   STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY!,
   STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET!,
@@ -98,15 +99,15 @@ export const ENV = {
   STRIPE_CREDIT_5_PRICE_ID: process.env.STRIPE_CREDIT_5_PRICE_ID,
   STRIPE_CREDIT_10_PRICE_ID: process.env.STRIPE_CREDIT_10_PRICE_ID,
   STRIPE_CREDIT_20_PRICE_ID: process.env.STRIPE_CREDIT_20_PRICE_ID,
-  
+
   // Cloudflare Turnstile
   TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY!,
   TURNSTILE_SITE_KEY: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
-  
+
   // Optional
   APP_URL: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
   PEXELS_API_KEY: process.env.PEXELS_API_KEY,
-  
+
   // Runtime environment
   NODE_ENV: process.env.NODE_ENV || 'development',
   IS_PRODUCTION: process.env.NODE_ENV === 'production',
