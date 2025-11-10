@@ -23,15 +23,15 @@ if (!supabaseUrl || !supabaseKey) {
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 describe('Transaction Atomicity Tests (HIGH-1)', () => {
-  let testUserId: string = 'test-user-id-placeholder';
-  let testProfileId: string = 'test-profile-id-placeholder';
+  const testUserId: string = 'test-user-id-placeholder';
+  // const testProfileId: string = 'test-profile-id-placeholder'; // Reserved for future use
 
   beforeEach(async () => {
     // Create test user and profile
     // In real tests, you'd use a dedicated test database
     console.log('⚠️  Note: These tests require a test database instance');
     console.log('⚠️  Do NOT run against production!');
-    
+
     // TODO: Implement actual test user creation when database is configured
     // const { data: testUser } = await supabase.auth.signUp({ email: 'test@test.com', password: 'test' });
     // testUserId = testUser.user.id;
@@ -45,7 +45,7 @@ describe('Transaction Atomicity Tests (HIGH-1)', () => {
   describe('create_itinerary_with_transaction()', () => {
     it('should create itinerary and deduct credits atomically', async () => {
       // This test verifies the basic success case
-      
+
       const testData = {
         p_user_id: testUserId,
         p_destination: 'Paris',
@@ -124,7 +124,7 @@ describe('Transaction Atomicity Tests (HIGH-1)', () => {
 
     it('should rollback when insufficient credits', async () => {
       // This test verifies rollback on credit check failure
-      
+
       // Set user to PAYG with 0.3 credits
       await supabase
         .from('profiles')
@@ -158,7 +158,7 @@ describe('Transaction Atomicity Tests (HIGH-1)', () => {
       };
 
       // Call transaction function (should fail)
-      const { data, error } = await supabase.rpc(
+      const { data } = await supabase.rpc(
         'create_itinerary_with_transaction',
         testData
       );
@@ -202,7 +202,7 @@ describe('Transaction Atomicity Tests (HIGH-1)', () => {
           .select('success')
           .eq('id', usageLogs[0].id)
           .single();
-        
+
         expect(log?.success).toBe(false);
       }
     });
@@ -210,7 +210,7 @@ describe('Transaction Atomicity Tests (HIGH-1)', () => {
     it('should rollback entire transaction on database error', async () => {
       // This test simulates a database error during itinerary creation
       // In practice, this could be a constraint violation
-      
+
       // Set up valid credits
       await supabase
         .from('profiles')
@@ -247,7 +247,7 @@ describe('Transaction Atomicity Tests (HIGH-1)', () => {
       };
 
       // Call transaction function (should fail due to DB constraints)
-      const { data, error } = await supabase.rpc(
+      const { data } = await supabase.rpc(
         'create_itinerary_with_transaction',
         testData
       );
@@ -276,7 +276,7 @@ describe('Transaction Atomicity Tests (HIGH-1)', () => {
 
     it('should handle concurrent transactions correctly', async () => {
       // This test verifies that concurrent transactions don't cause race conditions
-      
+
       // Set user to PAYG with 1.0 credits
       await supabase
         .from('profiles')
@@ -460,7 +460,7 @@ describe('Transaction Atomicity Tests (HIGH-1)', () => {
       };
 
       // Should fail authorization check
-      const { data, error } = await supabase.rpc(
+      const { data } = await supabase.rpc(
         'update_itinerary_with_transaction',
         testData
       );
@@ -483,7 +483,7 @@ describe('Transaction Atomicity Tests (HIGH-1)', () => {
   describe('Transaction Function Signature Tests', () => {
     it('should have all required parameters for create function', async () => {
       // Test that function exists with correct signature
-      const { data, error } = await supabase.rpc(
+      const { error } = await supabase.rpc(
         'create_itinerary_with_transaction',
         {
           p_user_id: 'test',
@@ -517,7 +517,7 @@ describe('Transaction Atomicity Tests (HIGH-1)', () => {
 
     it('should have all required parameters for update function', async () => {
       // Test that function exists with correct signature
-      const { data, error } = await supabase.rpc(
+      const { error } = await supabase.rpc(
         'update_itinerary_with_transaction',
         {
           p_user_id: 'test',

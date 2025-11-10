@@ -10,12 +10,16 @@ interface ItineraryShareButtonProps {
   itineraryId: string;
   title: string;
   description?: string;
+  days?: number;
+  places?: string[];
 }
 
-export function ItineraryShareButton({ 
-  itineraryId, 
-  title, 
-  description 
+export function ItineraryShareButton({
+  itineraryId,
+  title,
+  description,
+  days,
+  places
 }: ItineraryShareButtonProps) {
   const [isSharing, setIsSharing] = useState(false);
 
@@ -25,10 +29,16 @@ export function ItineraryShareButton({
     setIsSharing(true);
 
     try {
+      const generatedDescription =
+        description ||
+        (typeof days === 'number' && Array.isArray(places) && places.length > 0
+          ? `A ${days}-day itinerary for ${title}. Highlights: ${places.slice(0, 3).join(', ')}`
+          : `Check out this amazing ${title} travel itinerary!`);
+
       const result = await shareItinerary({
         id: itineraryId,
         title,
-        description: description || `Check out this amazing ${title} travel itinerary!`,
+        description: generatedDescription,
       });
 
       if (result.success) {
