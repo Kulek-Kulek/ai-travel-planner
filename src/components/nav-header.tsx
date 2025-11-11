@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { HideOnScroll } from '@/components/hide-on-scroll';
 import { MobileNav } from '@/components/mobile-nav';
 import { SignOutButton } from '@/components/sign-out-button';
+import { NavLink } from '@/components/nav-link';
 import { Plane, Sparkles, Users, LayoutDashboard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -29,16 +30,17 @@ export async function NavHeader() {
                 {/* Desktop Navigation */}
                 <nav className="hidden lg:flex items-center space-x-1">
                   {/* Pricing Link - Always Visible */}
-                  <Link
+                  <NavLink
                     href="/pricing"
                     className={cn(
                       buttonVariants({ variant: "ghost" }), 
                       "text-blue-600 hover:text-blue-700 hover:bg-blue-50 gap-1.5 font-semibold"
                     )}
+                    activeClassName="bg-blue-50 text-blue-700"
                   >
                     <Sparkles className="w-4 h-4" />
                     Pricing
-                  </Link>
+                  </NavLink>
                   
                   {/* User-specific Navigation */}
                   {user && (
@@ -46,42 +48,47 @@ export async function NavHeader() {
                       {userIsAdmin ? (
                         /* Admin Navigation */
                         <>
-                          <Link
+                          <NavLink
                             href="/admin/itineraries"
                             className={cn(buttonVariants({ variant: "ghost" }), "gap-1.5")}
+                            activeClassName="bg-accent text-accent-foreground"
                           >
                             <LayoutDashboard className="w-4 h-4" />
                             Dashboard
-                          </Link>
-                          <Link
+                          </NavLink>
+                          <NavLink
                             href="/admin/users"
                             className={cn(buttonVariants({ variant: "ghost" }), "gap-1.5")}
+                            activeClassName="bg-accent text-accent-foreground"
                           >
                             <Users className="w-4 h-4" />
                             Users
-                          </Link>
+                          </NavLink>
                         </>
                       ) : (
                         /* Regular User Navigation */
                         <>
-                          <Link
+                          <NavLink
                             href="/my-plans"
                             className={cn(buttonVariants({ variant: "ghost" }))}
+                            activeClassName="bg-accent text-accent-foreground"
                           >
                             My Plans
-                          </Link>
-                          <Link
+                          </NavLink>
+                          <NavLink
                             href="/bucket-list"
                             className={cn(buttonVariants({ variant: "ghost" }))}
+                            activeClassName="bg-accent text-accent-foreground"
                           >
                             Bucket List
-                          </Link>
-                          <Link
+                          </NavLink>
+                          <NavLink
                             href="/profile"
                             className={cn(buttonVariants({ variant: "ghost" }))}
+                            activeClassName="bg-accent text-accent-foreground"
                           >
                             Profile
-                          </Link>
+                          </NavLink>
                         </>
                       )}
                     </>

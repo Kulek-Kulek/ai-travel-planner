@@ -3,6 +3,7 @@
 import { useState, useEffect, useTransition } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
+import { NavLink } from '@/components/nav-link';
 import { 
   Menu, 
   X, 
@@ -117,80 +118,88 @@ export function MobileNav({ user, isAdmin }: MobileNavProps) {
             {/* Navigation Links */}
             <div className="flex-1 px-4 py-6 space-y-1 bg-white">
               {/* Home Link */}
-              <Link
+              <NavLink
                 href="/"
                 onClick={closeMenu}
                 className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                activeClassName="bg-gray-100 text-gray-900"
+                matchNestedPaths={false}
               >
                 <Home className="w-5 h-5" />
                 <span className="font-medium">Home</span>
-              </Link>
+              </NavLink>
 
               {/* Pricing Link - Always Visible */}
-              <Link
+              <NavLink
                 href="/pricing"
                 onClick={closeMenu}
                 className="flex items-center gap-3 px-4 py-3 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-blue-200 bg-blue-50/50"
+                activeClassName="bg-blue-50 text-blue-700 border-blue-300"
               >
                 <Sparkles className="w-5 h-5" />
                 <span className="font-semibold">Pricing Plans</span>
-              </Link>
+              </NavLink>
 
               {user && (
                 <>
                   {isAdmin ? (
                     /* Admin Navigation */
                     <>
-                      <Link
+                      <NavLink
                         href="/admin/itineraries"
                         onClick={closeMenu}
                         className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                        activeClassName="bg-gray-100 text-gray-900"
                       >
                         <LayoutDashboard className="w-5 h-5" />
                         <span className="font-semibold">Admin Dashboard</span>
-                      </Link>
+                      </NavLink>
 
-                      <Link
+                      <NavLink
                         href="/admin/users"
                         onClick={closeMenu}
                         className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                        activeClassName="bg-gray-100 text-gray-900"
                       >
                         <Users className="w-5 h-5" />
                         <span className="font-semibold">User Management</span>
-                      </Link>
+                      </NavLink>
                     </>
                   ) : (
                     /* Regular User Navigation */
                     <>
                       {/* My Plans */}
-                      <Link
+                      <NavLink
                         href="/my-plans"
                         onClick={closeMenu}
                         className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                        activeClassName="bg-gray-100 text-gray-900"
                       >
                         <ClipboardList className="w-5 h-5" />
                         <span className="font-medium">My Plans</span>
-                      </Link>
+                      </NavLink>
 
                       {/* Bucket List */}
-                      <Link
+                      <NavLink
                         href="/bucket-list"
                         onClick={closeMenu}
                         className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                        activeClassName="bg-gray-100 text-gray-900"
                       >
                         <ListCheck className="w-5 h-5" />
                         <span className="font-medium">Bucket List</span>
-                      </Link>
+                      </NavLink>
 
                       {/* Profile */}
-                      <Link
+                      <NavLink
                         href="/profile"
                         onClick={closeMenu}
                         className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                        activeClassName="bg-gray-100 text-gray-900"
                       >
                         <User className="w-5 h-5" />
                         <span className="font-medium">Profile</span>
-                      </Link>
+                      </NavLink>
                     </>
                   )}
                 </>
