@@ -71,7 +71,7 @@ function extractTravelInfo(text: string): ExtractedInfo {
     /(?:in|to|visit|visiting|explore|exploring|travel(?:l)?ing (?:on my own )?to|going to|trip to)\s+([a-zA-Z][a-zA-Z\s,\-']+?)(?:\s+for|\s+with|\s+during|\s+and|\.|,|$)/i,
     /^([a-zA-Z][a-zA-Z\s,\-']+?)(?:\s+for|\s+with|\s+trip|\s+in\s+\d|\.|,)/i,
   ];
-  
+
   for (const pattern of destinationPatterns) {
     const match = text.match(pattern);
     if (match && match[1]) {
@@ -79,7 +79,7 @@ function extractTravelInfo(text: string): ExtractedInfo {
       // Validate: reasonable length, no long numbers, not just common words
       const commonWords = ['the', 'a', 'an', 'my', 'our', 'this', 'that', 'these', 'those'];
       const isCommonWord = commonWords.includes(dest.toLowerCase());
-      
+
       if (dest.length >= 2 && dest.length <= 50 && !/\d{2,}/.test(dest) && !isCommonWord) {
         // Capitalize first letter of each word for display
         result.destination = dest
@@ -289,7 +289,7 @@ export const ItineraryForm = ({
   useEffect(() => {
     const extracted = extractTravelInfo(watchNotes);
     setExtractedInfo(extracted);
-    
+
     // Check if text is in English (for language hint)
     const isEnglish = isEnglishText(watchNotes);
     if (!isEnglish && watchNotes.length > 20) {
@@ -303,22 +303,22 @@ export const ItineraryForm = ({
       // Clear destination if extraction lost it and user hasn't manually filled fields
       form.setValue("destination", "", { shouldValidate: false });
     }
-    
+
     if (extracted.days && !form.getValues("days")) {
       form.setValue("days", extracted.days, { shouldValidate: false });
     } else if (!extracted.days && form.getValues("days") > 0 && !showDetailedFields) {
       // Clear days if extraction lost it and user hasn't manually filled fields
       form.setValue("days", 0, { shouldValidate: false });
     }
-    
+
     if (extracted.travelers && form.getValues("travelers") === 1) {
       form.setValue("travelers", extracted.travelers, { shouldValidate: false });
     }
-    
+
     if (extracted.children && !form.getValues("children")) {
       form.setValue("children", extracted.children, { shouldValidate: false });
     }
-    
+
     if (extracted.hasAccessibilityNeeds) {
       form.setValue("hasAccessibilityNeeds", true, { shouldValidate: false });
     }
@@ -375,7 +375,7 @@ export const ItineraryForm = ({
   const handleFormError = () => {
     // If there are errors, show the detailed fields
     setShowDetailedFields(true);
-    
+
     toast.error("Please provide missing information", {
       description: "We need a few more details to generate your perfect itinerary",
     });
@@ -401,11 +401,11 @@ export const ItineraryForm = ({
             name="notes"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-lg font-semibold text-slate-900">
+                <FormLabel className="text-lg font-semibold !text-slate-900">
                   Describe your ideal trip
                 </FormLabel>
                 <FormDescription className="text-sm text-slate-500">
-                  Tell us about your travel plans in your own words. Include where you want to go, 
+                  Tell us about your travel plans in your own words. Include where you want to go,
                   for how long, who&apos;s traveling, and what you&apos;d like to experience.
                 </FormDescription>
                 <FormControl>
@@ -431,7 +431,7 @@ export const ItineraryForm = ({
                           Non-English text detected
                         </p>
                         <p className="text-xs text-amber-700 mt-1">
-                          Automatic extraction works best with English descriptions. 
+                          Automatic extraction works best with English descriptions.
                           For multilingual support with high accuracy, consider upgrading to Premium (AI-powered extraction).
                         </p>
                       </div>
@@ -504,8 +504,8 @@ export const ItineraryForm = ({
                               Pro tip: Add your travel dates for a more precise plan!
                             </p>
                             <p className="text-xs text-blue-700 mt-1">
-                              Knowing your specific dates helps us recommend seasonal activities, 
-                              check for local events, and suggest the best times to visit attractions. 
+                              Knowing your specific dates helps us recommend seasonal activities,
+                              check for local events, and suggest the best times to visit attractions.
                               Click below to add them.
                             </p>
                             <button
@@ -775,8 +775,8 @@ export const ItineraryForm = ({
                             const numValue = parseInt(e.target.value, 10);
                             const value =
                               e.target.value === "" ||
-                              Number.isNaN(numValue) ||
-                              numValue === 0
+                                Number.isNaN(numValue) ||
+                                numValue === 0
                                 ? undefined
                                 : numValue;
                             field.onChange(value);

@@ -88,8 +88,8 @@ const itineraryFormSchema = z
     hasAccessibilityNeeds: z.boolean().optional(),
     notes: z
       .string()
-      .min(20, "Please provide at least 20 characters describing your trip")
-      .max(500, "Notes must be less than 500 characters"),
+      .min(15, "Please provide at least 15 characters describing your trip")
+      .max(250, "Notes must be less than 250 characters"),
     model: z.enum(OPENROUTER_MODEL_VALUES, {
       message: "Select an AI provider",
     }),
@@ -499,7 +499,7 @@ export const ItineraryFormAIEnhanced = ({
             name="notes"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-lg font-semibold text-slate-900">
+                <FormLabel className="text-lg font-semibold !text-slate-900">
                   Describe your ideal trip
                 </FormLabel>
                 <FormDescription className="text-sm text-slate-500">
@@ -513,7 +513,7 @@ export const ItineraryFormAIEnhanced = ({
                       className="min-h-[130px] resize-y rounded-[26px] border-0 bg-white/90 px-5 py-4 text-base leading-7 text-slate-900 shadow-sm focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-0"
                       {...field}
                       disabled={isLoading || isFormDisabled}
-                      maxLength={500}
+                      maxLength={250}
                     />
                   </div>
                 </FormControl>
@@ -521,10 +521,10 @@ export const ItineraryFormAIEnhanced = ({
                   <span>Be specific about your destination, duration, and interests</span>
                   <span className={cn(
                     "font-medium",
-                    watchNotes.length > 450 && "text-amber-600",
-                    watchNotes.length === 500 && "text-red-600"
+                    watchNotes.length > 200 && "text-amber-600",
+                    watchNotes.length === 250 && "text-red-600"
                   )}>
-                    {watchNotes.length}/500
+                    {watchNotes.length}/250
                   </span>
                 </div>
                 {isFormDisabled && (

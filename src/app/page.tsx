@@ -896,12 +896,14 @@ export default function Home() {
               )}
 
               <div className="flex items-center justify-between gap-4">
-                <h2 className="text-2xl font-semibold text-slate-900">Preview</h2>
+                <h2 className="text-2xl font-semibold text-slate-900">
+                  {result ? "Your Itinerary" : "Preview"}
+                </h2>
                 <span
                   aria-live="polite"
                   className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${mutation.isPending && !userCancelled
-                      ? "bg-indigo-100 text-indigo-700"
-                      : "bg-emerald-100 text-emerald-700"
+                    ? "bg-indigo-100 text-indigo-700"
+                    : "bg-emerald-100 text-emerald-700"
                     }`}
                 >
                   {mutation.isPending && !userCancelled ? "Generating" : "Ready"}

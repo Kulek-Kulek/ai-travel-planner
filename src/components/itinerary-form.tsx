@@ -202,7 +202,7 @@ export const ItineraryForm = ({
             name="notes"
             render={({ field }) => (
               <FormItem>
-                <FormLabel className="text-lg font-semibold text-slate-900">
+                <FormLabel className="text-lg font-semibold !text-slate-900">
                   Describe your ideal trip
                 </FormLabel>
                 <FormDescription className="text-sm text-slate-500">
