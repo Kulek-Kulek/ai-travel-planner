@@ -128,7 +128,7 @@ const aiResponseSchema = z.object({
 
 type ActionResult<T> =
   | { success: true; data: T }
-  | { success: false; error: string };
+  | { success: false; error: string; requireAuth?: boolean };
 
 // Saved itinerary response (includes database ID)
 type SavedItinerary = z.infer<typeof aiResponseSchema> & {
@@ -214,24 +214,47 @@ export async function generateItinerary(
       data: { user },
     } = await supabase.auth.getUser();
 
-    // 1.5. Verify Turnstile token (bot protection) - only required for unauthenticated users
-    // Authenticated users editing/regenerating their itineraries are already verified
-    if (!user?.id && !validated.turnstileToken) {
-      console.error('❌ Missing Turnstile token for unauthenticated user');
-      return {
-        success: false,
-        error: 'Security verification required. Please refresh the page and try again.',
-      };
-    }
+    // 1.5. CRITICAL SECURITY: Anonymous user validation
+    // Prevent abuse via refresh/storage clearing (each request costs real money!)
+    let anonymousSessionToken: string | undefined;
     
-    if (!user?.id && validated.turnstileToken) {
+    if (!user?.id) {
+      // Step 1: Require Turnstile token for EVERY anonymous request
+      if (!validated.turnstileToken) {
+        return {
+          success: false,
+          error: 'Security verification required. Please refresh the page and try again.',
+        };
+      }
+      
+      // Step 2: Verify Turnstile token
       const isValidToken = await verifyTurnstileToken(validated.turnstileToken);
       if (!isValidToken) {
-        console.error('❌ Invalid Turnstile token - possible bot activity');
         return {
           success: false,
           error: 'Security verification failed. Please refresh the page and try again.',
         };
+      }
+      
+      // Step 3: Validate anonymous session (prevents refresh/clear storage bypass)
+      const { validateAnonymousSession, trackTurnstileVerification } = await import(
+        '@/lib/utils/anonymous-session'
+      );
+      
+      const sessionValidation = await validateAnonymousSession();
+      if (!sessionValidation.valid) {
+        return {
+          success: false,
+          error: sessionValidation.reason || 'Session validation failed',
+          requireAuth: sessionValidation.requireAuth,
+        };
+      }
+      
+      anonymousSessionToken = sessionValidation.sessionToken;
+      
+      // Track Turnstile completion for analytics
+      if (anonymousSessionToken) {
+        await trackTurnstileVerification(anonymousSessionToken);
       }
     }
 
@@ -239,7 +262,7 @@ export async function generateItinerary(
     const modelKey = await mapOpenRouterModelToKey(validated.model);
 
     // 2.5. Check rate limits for ALL users (authenticated and anonymous)
-    // This prevents abuse even with valid Turnstile tokens
+    // Defense-in-depth: IP rate limit + session limit + tier limit
     const rateLimitCheck = await checkRateLimit();
     if (!rateLimitCheck.allowed) {
       console.warn('⚠️ Rate limit exceeded for user:', user?.id || 'anonymous');
@@ -509,11 +532,23 @@ export async function generateItinerary(
       }
       
     } else {
-      // ✅ ANONYMOUS USER: Use atomic transaction function (HIGH-1)
-      // This ensures consistency and proper usage logging even for anonymous users
+      // ✅ ANONYMOUS USER: Use session-validated atomic transaction (CRITICAL SECURITY)
+      // This ensures:
+      // 1. Session validation (prevents refresh/clear storage bypass)
+      // 2. Atomicity (database writes + logging)
+      // 3. Strict limit enforcement (1 itinerary per session)
+      
+      if (!anonymousSessionToken) {
+        return {
+          success: false,
+          error: 'Session validation failed. Please refresh the page.',
+        };
+      }
+      
       const { data, error } = await supabase.rpc(
-        'create_anonymous_itinerary_with_transaction',
+        'create_anonymous_itinerary_with_session_check',
         {
+          p_session_token: anonymousSessionToken,
           p_destination: validated.destination,
           p_days: validated.days,
           p_travelers: validated.travelers,
@@ -533,10 +568,39 @@ export async function generateItinerary(
       );
       
       if (error || !data?.success) {
-        console.error("Transaction failed:", error || data?.error);
+        // Handle specific error types from session validation
+        if (data?.error === 'INVALID_SESSION') {
+          return {
+            success: false,
+            error: 'Your session has expired. Please refresh the page.',
+          };
+        }
+        
+        if (data?.error === 'SESSION_BLOCKED') {
+          return {
+            success: false,
+            error: data.message || 'Your session is temporarily blocked.',
+          };
+        }
+        
+        if (data?.error === 'LIMIT_EXCEEDED') {
+          return {
+            success: false,
+            error: 'You have already created a draft itinerary. Please sign in to create more travel plans.',
+            requireAuth: true,
+          };
+        }
+        
+        if (data?.error === 'SESSION_EXPIRED') {
+          return {
+            success: false,
+            error: 'Your session has expired. Please refresh the page.',
+          };
+        }
+        
         return {
           success: false,
-          error: data?.error || error?.message || "Failed to save itinerary. Please try again or sign in.",
+          error: data?.message || error?.message || "Failed to save itinerary. Please try again or sign in.",
         };
       }
       
