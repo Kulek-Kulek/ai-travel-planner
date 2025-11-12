@@ -28,15 +28,7 @@ export function SecurityAlertDialog({
   severity = 'error',
   detectedIssues = [],
 }: SecurityAlertDialogProps) {
-  // Debug logging
-  if (open) {
-    console.log('🔴 SecurityAlertDialog rendering with open=true', {
-      severity,
-      description: description.substring(0, 100) + '...',
-      detectedIssues
-    });
-  }
-  
+
   // Determine icon and colors based on severity
   const getIconAndColors = () => {
     switch (severity) {
@@ -99,7 +91,7 @@ export function SecurityAlertDialog({
 
         <div className="rounded-lg border bg-muted/30 p-4">
           <p className="text-sm text-muted-foreground">
-            <strong className="text-foreground">Note:</strong> Our system protects against prompt injection, 
+            <strong className="text-foreground">Note:</strong> Our system protects against prompt injection,
             fake destinations, and inappropriate content to ensure a safe travel planning experience.
           </p>
         </div>
@@ -109,7 +101,7 @@ export function SecurityAlertDialog({
             onClick={() => onOpenChange(false)}
             className="w-full sm:w-auto"
           >
-           Yes, I understand
+            Yes, I understand
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
