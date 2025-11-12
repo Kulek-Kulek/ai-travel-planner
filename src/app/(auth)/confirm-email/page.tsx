@@ -95,19 +95,19 @@ export default function ConfirmEmailPage() {
           </h2>
           <ol className="space-y-2.5 sm:space-y-3 text-sm sm:text-base text-gray-700">
             <li className="flex items-start gap-2.5">
-              <span className="font-semibold text-blue-600 min-w-[1.5rem]">1.</span>
+              <span className="font-semibold text-blue-600">1.</span>
               <span>Open your email inbox</span>
             </li>
             <li className="flex items-start gap-2.5">
-              <span className="font-semibold text-blue-600 min-w-[1.5rem]">2.</span>
+              <span className="font-semibold text-blue-600">2.</span>
               <span>Look for an email from AI Travel Planner</span>
             </li>
             <li className="flex items-start gap-2.5">
-              <span className="font-semibold text-blue-600 min-w-[1.5rem]">3.</span>
+              <span className="font-semibold text-blue-600">3.</span>
               <span>Click the confirmation link</span>
             </li>
             <li className="flex items-start gap-2.5">
-              <span className="font-semibold text-blue-600 min-w-[1.5rem]">4.</span>
+              <span className="font-semibold text-blue-600">4.</span>
               <span>Choose your plan and start planning!</span>
             </li>
           </ol>
