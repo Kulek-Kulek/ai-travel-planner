@@ -48,7 +48,7 @@ export default function SignUpPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden px-4 py-8 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600">
+    <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden px-4 py-6 sm:py-8 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600">
       {/* Background blur effects */}
       <div aria-hidden className="pointer-events-none absolute inset-0">
         <div className="absolute -left-24 top-0 h-72 w-72 rounded-full bg-white/10 blur-3xl" />
@@ -56,7 +56,7 @@ export default function SignUpPage() {
       </div>
       
       {/* Navigation */}
-      <div className="w-full max-w-md mb-4 relative z-10">
+      <div className="w-full max-w-lg mb-4 sm:mb-6 relative z-10">
         <Link 
           href="/"
           className="inline-flex items-center gap-2 text-white/90 hover:text-white transition-colors group"
@@ -66,12 +66,12 @@ export default function SignUpPage() {
         </Link>
       </div>
       
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl p-5 relative z-10 max-h-[calc(100vh-8rem)] overflow-y-auto">
-        <div className="text-center mb-4">
-          <h1 className="text-2xl font-bold text-gray-900">Create Account</h1>
-          <p className="text-xs text-gray-600 mt-1">Sign up to save your itineraries</p>
-          <div className="mt-2 px-2 py-1.5 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-xs text-blue-800">
+      <div className="max-w-lg w-full bg-white rounded-2xl shadow-2xl p-6 sm:p-8 relative z-10">
+        <div className="text-center mb-5 sm:mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Create Account</h1>
+          <p className="text-sm sm:text-base text-gray-600 mt-2">Sign up to save your itineraries</p>
+          <div className="mt-4 px-4 sm:px-5 py-3 sm:py-3.5 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm sm:text-base text-blue-800 font-medium">
             You&apos;ll need to confirm your email
             </p>
           </div>
@@ -81,11 +81,11 @@ export default function SignUpPage() {
         <Button
           type="button"
           variant="outline"
-          className="w-full mb-3 flex items-center justify-center gap-3 h-9"
+          className="w-full mb-4 sm:mb-5 flex items-center justify-center gap-3 h-11"
           onClick={handleGoogleSignUp}
           disabled={isPending}
         >
-          <svg className="w-4 h-4" viewBox="0 0 24 24">
+          <svg className="w-5 h-5" viewBox="0 0 24 24">
             <path
               fill="#4285F4"
               d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -107,44 +107,44 @@ export default function SignUpPage() {
         </Button>
 
         {/* Divider */}
-        <div className="relative mb-3">
+        <div className="relative mb-4 sm:mb-5">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-gray-300"></div>
           </div>
-          <div className="relative flex justify-center text-xs">
+          <div className="relative flex justify-center text-sm">
             <span className="px-2 bg-white text-gray-500">Or continue with email</span>
           </div>
         </div>
 
-        <form action={handleSubmit} className="space-y-3">
+        <form action={handleSubmit} className="space-y-4 sm:space-y-5">
           {/* Hidden itineraryId field */}
           {draftId && (
             <input type="hidden" name="itineraryId" value={draftId} />
           )}
           
           {/* Name */}
-          <div className="space-y-1">
-            <Label htmlFor="name" className="text-xs">Name</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="name" className="text-sm sm:text-base">Name</Label>
             <Input
               id="name"
               name="name"
               type="text"
-              placeholder="Kris, Kris Smith, or any nickname"
+              placeholder="Your name"
               required
               disabled={isPending}
-              className="h-9 text-sm"
+              className="h-11 text-sm sm:text-base"
             />
-            <p className="text-[10px] text-gray-500">
+            <p className="text-xs sm:text-sm text-gray-500">
               Appears on your itineraries
             </p>
             {errors.name && (
-              <p className="text-xs text-red-600">{errors.name[0]}</p>
+              <p className="text-xs sm:text-sm text-red-600">{errors.name[0]}</p>
             )}
           </div>
 
           {/* Email */}
-          <div className="space-y-1">
-            <Label htmlFor="email" className="text-xs">Email</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="email" className="text-sm sm:text-base">Email</Label>
             <Input
               id="email"
               name="email"
@@ -152,16 +152,16 @@ export default function SignUpPage() {
               placeholder="you@example.com"
               required
               disabled={isPending}
-              className="h-9 text-sm"
+              className="h-11 text-sm sm:text-base"
             />
             {errors.email && (
-              <p className="text-xs text-red-600">{errors.email[0]}</p>
+              <p className="text-xs sm:text-sm text-red-600">{errors.email[0]}</p>
             )}
           </div>
 
           {/* Password */}
-          <div className="space-y-1">
-            <Label htmlFor="password" className="text-xs">Password</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="password" className="text-sm sm:text-base">Password</Label>
             <Input
               id="password"
               name="password"
@@ -169,16 +169,16 @@ export default function SignUpPage() {
               placeholder="At least 8 characters"
               required
               disabled={isPending}
-              className="h-9 text-sm"
+              className="h-11 text-sm sm:text-base"
             />
             {errors.password && (
-              <p className="text-xs text-red-600">{errors.password[0]}</p>
+              <p className="text-xs sm:text-sm text-red-600">{errors.password[0]}</p>
             )}
           </div>
 
           {/* Confirm Password */}
-          <div className="space-y-1">
-            <Label htmlFor="confirmPassword" className="text-xs">Confirm Password</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="confirmPassword" className="text-sm sm:text-base">Confirm Password</Label>
             <Input
               id="confirmPassword"
               name="confirmPassword"
@@ -186,27 +186,27 @@ export default function SignUpPage() {
               placeholder="••••••••"
               required
               disabled={isPending}
-              className="h-9 text-sm"
+              className="h-11 text-sm sm:text-base"
             />
             {errors.confirmPassword && (
-              <p className="text-xs text-red-600">{errors.confirmPassword[0]}</p>
+              <p className="text-xs sm:text-sm text-red-600">{errors.confirmPassword[0]}</p>
             )}
           </div>
 
           {/* General errors */}
           {errors.general && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-xs">
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm">
               {errors.general[0]}
             </div>
           )}
 
           {/* Submit Button */}
-          <Button type="submit" className="w-full h-9 text-sm" disabled={isPending}>
+          <Button type="submit" className="w-full h-11" disabled={isPending}>
             {isPending ? 'Creating account...' : 'Sign Up'}
           </Button>
         </form>
 
-        <div className="mt-3 text-center text-xs text-gray-600">
+        <div className="mt-5 sm:mt-6 text-center text-sm sm:text-base text-gray-600">
           Already have an account?{' '}
           <Link 
             href={draftId ? `/sign-in?itineraryId=${draftId}` : "/sign-in"} 
