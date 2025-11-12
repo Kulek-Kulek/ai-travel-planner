@@ -116,7 +116,7 @@ export default function ConfirmEmailPage() {
         {/* Tips */}
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 sm:p-5 mb-5">
           <p className="text-sm sm:text-base text-gray-700">
-            <span className="font-semibold text-gray-900">💡 Tip:</span> Can&apos;t find the email?
+            <span className="font-semibold text-gray-900">Tip:</span> Can&apos;t find the email?
             Check your spam folder.
           </p>
         </div>
