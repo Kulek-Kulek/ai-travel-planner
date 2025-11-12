@@ -48,7 +48,7 @@ export type DeletedUserRow = Database['public']['Tables']['deleted_users']['Row'
  */
 export type ActionResult<T> =
   | { success: true; data: T }
-  | { success: false; error: string };
+  | { success: false; error: string; requireAuth?: boolean };
 
 /**
  * Pagination parameters for list queries

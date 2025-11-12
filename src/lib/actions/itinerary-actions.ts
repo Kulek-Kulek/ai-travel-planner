@@ -191,14 +191,13 @@ export async function claimDraftItinerary(itineraryId: string): Promise<ActionRe
     const { data: { user } } = await supabase.auth.getUser();
     
     if (!user) {
-      console.error('🔍 claimDraftItinerary: User not authenticated');
       return {
         success: false,
         error: 'You must be logged in to claim this itinerary',
       };
     }
     
-    // First, let's check what the current status is
+    // Check what the current status is
     const { data: existingItinerary, error: fetchError } = await supabase
       .from('itineraries')
       .select('id, status, user_id, is_private')
@@ -206,7 +205,6 @@ export async function claimDraftItinerary(itineraryId: string): Promise<ActionRe
       .single();
     
     if (fetchError) {
-      console.error('claimDraftItinerary: Error fetching itinerary:', fetchError);
       return {
         success: false,
         error: 'Failed to find itinerary',
@@ -220,7 +218,6 @@ export async function claimDraftItinerary(itineraryId: string): Promise<ActionRe
     
     // If already published but belongs to someone else, can't claim
     if (existingItinerary.status === 'published' && existingItinerary.user_id && existingItinerary.user_id !== user.id) {
-      console.error('claimDraftItinerary: Itinerary already belongs to another user');
       return {
         success: false,
         error: 'This itinerary already belongs to another user',
@@ -236,45 +233,38 @@ export async function claimDraftItinerary(itineraryId: string): Promise<ActionRe
       });
     
     if (!tierCheck || !tierCheck.allowed) {
-      console.warn('⚠️ claimDraftItinerary: User has exceeded tier limit');
       return {
         success: false,
         error: tierCheck?.reason || 'You have reached your plan generation limit. Please upgrade to save this itinerary.',
       };
     }
     
-    // Update the itinerary to published and assign to user
-    const { data, error } = await supabase
+    // Use database function to claim itinerary
+    // This automatically decrements the anonymous session counter
+    // so the claimed itinerary doesn't count against anonymous limit
+    const { data: claimResult, error: claimError } = await supabase
+      .rpc('claim_anonymous_itinerary', {
+        p_itinerary_id: itineraryId,
+        p_user_id: user.id,
+      });
+    
+    if (claimError || !claimResult?.success) {
+      return {
+        success: false,
+        error: claimResult?.error || claimError?.message || 'Failed to save itinerary',
+      };
+    }
+    
+    // Fetch the claimed itinerary to get model info
+    const { data: claimedItinerary } = await supabase
       .from('itineraries')
-      .update({
-        user_id: user.id,
-        status: 'published',
-        is_private: false, // Explicitly set to public
-      })
+      .select('ai_model_used')
       .eq('id', itineraryId)
-      .eq('status', 'draft') // Only update if it's still a draft
-      .select(); // Return the updated row
-    
-    if (error) {
-      console.error('claimDraftItinerary: Database error:', error);
-      return {
-        success: false,
-        error: 'Failed to save itinerary',
-      };
-    }
-    
-    if (!data || data.length === 0) {
-      console.warn('claimDraftItinerary: No rows updated. Itinerary might not be a draft or does not exist.');
-      return {
-        success: false,
-        error: 'Itinerary could not be claimed. It may have already been saved.',
-      };
-    }
+      .single();
     
     // Record the plan generation to increment the user's plan count
     // This is important for tier limit tracking
-    const claimedItinerary = data[0];
-    const modelUsed = claimedItinerary.ai_model_used || 'gemini-flash';
+    const modelUsed = claimedItinerary?.ai_model_used || 'gemini-flash';
     
     // Import recordPlanGeneration dynamically to avoid circular dependency
     const { recordPlanGeneration } = await import('./subscription-actions');
@@ -285,13 +275,12 @@ export async function claimDraftItinerary(itineraryId: string): Promise<ActionRe
     );
     
     if (!recordResult.success) {
-      console.error('Failed to record plan generation after claiming:', recordResult.error);
       // Don't fail the whole operation, the itinerary is already claimed
+      // Just log silently for debugging
     }
     
     return { success: true, data: undefined };
-  } catch (error) {
-    console.error('Error in claimDraftItinerary:', error);
+  } catch {
     return {
       success: false,
       error: 'An unexpected error occurred',

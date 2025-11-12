@@ -557,9 +557,11 @@ async function checkIPRateLimit(): Promise<{
     return { allowed: true };
   }
   
-  // IP rate limits (stricter than authenticated users)
-  const IP_HOURLY_LIMIT = 10;
-  const IP_DAILY_LIMIT = 20;
+  // IP rate limits (STRICT for anonymous users to prevent API cost abuse)
+  // Each anonymous request costs real money via OpenRouter API
+  // Defense against: refresh page bypass, storage clearing, VPN rotation
+  const IP_HOURLY_LIMIT = 2;  // Reduced from 10 to 2 (CRITICAL SECURITY FIX)
+  const IP_DAILY_LIMIT = 3;   // Reduced from 20 to 3 (CRITICAL SECURITY FIX)
   
   // Check hourly limit
   const hourAgo = new Date(Date.now() - 60 * 60 * 1000);

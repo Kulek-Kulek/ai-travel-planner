@@ -370,8 +370,8 @@ export default function Home() {
         return;
       }
       if (response.success) {
-        // Trigger confetti effect
-        triggerConfetti();
+        // NOTE: Confetti is now triggered via useEffect when banner closes
+        // This ensures perfect synchronization between banner closing and confetti firing
 
         // Show success toast
         toast.success("Itinerary generated!", {
@@ -709,6 +709,30 @@ export default function Home() {
     };
   }, []);
 
+  // 🎊 Trigger confetti when Preview banner closes (when generation completes)
+  // This ensures confetti fires at the exact moment the banner transitions from "Generating" to "Ready"
+  const prevIsPendingRef = useRef(mutation.isPending);
+
+  useEffect(() => {
+    // Detect the transition: was pending → now not pending AND we have a result
+    const wasGenerating = prevIsPendingRef.current;
+    const isNowReady = !mutation.isPending;
+    const hasResult = !!result;
+
+    // Fire confetti when banner closes (generation completes successfully)
+    if (wasGenerating && isNowReady && hasResult && !cancelledRef.current) {
+      // Small delay to let the "Ready" badge render first, then confetti
+      const confettiTimeout = setTimeout(() => {
+        triggerConfetti();
+      }, 150); // 150ms delay for perfect visual sync
+
+      scrollTimeoutRefs.current.push(confettiTimeout);
+    }
+
+    // Update the ref for next render
+    prevIsPendingRef.current = mutation.isPending;
+  }, [mutation.isPending, result]);
+
   // Cleanup all scroll timeouts on unmount
   useEffect(() => {
     return () => {
@@ -900,8 +924,8 @@ export default function Home() {
                 <span
                   aria-live="polite"
                   className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${mutation.isPending && !userCancelled
-                      ? "bg-indigo-100 text-indigo-700"
-                      : "bg-emerald-100 text-emerald-700"
+                    ? "bg-indigo-100 text-indigo-700"
+                    : "bg-emerald-100 text-emerald-700"
                     }`}
                 >
                   {mutation.isPending && !userCancelled ? "Generating" : "Ready"}
