@@ -7,7 +7,6 @@ import { describe, it, expect, vi } from 'vitest';
 import { generateItinerary } from '@/lib/actions/ai-actions';
 import {
   updateItinerary,
-  deleteItinerary,
 } from '@/lib/actions/itinerary-actions';
 
 // Mock Supabase client

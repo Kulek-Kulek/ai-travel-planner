@@ -12,6 +12,7 @@ import { GoogleMapsButton } from '@/components/google-maps-button';
 import { ScrollToTop } from '@/components/scroll-to-top';
 import { isGoogleMapsEnabled } from '@/lib/config/google-maps';
 import { createClient } from '@/lib/supabase/server';
+import { generateBookingLink } from '@/lib/utils/booking-affiliate';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -230,14 +231,19 @@ export default async function ItineraryPage({
           />
         )}
 
-        {/* Quick Booking Button - Always visible */}
+        {/* Quick Booking Button - Always visible for itineraries without dates */}
         {!start_date || !end_date ? (
           <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-3">
               Find Hotels in {ai_plan.city || destination}
             </h3>
             <a
-              href={`https://www.booking.com/searchresults.html?ss=${encodeURIComponent(ai_plan.city || destination)}&aid=2388329`}
+              href={generateBookingLink({
+                destination: ai_plan.city || destination,
+                adults: travelers,
+                children: children || 0,
+                childAges: child_ages || [],
+              })}
               target="_blank"
               rel="noopener noreferrer"
               className="w-full group relative overflow-hidden rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-6 py-3 transition-all duration-200 hover:shadow-lg active:scale-[0.98] flex items-center justify-center gap-2 text-white font-semibold"

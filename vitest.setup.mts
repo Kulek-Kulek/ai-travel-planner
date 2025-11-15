@@ -2,9 +2,10 @@
 import { expect, vi } from 'vitest'
 
 // Suppress console output during tests
-const originalConsoleError = console.error
-const originalConsoleWarn = console.warn
-const originalConsoleLog = console.log
+// Store original methods in case we need them for debugging later
+// const originalConsoleError = console.error
+// const originalConsoleWarn = console.warn
+// const originalConsoleLog = console.log
 
 console.error = vi.fn()
 console.warn = vi.fn()
