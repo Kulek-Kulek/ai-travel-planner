@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { validateContentWithAI, validateContentBasic } from '../ai-content-validator';
+import { validateContentBasic } from '../ai-content-validator';
 
 describe('AI Content Validator - Basic (No API)', () => {
   describe('validateContentBasic', () => {
