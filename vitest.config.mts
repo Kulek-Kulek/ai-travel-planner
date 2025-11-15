@@ -7,7 +7,10 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    setupFiles: ['./vitest.setup.ts'],
+    setupFiles: ['./vitest.setup.mts'],
+    // Suppress console output during tests
+    silent: false,
+    onConsoleLog: () => false, // Hide all console.log output
     include: [
       '**/__tests__/**/*.test.ts', 
       '**/__tests__/**/*.test.tsx',

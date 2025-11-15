@@ -1,5 +1,20 @@
 // Vitest setup file for global test configuration
-import { expect } from 'vitest'
+import { expect, vi } from 'vitest'
+
+// Suppress console output during tests
+const originalConsoleError = console.error
+const originalConsoleWarn = console.warn
+const originalConsoleLog = console.log
+
+console.error = vi.fn()
+console.warn = vi.fn()
+console.log = vi.fn()
+
+// Restore original console methods after all tests (optional, for debugging)
+// Uncomment these lines if you need to see console output for debugging:
+// console.error = originalConsoleError
+// console.warn = originalConsoleWarn
+// console.log = originalConsoleLog
 
 // Mock environment variables for tests
 process.env.OPENAI_API_KEY = 'test-api-key'
